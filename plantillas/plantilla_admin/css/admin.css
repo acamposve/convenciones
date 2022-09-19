@@ -1,0 +1,926 @@
+/* CSS Document */
+.botones 	{  
+font-family: Verdana; 
+font-size: 9pt; 
+color: #FFFFFF; 
+background-color:#6d0c06; 
+border-color: #000000 ; 
+border-top-width: 1pix; 
+border-right-width: 1pix; 
+border-bottom-width: 1pix; 
+border-left-width: 1pix;
+}
+.texto{
+font-family:Verdana, Arial, Helvetica, sans-serif;
+font-size:10px;
+color:#000000;
+font-weight:bold;
+background-color:#959292;
+
+}
+
+.texto_simple{
+font-family:Verdana, Arial, Helvetica, sans-serif;
+font-size:12px;
+color:#000000;
+}
+
+
+.entrar{
+	border:#003300;
+	font-weight:bold;
+	height:0;
+	width:0;
+	cursor:hand;
+}
+
+
+.textfield{
+border-color:#000000;
+border-style:solid;
+border-width:1;
+font-size:12px;
+
+}
+
+.verdana_blanco{
+font-family:Verdana, Arial, Helvetica, sans-serif;
+font-size:10px;
+color:#FFFFFF;
+font-weight:bold;
+}
+
+.verdana_blanco2{
+font-family:Verdana, Arial, Helvetica, sans-serif;
+font-size:10px;
+color:#8f2323;
+font-weight:bold;
+}
+
+.a:link {
+	color: #0000CC;
+	text-decoration: none;
+}
+a:visited {
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: none;
+	color: #000000;
+}
+a:active {
+	text-decoration: none;
+	color: #000000;
+}
+.Estilo4 {font-size: 12px; color: #000000; font-family: Verdana, Arial, Helvetica, sans-serif; }
+.Estilo5 {font-size: 10px}
+.Estilo8 {font-size: 10px; color: #000000; font-family: Verdana, Arial, Helvetica, sans-serif; }
+
+.botonGuardar{
+	background:url(../../../admin/modulos/tablas/media/boton_guardar.jpg);
+	font:Verdana, Arial, Helvetica, sans-serif;
+	font-size:10px;
+	font-weight:bold;
+	background-attachment:inherit;
+	border:0;
+	height:15;
+	width:66;
+	cursor:pointer;
+}
+.botonImprimir{ 
+	background:url(../../../admin/modulos/tablas/media/boton_imprimir.jpg);
+	font:Verdana, Arial, Helvetica, sans-serif;
+	font-size:10px;
+	font-weight:bold;
+	background-attachment:inherit;
+	border:0;
+	height:15;
+	width:66;
+	cursor:pointer;
+}
+.titulo {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 10px;
+	color: #CC6666;
+}
+
+.tituloCabecera{
+	font-family:Verdana, Arial, Helvetica, sans-serif;
+	font-size:16px;
+	color:#000000;
+}
+.tex {
+	font-family: Tw Cen MT;
+	font-size: 14px;
+	font-style: normal;
+	line-height: normal;
+	font-weight: bold;
+	font-variant: normal;
+	color: #ffffff;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	 }
+	 
+.tex2 {
+	font-family: Tw Cen MT;
+	font-size: 24px;
+	font-style: normal;
+	line-height: normal;
+	font-weight: bold;
+	font-variant: normal;
+	color: #ffffff;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	 }
+	 
+.tex3 {
+	font-family: Tw Cen MT;
+	font-size: 14px;
+	font-style: normal;
+	line-height: normal;
+	font-weight: bold;
+	font-variant: normal;
+	color: #8f2323;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	 }
+.tex4 {
+	font-family: Tw Cen MT;
+	font-size: 24px;
+	font-style: normal;
+	line-height: normal;
+	font-weight: bold;
+	font-variant: normal;
+	color: #8f2323;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	 }
+.tex5 {
+	font-family: Tw Cen MT;
+	font-size: 12px;
+	font-style: normal;
+	line-height: normal;
+	font-weight: bold;
+	font-variant: normal;
+	color: #ffffff;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	 }
+
+.texMenu {
+	font-family: Tw Cen MT;
+	font-size: 14px;
+	font-style: normal;
+	line-height: normal;
+	font-variant: normal;
+	color: #000000;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px;
+	 }
+
+
+
+/*ESTILOS CCCOL
+/*ESTILOS CCCOL
+/*ESTILOS CCCOL
+
+
+
+	 @charset "utf-8";
+/*
+					Hoja de Estilo para CCCOL
+*/
+/*===============================================================================
+									General
+===============================================================================*/
+
+img /* todas las imagenes */
+{
+	border:none;
+	margin:0;
+	padding:0;
+}
+/*------------------------------------------------------------------------------*/
+
+p
+{
+	letter-spacing:1px;
+	margin-top:6px;
+	margin-bottom:2px;
+}
+
+/*------------------------------------------------------------------------------*/
+
+h3
+{
+	font-size:16px;
+	margin:0;
+	margin-bottom:12px;
+}
+/*------------------------------------------------------------------------------*/
+
+h4 /* todos los titulos h4 */
+{
+	margin:0;
+	padding:0;
+}
+/*------------------------------------------------------------------------------*/
+
+li /* todos los li */
+{
+	list-style:inside;
+}
+/*------------------------------------------------------------------------------*/
+
+a /* todos los links */
+{
+	color:#000000;
+	background-color:transparent;
+	text-decoration:none;
+}
+
+a:hover /* todos los links con mouse encima */
+{
+	text-decoration:underline;
+}
+/*------------------------------------------------------------------------------*/
+
+.clearfloat /* fix para divs flotantes en plantilla */
+{
+	clear:both;
+    height:0;
+    font-size: 1px;
+    line-height: 0px;
+}
+/*------------------------------------------------------------------------------*/
+
+.textAlignRight
+{
+	text-align:right;
+	font-size:12px;
+}
+/*------------------------------------------------------------------------------*/
+
+.textAlignLeft
+{
+	text-align:left;
+	font-size:12px;
+}
+/*------------------------------------------------------------------------------*/
+
+.textAlignCenter
+{
+	text-align:center;
+	font-size:12px;
+}
+/*------------------------------------------------------------------------------*/
+
+.textAlignJustify
+{
+	text-align:justify;
+	font-size:12px;
+}
+
+.bold
+{
+	font-weight:bold;
+}
+/*------------------------------------------------------------------------------*/
+/*===============================================================================
+									Navegación
+									
+							Elementos que son bloques
+===============================================================================*/
+
+body
+{
+	background-color:#d9d7d7;
+	color:#000000;
+	padding:0;
+	margin:0;
+	text-align:center;
+}
+/*------------------------------------------------------------------------------*/
+
+cabecera /* barra unicolor azul */
+{
+	background-color:#6d0c07;
+	height:47px;
+	display:block;
+	margin:0px auto 2px;
+	padding:0px;
+}
+.cabecera_UP /* barra unicolor azul */
+{
+	background-color:#6d0c07;
+	height:47px;
+	display:block;
+	margin:0px auto 2px;
+	padding:0px;
+}
+
+/*------------------------------------------------------------------------------*/
+
+.cabLogin
+{
+	background-image:url(images/cabLogin.jpg);
+	background-position:left top;
+	background-repeat:no-repeat;
+	text-align:left;
+	height:25px;
+	color:inherit;
+	margin:0;
+	margin-left:210px;
+	color:#FFFFFF;
+}
+
+.cabLogin img
+{
+	float:left;
+	clear:left;
+}
+.cabLogin p
+{
+	margin:0;
+	padding-top:5px;
+	font-weight:bold;
+	text-align:right;
+	word-spacing:10px;
+	padding-right:10px;
+}
+
+
+/*------------------------------------------------------------------------------*/
+
+.cuerpo /* Donde se encuentra el contenido del site */
+{
+	margin:0 auto;
+	padding:0;
+	width:100%;
+	text-align:left;
+	/*border:#FFFFFF solid 1px;*/
+}
+/*------------------------------------------------------------------------------*/
+
+.cpoIzq /* Parte izquierda del cuerpo */
+{
+	float:left;
+	/*clear:right;*/
+	width:205px;
+}
+/*------------------------------------------------------------------------------*/
+
+.logoHSP /* logo latin gaming */
+{
+	border:#9d9d9d solid 1px;
+	background-color:#FFFFFF;
+	color:inherit;
+	height:72px;
+	width:204px;
+	text-align:center;
+	padding:0;
+}
+/*------------------------------------------------------------------------------*/
+
+.imgLogoLG /* imagen logo */
+{
+	background-image:url(images/logoARRHH.jpg);
+	background-position:center;
+	background-repeat:no-repeat;
+	height:70px;
+	width:203px
+}
+/*------------------------------------------------------------------------------*/
+
+.cabMenuIzqda /* cabecera menu izquierda */
+{
+	width:204px;
+	height:28px;
+	background-image:url(images/cabMenuIzqda.jpg);
+	background-repeat:repeat-x;
+	border:#9b6d25 solid 1px;
+	margin:0;
+	padding:0;
+}
+/*------------------------------------------------------------------------------*/
+
+.menuArbol	/* bloque gris donde arbol se encuentra */
+{
+	background-color:#FFFFFF;
+	background-image:url(images/menuArbol.jpg);
+	background-position:left;
+	background-repeat:repeat-y;
+	border:#a3a3a3 solid 1px;
+	width:204px;
+}
+/*------------------------------------------------------------------------------*/
+
+.ulArbol, .ulArbol ul /* cuerpo del arbol y subseccion del mismo */
+{
+	padding:5px;
+	margin:0;
+}
+/*------------------------------------------------------------------------------*/
+
+.liArbol /* list item del arbol*/
+{
+	list-style:inside;
+	margin-bottom:6px;
+	padding-left:4px;
+}
+/*------------------------------------------------------------------------------*/
+
+.liArbolAma /* list item de arbol amarillo */
+{
+	border:#ffcc00 solid 1px;
+	background-color:#ffefb2;
+	color:inherit;
+	list-style:inside;
+	margin-bottom:6px;
+	padding-left:4px;
+}
+/*------------------------------------------------------------------------------*/
+
+.liArbolPos /* list item positivo */
+{
+	list-style-image:url(images/arbolPositivo.gif);
+}
+/*------------------------------------------------------------------------------*/
+
+.liArbolNeg  /* list item positivo */
+{
+	list-style-image:url(images/arbolNegativo.gif);
+}
+/*------------------------------------------------------------------------------*/
+
+.cpoDer /* columna derecha del cuerpo */
+{
+	margin:0 0 0 210px;
+	padding:0;
+
+}
+/*------------------------------------------------------------------------------*/
+
+.cabCpoDer /* cabecera de la columna derecha del cuerpo */
+{
+	background-color:#FFFFFF;
+	background-image:url(images/cabCpoDer.jpg);
+	background-position:left;
+	background-repeat:no-repeat;
+	color:inherit;
+	margin:0;
+	padding:0;
+	height:79px;
+}
+/*------------------------------------------------------------------------------*/
+
+.titCabRoj /* titulo azul de la cabecera */
+{
+	float:left;
+}
+/*------------------------------------------------------------------------------*/
+
+.imgCabCpoDer /* imagen de la cabecera de la columna derecha del cuerpo */
+{
+	float:right;
+	background-image:url(images/imgCabCpoDerecha.jpg);
+	height:79px;
+	width:214px;
+}
+/*------------------------------------------------------------------------------*/
+.infoMod /* bloque información módulo */
+{
+	background-image:url(images/infoMod.jpg);
+	background-repeat:repeat-x;
+	height:22px;
+	margin:0;
+	border-bottom:#9d9d9d solid 1px;
+	border-left:#9d9d9d solid 1px;
+	border-right:#9d9d9d solid 1px;
+	padding:4px 20px 0px 20px;
+}
+/*------------------------------------------------------------------------------*/
+.fechaMod /* texto indicativo de la fecha */
+{
+	float:right;
+}
+/*------------------------------------------------------------------------------*/
+
+.navCpoDer /* bitacora de navegacion ubicada en la columna derecha del cuerpo */
+{
+	background:#e5e5e5;
+	height:18px;
+	margin:0;
+	border-bottom:#9d9d9d solid 1px;
+	border-left:#9d9d9d solid 1px;
+	border-right:#9d9d9d solid 1px;
+}
+/*------------------------------------------------------------------------------*/
+
+.parNavCpoDer /* parrafo de la bitacora de navegacion */
+{
+	margin:0;
+	padding-left:20px;
+	padding-top:2px;
+	font-size:11px;
+	letter-spacing:1px;
+	color:#003399;
+	font-weight:bold;
+}
+/*------------------------------------------------------------------------------*/
+
+.linkParNavCpoDer /* links dentro del parrafo de la bitacora */
+{
+	text-decoration:none;
+}
+/*------------------------------------------------------------------------------*/
+
+.busCpoDer /* seccion de busqueda ubicada en la parte derecha del cuerpo */
+{
+	background-color:#eeeeee;
+	margin:0;
+	height:30px;
+}
+.Color_tabla /* dar color a las tr o td gris */
+{
+	background-color:#eeeeee;
+
+}
+.tabla_inicio_fin /* dar color a las tr gris oscuro, fin o inicio listados*/
+{
+	font-family:Verdana, Arial, Helvetica, sans-serif;
+	font-size:12px;
+	color:#000000;
+	background-color:#CCCCCC;
+
+}
+/*------------------------------------------------------------------------------*/
+
+.parBusCpoDer /* parrafo de la busqueda ubicado en la parte derecha del cuerpo */
+{
+	margin:0;
+	background-color:#f3f3f3;	
+	padding-top:4px;
+	height:50px;
+	padding-left:19px;
+}
+/*------------------------------------------------------------------------------*/
+
+.linkExportar /* link boton exportar */
+{
+	position:fixed;
+	right:0;
+	margin-right:10px;
+	width:100px;
+	text-align:center;
+	height:17px;
+	padding-top:3px;
+	letter-spacing:1px;
+	background-image:url(images/botonGris.jpg);
+	background-repeat:repeat-x;
+	border:#917915 solid 1px;
+	color:#FFFFFF;
+	background-color:#959292;
+	font-weight:bold;
+	text-decoration:none;
+}
+/*------------------------------------------------------------------------------*/
+
+.linkAgregar /* link boton agregar */
+{
+
+	right:130px;
+	background-color:#6d0c07;
+	width:140px;
+	text-align:center;
+	height:22px;
+	padding-top:3px;
+	letter-spacing:1px;
+	background-image:url(images/botonGris.jpg);
+	background-repeat:repeat-x;
+/*	border:#917915 solid 1px;*/
+	color:#FFFFFF;
+	font-weight:bold;
+	font-size:11px;
+	/*text-decoration: overline;*/
+}
+/*------------------------------------------------------------------------------*/
+
+.barBuscar /* textbox barra de busqueda */
+{
+	border:#666666 solid 1px;
+
+	margin-bottom:2px;
+	height:17px;
+}
+/*------------------------------------------------------------------------------*/
+
+.btnBuscar /* boton de la barra de busqueda */
+{
+	background-image:url(images_2/btnBusqueda.jpg);
+	background-color:transparent;
+	color:transparent;
+	border:none;
+	width:24px;
+	height:22px;
+	margin:0;
+	margin-left:-3px;
+}
+/*------------------------------------------------------------------------------*/
+
+.regCpoDer /* seccion de registros de la parte derecha del cuerpo */
+{
+	/*background-color:#FF0000;*/
+	
+}
+/*------------------------------------------------------------------------------*/
+
+.regCpoDer2 /* seccion de registros de la parte derecha del cuerpo TIPO 2 */
+{
+	background-color:#FFFFFF;
+	padding:20px 40px 30px 40px;
+	border:#999999 solid 1px;
+	border-top:none;
+}
+
+.parEspRegCpoDer2 /* parrafo especial */
+{
+	padding-left:22px;
+}
+/*------------------------------------------------------------------------------*/
+
+.tblReg /* tabla de registros */
+{
+	margin:auto;
+	background-color:#FFFFFF;
+	width:100%;
+	text-align:center;
+	border:#aaaaaa solid 1px;
+	font-size:12px;
+	letter-spacing:0.8px;
+}
+/*------------------------------------------------------------------------------*/
+
+.titTblReg /* titutlos de la tabla de registros */
+{
+	height:19px;
+}
+/*------------------------------------------------------------------------------*/
+
+.trTblReg1, .trTblReg1 td /* fila tipo 1 de la tabla de registros */
+{
+	background-color:#ededed;
+	padding-top:12px;
+	padding-bottom:12px;
+	font-size:12px;	
+}
+/*------------------------------------------------------------------------------*/
+
+.trTblReg2, .trTblReg2 td /* fila tipo 2 de la tabla de registros */
+{
+	background-color:#FFFFFF;
+	padding-top:12px;
+	padding-bottom:12px;
+	font-size:12px;	
+}
+/*------------------------------------------------------------------------------*/
+
+.btnBusq /* boton de busqueda en el panel de acciones de la tabla registro */
+{
+	background-image:url(images/btnBusq.gif);
+	background-color:transparent;
+	color:transparent;
+	border:none;
+	width:21px;
+	height:21px;
+	margin:0;
+}
+/*------------------------------------------------------------------------------*/
+
+.btnEdt /* boton de edicion en el panel de acciones de la tabla registro */
+{
+	background-image:url(images/btnEdt.gif);
+	background-color:transparent;
+	color:transparent;
+	border:none;
+	width:21px;
+	height:21px;
+	margin:0 10px 0;
+}
+/*------------------------------------------------------------------------------*/
+
+.btnElm /* boton de eliminar en el panel de acciones de la tabla registro */
+{
+	background-image:url(images/btnElm.gif);
+	background-color:transparent;
+	color:transparent;
+	border:none;
+	width:21px;
+	height:21px;
+	margin:0;
+}
+/*------------------------------------------------------------------------------*/
+
+.footTblReg /* footer de la tabla */
+{
+	background-image:url(images/footTblReg.jpg);
+	background-repeat:repeat-x;
+	height:16px;
+	background-color:#dddddd;
+	letter-spacing:1px;
+	word-spacing:8px;
+}
+
+.footTblReg td
+{
+	border:#888888 solid 1px;
+}
+/*------------------------------------------------------------------------------*/
+
+.footer /* footer del site */
+{
+	clear:both;
+}
+/*===============================================================================
+									Fuentes
+===============================================================================*/
+
+body
+{
+	font-family:Arial, Helvetica, sans-serif;
+	font-size:11px;
+}
+/*------------------------------------------------------------------------------*/
+
+.titCabMenu /* titulo cabecera menu */
+{
+	font-family:Verdana, Arial, Helvetica, sans-serif;
+	font-size:10px;
+	letter-spacing:1px;
+	padding:0 0 0 0px;
+	margin:6px 0 0 6px;
+	background-color:transparent;
+	color:#FFFFFF;
+}
+/*------------------------------------------------------------------------------*/
+
+.txtPn /* texto párrafo negro */
+{
+	font-size:18px;
+	background-color:transparent;
+	color: #FFFFFF;
+}
+
+.txtPnlogin /* texto blanco Login */
+{
+	font-size:14px;
+	background-color:transparent;
+	color: #FFFFFF;
+}
+/*------------------------------------------------------------------------------*/
+.txtPnIni /* texto párrafo negro */
+{
+	font-size:18px;
+	background-color:transparent;
+	color:#000000;
+}
+
+/*------------------------------------------------------------------------------*/
+
+.titCabRoj /* título header azul */
+{
+	font-size:16px;
+	background-color:transparent;
+	color:#a81710;
+	padding-top:26px;
+	padding-left:20px;
+	margin:0;
+}
+/*------------------------------------------------------------------------------*/
+
+.titNavGri /* título navegacion */
+{
+	font-size:10px;
+	background-color:transparent;
+	color:#717070;
+	font-weight:bold;
+}
+/*------------------------------------------------------------------------------*/
+
+.titNavGri /* título navegacion gris */
+{
+	font-size:10px;
+	background-color:transparent;
+	color:#666666;
+	font-weight:bold;
+}
+/*------------------------------------------------------------------------------*/
+
+.linkArbol /* links del arbol */
+{
+	text-decoration:none;
+	background-color:transparent;
+	color:#111111;
+	font-size:11px;
+	letter-spacing:1px;
+}
+/*------------------------------------------------------------------------------*/
+
+.txtInfoMod /* texto de información Módulo */
+{
+	font-size:12px;
+	font-weight:bold;
+	color:#717070;
+	background-color:transparent;
+	letter-spacing:1px;
+	margin:0;
+}
+
+/*===============================================================================
+									Formularios
+===============================================================================*/
+/*
+	No existe aun estandar para formularios.
+*/
+
+.btnFormReg /* boton formulario regular */
+{
+	text-align:center;
+	letter-spacing:1px;
+	background-image:url(images/boton.jpg);
+	background-repeat:repeat-x;
+	border:#886d00 solid 1px;
+	color:#FFFFFF;
+	background-color:#FFFFFF;
+	font-weight:bold;
+	text-decoration:none;
+	font-size:11px;
+
+}
+
+.textBox
+{
+	width:200px;
+}
+
+.textArea
+{
+	overflow:visible;
+}
+
+input
+{
+	margin:0;
+}
+
+/*===============================================================================
+									Especial
+===============================================================================*/
+.menAdv /* mensaje de advertencia */
+{
+	background-color:#f8eca7;
+	color:#000000;
+}
+
+.imgAdv /* imagen de advertencia */
+{
+	background-image:url(images/advertencia.gif);
+	background-position:center;
+	background-repeat:no-repeat;
+	width:69px;
+	height:70px;
+	float:left;
+}
+
+.imgInfo /* imagen de informacion */
+{
+	background-image:url(images/informacion.gif);
+	background-position:center;
+	background-repeat:no-repeat;
+	width:69px;
+	height:70px;
+	float:left;
+}
+
+.txtMenAdv /* texto del mensaje de advertencia */
+{
+	font-weight:bold;
+	letter-spacing:1px;
+	font-size:11px;
+	text-align:left;
+	float:left;
+	padding-top:22px;
+	padding-left:6px;
+}

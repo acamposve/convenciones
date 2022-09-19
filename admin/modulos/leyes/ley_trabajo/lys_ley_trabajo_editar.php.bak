@@ -1,0 +1,79 @@
+
+<link href="../../../../plantillas/plantilla_admin/css/admin.css" rel="stylesheet" type="text/css">
+<style type="text/css">
+<!--
+.Estilo9 {font-size: 12px}
+-->
+</style>
+
+<table width="100%" height="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="F8EEEE">
+  <tr>
+    <td width="13" height="32" bgcolor="CC6666">&nbsp;</td>
+    <td width="505" bgcolor="CC6666"><div align="center"><span class="verdana_blanco"><? print $msg; 
+	$msg="";?></span></div></td>
+    <td width="11" bgcolor="CC6666">&nbsp;</td>
+  </tr>
+  <tr>
+    <td bgcolor="F8EEEE">&nbsp;</td>
+    <td rowspan="3" valign="top" bgcolor="F8EEEE"><form name="form1" method="post" action="" enctype="multipart/form-data">
+      <table width="100%" height="100%" border="0" cellpadding="2" cellspacing="2" class="texto">
+        <tr>
+          <td width="42%" height="16"><label>Fecha de Publicacion:</label></td>
+          <td width="53%">PDF Asociado:</td>
+          <td width="5%"><div align="center"></div></td>
+        </tr>
+        <tr>
+          <td height="16" valign="middle"><input name="fecha_publicacion" type="text" class="texto"  value="<? print $fecha_publicacion; ?>" /></td>
+          <td valign="middle"><input name="pdf_asociado" type="file" class="texto" readonly="" value="" />
+            &nbsp;&nbsp;</td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td height="16">Descripcion Resumen:</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td height="20" colspan="2"><textarea name="descripcion_resumen" cols="60" rows="10"  class="mceEditor" ><? print $descripcion_resumen;  ?></textarea></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td height="16">Total Articulos:</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td><input name="total_articulos" type="text" class="texto" id="Cant_articulos" size="6" readonly="" value="<? print $total_articulos; ?>" /></td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td><input name="enviar" type="hidden" value="1"/></td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+        </tr>
+        
+        <tr>
+          <td colspan="3" valign="bottom"><label></label>
+            <input name="Submit" type="submit" class="botonGuardar" value=" " /></td>
+          </tr>
+      </table>
+        </form>    </td>
+    <td bgcolor="F8EEEE">&nbsp;</td>
+  </tr>
+  <tr>
+    <td height="30" bgcolor="F8EEEE">&nbsp;</td>
+    <td bgcolor="F8EEEE">&nbsp;</td>
+  </tr>
+  <tr>
+    <td height="92" bgcolor="F8EEEE">&nbsp;</td>
+    <td bgcolor="F8EEEE">&nbsp;</td>
+  </tr>
+  <tr>
+    <td height="10" bgcolor="F8EEEE"></td>
+    <td bgcolor="F8EEEE"></td>
+    <td bgcolor="F8EEEE"></td>
+	
+  </tr>
+</table>
+
