@@ -13,3 +13,14 @@ STORAGE_DIR.mkdir(exist_ok=True)
 
 # Modelo por defecto para clasificacion (Art IV.5): claude-opus-5, salvo que se pida otro explicitamente.
 CLASSIFICATION_MODEL = os.environ.get("CLASSIFICATION_MODEL", "claude-opus-5")
+
+# Auth (docs/auth-spec.md): misma signing key que api/ (Program.cs) para poder validar
+# localmente, sin llamar a la API, los JWT que ella emite.
+JWT_SIGNING_KEY = os.environ["JWT_SIGNING_KEY"]
+JWT_ISSUER = "comparador-api"
+JWT_AUDIENCE = "comparador-web"
+
+# CORS: la app de React (web/) llama a este servicio directo desde el navegador para
+# /tenants y /documentos, en un origen distinto (5173 vs 8000) — mismo motivo que
+# api/Program.cs necesita su propio Cors:WebOrigin.
+WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:5173")

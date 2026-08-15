@@ -11,15 +11,27 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import require_role
 from app.classification import build_system_prompt, classify_clause
-from app.config import STORAGE_DIR
+from app.config import STORAGE_DIR, WEB_ORIGIN
 from app.db import get_conn
 from app.extraction import ExtractionError, extract_text
 from app.segmentation import segment_clauses
 
 app = FastAPI(title="Comparador de Documentos Legales — demo Venezuela")
+
+# La app de React (web/) llama a este servicio directo desde el navegador — sin esto el
+# navegador bloquea la carga/lista de documentos con "No 'Access-Control-Allow-Origin'".
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[WEB_ORIGIN],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------------------------------------------------------------------------
@@ -30,8 +42,14 @@ app = FastAPI(title="Comparador de Documentos Legales — demo Venezuela")
 @app.post("/tenants", status_code=201)
 def crear_tenant(nombre_empresa: str = Form(...)):
     with get_conn() as conn, conn.cursor() as cur:
+        # Pais fijo Venezuela para este MVP (Art I.3): sin selector, se resuelve el unico
+        # pais activo de la tabla paises en vez de pedirlo en el form.
         cur.execute(
-            "INSERT INTO tenants (nombre_empresa) VALUES (%s) RETURNING id, nombre_empresa, pais, created_at",
+            """
+            INSERT INTO tenants (nombre_empresa, pais_id)
+            SELECT %s, id FROM paises WHERE codigo = 'VE'
+            RETURNING id, nombre_empresa, pais_id, plan_licencia, created_at
+            """,
             (nombre_empresa,),
         )
         tenant = cur.fetchone()
@@ -42,7 +60,15 @@ def crear_tenant(nombre_empresa: str = Form(...)):
 @app.get("/tenants")
 def listar_tenants():
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("SELECT id, nombre_empresa, pais, created_at FROM tenants ORDER BY id")
+        cur.execute(
+            """
+            SELECT t.id, t.nombre_empresa, t.plan_licencia, t.created_at,
+                   p.codigo AS pais_codigo, p.nombre AS pais_nombre
+            FROM tenants t
+            JOIN paises p ON p.id = t.pais_id
+            ORDER BY t.created_at
+            """
+        )
         return cur.fetchall()
 
 
@@ -70,7 +96,7 @@ def _validar_url_publica(url: str) -> None:
         )
 
 
-def _guardar_archivo(tenant_id: int, filename: str, contenido: bytes) -> str:
+def _guardar_archivo(tenant_id: uuid.UUID, filename: str, contenido: bytes) -> str:
     safe_name = os.path.basename(filename)
     destino_dir = STORAGE_DIR / str(tenant_id)
     destino_dir.mkdir(parents=True, exist_ok=True)
@@ -98,12 +124,18 @@ def _descargar_url(url: str) -> tuple[bytes, str]:
 
 @app.post("/documentos", status_code=201)
 def crear_documento(
-    tenant_id: int = Form(...),
+    request: Request,
     origen: str = Form(...),
     url_origen: Optional[str] = Form(None),
     es_publico: bool = Form(False),
     archivo: Optional[UploadFile] = File(None),
 ):
+    # auth-spec.md §5: "Cargar documento (ingesta)" = AdminTenant/Editor. tenant_id sale
+    # del claim del JWT (Art VI.2), nunca de un form field — evita cross-tenant manipulando
+    # el payload.
+    claims = require_role(request, "AdminTenant", "Editor")
+    tenant_id = claims.tenant_id
+
     if origen not in ("archivo", "url"):
         raise HTTPException(422, "origen debe ser 'archivo' o 'url'")
     if origen == "url" and not url_origen:
@@ -159,7 +191,7 @@ def _marcar_error(documento_id: int, mensaje: str) -> None:
         conn.commit()
 
 
-def _procesar_pipeline(documento_id: int, tenant_id: int, ruta_archivo: str) -> None:
+def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, ruta_archivo: str) -> None:
     try:
         texto = extract_text(ruta_archivo)
     except ExtractionError as exc:
@@ -225,7 +257,7 @@ def _procesar_pipeline(documento_id: int, tenant_id: int, ruta_archivo: str) -> 
         conn.commit()
 
 
-def _obtener_documento(documento_id: int, tenant_id: int) -> dict:
+def _obtener_documento(documento_id: int, tenant_id: uuid.UUID) -> dict:
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT * FROM documentos WHERE id = %s AND tenant_id = %s",
@@ -251,12 +283,14 @@ def _obtener_documento(documento_id: int, tenant_id: int) -> dict:
 
 
 @app.get("/documentos/{documento_id}")
-def obtener_documento(documento_id: int, tenant_id: int):
-    return _obtener_documento(documento_id, tenant_id)
+def obtener_documento(request: Request, documento_id: int):
+    # Art VI.2: tenant_id sale SIEMPRE del claim del JWT, nunca de un query param — antes
+    # este endpoint tomaba tenant_id directo de la URL, sin ninguna autenticacion.
+    claims = require_role(request, "AdminTenant", "Revisor", "Editor", "Visualizador")
+    return _obtener_documento(documento_id, claims.tenant_id)
 
 
-@app.get("/documentos")
-def listar_documentos(tenant_id: int):
+def _listar_documentos(tenant_id: uuid.UUID) -> list[dict]:
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT id, origen, url_origen, es_publico, estado, estado_detalle, created_at "
@@ -266,9 +300,7 @@ def listar_documentos(tenant_id: int):
         return cur.fetchall()
 
 
-# ---------------------------------------------------------------------------
-# UI minima (paso 3): HTML servido por este mismo backend.
-# ---------------------------------------------------------------------------
-from app.ui import router as ui_router  # noqa: E402  (registrado al final para reusar lo de arriba)
-
-app.include_router(ui_router)
+@app.get("/documentos")
+def listar_documentos(request: Request):
+    claims = require_role(request, "AdminTenant", "Revisor", "Editor", "Visualizador")
+    return _listar_documentos(claims.tenant_id)

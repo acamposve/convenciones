@@ -1,0 +1,10 @@
+# Copiar a terraform.tfvars y ajustar. NUNCA poner secretos acá — esos
+# van como variables de entorno TF_VAR_<nombre> desde GitHub Secrets
+# (ver plan-publish-azure.md sección 0).
+
+location     = "eastus"
+project_name = "comparador"
+environment  = "demo"
+
+# postgres_admin_password, jwt_signing_key y anthropic_api_key
+# se omiten intencionalmente de este archivo.

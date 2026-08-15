@@ -1,0 +1,148 @@
+# NOTA: los nombres de recurso (ACR, resource group, container apps) deben
+# coincidir con lo que Terraform realmente creó — confirmar tras el primer
+# `terraform apply` si los nombres difieren.
+name: Deploy Apps to Azure
+
+on:
+  push:
+    branches: [main]
+    paths: ["api/**", "service/**", "web/**"]
+  workflow_dispatch: {} # permite re-disparar manualmente sin nuevo commit
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RESOURCE_GROUP: rg-comparador-demo
+  ACR_NAME: comparadordemoacr
+  POSTGRES_SERVER: psql-comparador-demo
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: echo "tag=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Build & push API
+        run: |
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/comparador-api:${{ steps.tag.outputs.tag }} api
+          docker push ${{ env.ACR_NAME }}.azurecr.io/comparador-api:${{ steps.tag.outputs.tag }}
+
+      - name: Build & push AI service
+        run: |
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/comparador-ai-service:${{ steps.tag.outputs.tag }} service
+          docker push ${{ env.ACR_NAME }}.azurecr.io/comparador-ai-service:${{ steps.tag.outputs.tag }}
+
+      # Vite bakea las VITE_* en el bundle en build time (no las lee en runtime), asi que
+      # el frontend necesita las URLs reales de "api" y "ai-service" ANTES de buildear su
+      # imagen. Solo existen porque, segun el orden documentado en plan-publish-azure.md
+      # §3, deploy-apps.yml corre siempre despues de que terraform ya creo estas Container
+      # Apps (el FQDN existe apenas se crea el recurso, aunque su imagen "latest" todavia
+      # no se haya pusheado la primera vez).
+      - name: Resolver URLs de api y ai-service
+        id: urls
+        run: |
+          API_FQDN=$(az containerapp show --name ca-comparador-api --resource-group ${{ env.RESOURCE_GROUP }} --query properties.configuration.ingress.fqdn -o tsv)
+          AI_FQDN=$(az containerapp show --name ca-comparador-ai --resource-group ${{ env.RESOURCE_GROUP }} --query properties.configuration.ingress.fqdn -o tsv)
+          echo "api_url=https://$API_FQDN" >> "$GITHUB_OUTPUT"
+          echo "ai_url=https://$AI_FQDN" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push frontend
+        run: |
+          docker build \
+            --build-arg VITE_API_BASE_URL=${{ steps.urls.outputs.api_url }} \
+            --build-arg VITE_DOCUMENT_API_BASE_URL=${{ steps.urls.outputs.ai_url }} \
+            -t ${{ env.ACR_NAME }}.azurecr.io/comparador-frontend:${{ steps.tag.outputs.tag }} web
+          docker push ${{ env.ACR_NAME }}.azurecr.io/comparador-frontend:${{ steps.tag.outputs.tag }}
+
+  migrate-database:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: azure-production # misma aprobación manual que la infra
+    defaults:
+      run:
+        working-directory: service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # El runner de GitHub Actions tiene IP dinámica — se abre una regla
+      # de firewall temporal en Postgres solo para esta corrida, y se
+      # cierra al final aunque falle el paso de migración.
+      - name: Abrir firewall temporal
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
+          az postgres flexible-server firewall-rule create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.POSTGRES_SERVER }} \
+            --rule-name github-actions-temp \
+            --start-ip-address "$RUNNER_IP" \
+            --end-ip-address "$RUNNER_IP"
+
+      # Este repo maneja el schema con SQL plano (db/schema.sql + db/migrations/*.sql),
+      # no con EF Code-First (ver Program.cs y docs/bootstrap-demo.md) — mismo patron que
+      # el servicio "seed" de service/docker-compose.yml para desarrollo local. schema.sql
+      # solo se aplica en una base nueva; si ya existe, las migraciones nuevas en
+      # db/migrations/ se aplican a mano, una sola vez (igual que documenta 002_auth.sql).
+      - name: Aplicar schema (solo primera vez) y sembrar el admin
+        run: |
+          pip install --quiet psycopg[binary] bcrypt python-dotenv
+          if [ -z "$(psql "$DATABASE_URL" -tAc "SELECT to_regclass('public.tenants')")" ]; then
+            echo "Base nueva — aplicando db/schema.sql"
+            psql "$DATABASE_URL" -f db/schema.sql
+          else
+            echo "Schema ya existe — si hay migraciones nuevas en db/migrations/, aplicalas a mano (🔴 MANUAL, ver docs/plan-publish-azure.md)."
+          fi
+          python db/seed_admin_user.py
+        env:
+          # 🔴 MANUAL: confirmar que el usuario ("comparador_admin" abajo)
+          # coincide con var.postgres_admin_username en Terraform si lo
+          # cambiaste del default. ubuntu-latest ya trae `psql` instalado.
+          DATABASE_URL: "postgresql://comparador_admin:${{ secrets.TF_VAR_postgres_admin_password }}@${{ env.POSTGRES_SERVER }}.postgres.database.azure.com/comparador?sslmode=require"
+
+      - name: Cerrar firewall temporal
+        if: always() # se ejecuta incluso si la migración falló arriba
+        run: |
+          az postgres flexible-server firewall-rule delete \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.POSTGRES_SERVER }} \
+            --rule-name github-actions-temp \
+            --yes
+
+  deploy-container-apps:
+    needs: [build-and-push, migrate-database]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Actualizar las 3 Container Apps con la nueva imagen
+        run: |
+          TAG=${{ needs.build-and-push.outputs.image_tag }}
+          az containerapp update --name ca-comparador-api --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_NAME }}.azurecr.io/comparador-api:$TAG
+          az containerapp update --name ca-comparador-ai --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_NAME }}.azurecr.io/comparador-ai-service:$TAG
+          az containerapp update --name ca-comparador-frontend --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_NAME }}.azurecr.io/comparador-frontend:$TAG

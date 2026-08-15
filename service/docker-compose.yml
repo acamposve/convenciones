@@ -10,6 +10,75 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      # Solo corre en un volumen nuevo (comportamiento estandar de la imagen postgres):
+      # docker-entrypoint-initdb.d se ignora si db_data ya tiene datos. schema.sql documenta
+      # explicitamente que es para "instalacion nueva" — este es ese caso.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-convenciones}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Bootstrap de un solo uso: tenant demo + usuario AdminTenant (service/db/seed_admin_user.py),
+  # el paso que auth-spec.md §4 exige antes de que el primer login pueda funcionar. Antes era
+  # un curl a mano contra POST /tenants seguido de correr el script — ahora "docker compose up"
+  # deja el demo logueable sin pasos manuales adicionales.
+  seed:
+    image: python:3.12-slim
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-convenciones}:${POSTGRES_PASSWORD:-convenciones}@db:5432/${POSTGRES_DB:-convenciones}"
+      TENANT_DEMO_NOMBRE: ${TENANT_DEMO_NOMBRE:-Empresa Demo}
+    command: sh -c "pip install --quiet psycopg[binary] bcrypt python-dotenv && python db/seed_admin_user.py"
+    restart: "no"
+
+  # api y web vienen del scaffold de autenticacion (docs/auth-spec.md), adaptados para
+  # compartir esta MISMA base "convenciones" (tenants/usuarios/documentos/clausulas en un
+  # solo tenant_id) en vez de tener su propio compose standalone con una DB "comparador"
+  # separada.
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-convenciones};Username=${POSTGRES_USER:-convenciones};Password=${POSTGRES_PASSWORD:-convenciones}"
+      Jwt__Issuer: "comparador-api"
+      Jwt__Audience: "comparador-web"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-dev-only-change-me-32-bytes-minimum}
+      Jwt__AccessTokenMinutes: "15"
+      Jwt__RefreshTokenDays: "7"
+      Cors__WebOrigin: "http://localhost:${WEB_PORT:-5173}"
+    ports:
+      - "${API_PORT:-5080}:8080"
+
+  web:
+    build:
+      context: ../web
+      # Dockerfile (sin sufijo) es el build de produccion para deploy-apps.yml (multi-stage
+      # + nginx en :80, bakea las VITE_* en build time) — para desarrollo local con
+      # hot-reload se usa Dockerfile.dev (vite dev server, lee las VITE_* en runtime).
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE_URL: "http://localhost:${API_PORT:-5080}"
+      # El servicio Python (ingesta/clasificacion) no esta containerizado todavia (corre
+      # local con uvicorn) — por eso apunta a localhost, no a un hostname de la red docker.
+      VITE_DOCUMENT_API_BASE_URL: "http://localhost:${DOCUMENT_API_PORT:-8000}"
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ../web:/app
+      - /app/node_modules
 
 volumes:
   db_data:
