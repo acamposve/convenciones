@@ -72,9 +72,14 @@ resource "azurerm_container_app" "api" {
         name        = "Storage__ConnectionString"
         secret_name = "storage-connection-string"
       }
+      # ingress[0].fqdn (FQDN estable de la app), NO latest_revision_fqdn: este ultimo
+      # incluye el sufijo de la revision (ca-comparador-frontend--du3sbi8...), que cambia
+      # cada vez que deploy-apps.yml pushea una imagen nueva. Con el, el allowlist quedaba
+      # apuntando a la revision del bootstrap y el navegador recibia el preflight sin
+      # Access-Control-Allow-Origin — el login moria con error de CORS.
       env {
         name  = "Cors__WebOrigin"
-        value = "https://${azurerm_container_app.frontend.latest_revision_fqdn}"
+        value = "https://${azurerm_container_app.frontend.ingress[0].fqdn}"
       }
     }
   }
@@ -158,9 +163,11 @@ resource "azurerm_container_app" "ai_service" {
       # CORS (service/app/main.py) — el frontend llama a este servicio directo desde el
       # navegador, no a traves de "api". Sin esto el navegador bloquea /tenants y
       # /documentos con "No 'Access-Control-Allow-Origin' header".
+      # ingress[0].fqdn y no latest_revision_fqdn, por el mismo motivo que Cors__WebOrigin
+      # en la app "api" de arriba.
       env {
         name  = "WEB_ORIGIN"
-        value = "https://${azurerm_container_app.frontend.latest_revision_fqdn}"
+        value = "https://${azurerm_container_app.frontend.ingress[0].fqdn}"
       }
     }
   }
