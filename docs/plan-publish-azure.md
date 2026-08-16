@@ -52,14 +52,16 @@ az role assignment create \
   --role Contributor \
   --scope /subscriptions/<SUBSCRIPTION_ID>
 
-# Federated credential: permite que SOLO el workflow en la rama main
+# Federated credential: permite que SOLO el workflow en la rama master
 # de tu repo se autentique como esta app, sin client secret
+# (la rama por defecto de este repo es "master", no "main" — confirmar con
+# `git branch -r` / github/HEAD antes de correr esto si el repo cambia)
 az ad app federated-credential create \
   --id <APP_ID> \
   --parameters '{
-    "name": "github-main-branch",
+    "name": "github-master-branch",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:<TU_ORG>/<TU_REPO>:ref:refs/heads/main",
+    "subject": "repo:<TU_ORG>/<TU_REPO>:ref:refs/heads/master",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
@@ -99,8 +101,8 @@ Automatizado, sin intervención manual una vez configurado el paso 0:
 | Workflow | Dispara con | Qué hace |
 |---|---|---|
 | `ci.yml` | Cualquier PR | Build + test de API (.NET), servicio IA (Python) y frontend (React). No toca Azure. |
-| `terraform.yml` | PR que toca `infra/terraform/**` → `plan`. Push a `main` → `apply` | Aplica la infraestructura. El `apply` requiere aprobación manual (ver 🔴 abajo) |
-| `deploy-apps.yml` | Push a `main` que toca `api/**`, `service/**` o `web/**` | Build de las 3 imágenes Docker, push a ACR, actualiza las Container Apps, aplica `db/schema.sql` o la migración legacy necesaria y corre los seeds de taxonomía y AdminTenant |
+| `terraform.yml` | PR que toca `infra/terraform/**` → `plan`. Push a `master` → `apply` | Aplica la infraestructura. El `apply` requiere aprobación manual (ver 🔴 abajo) |
+| `deploy-apps.yml` | Push a `master` que toca `api/**`, `service/**` o `web/**` | Build de las 3 imágenes Docker, push a ACR, actualiza las Container Apps, aplica `db/schema.sql` o la migración legacy necesaria y corre los seeds de taxonomía y AdminTenant |
 
 ### 🔴 MANUAL — Configurar el Environment de aprobación
 
@@ -114,7 +116,7 @@ no en código.
 
 1. 🔴 **MANUAL** — Completar toda la sección 0 (cuenta, OIDC, secretos)
 2. Abrir un PR que incluya `infra/terraform/` → revisa el `plan` que postea el workflow
-3. Mergear a `main` → el `apply` queda pendiente de tu aprobación en el Environment
+3. Mergear a `master` (rama por defecto de este repo) → el `apply` queda pendiente de tu aprobación en el Environment
 4. 🔴 **MANUAL** — Aprobar el `apply` en la pestaña Actions de GitHub
 5. Una vez que la infra existe, mergear o re-disparar `deploy-apps.yml` → build, push,
    deploy de las 3 apps, schema/migración y seeds corren solos. Terraform crea primero las
