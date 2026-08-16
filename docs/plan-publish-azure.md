@@ -71,6 +71,20 @@ az ad app federated-credential create \
     "subject": "repo:<TU_ORG>/<TU_REPO>:ref:refs/heads/main",
     "audiences": ["api://AzureADTokenExchange"]
   }'
+
+# Segunda credential, IMPRESCINDIBLE ademas de la de arriba: todo job que declare
+# `environment: azure-production` (apply en terraform.yml, migrate-database en
+# deploy-apps.yml) presenta un subject distinto — "environment:<nombre>", no
+# "ref:refs/heads/<rama>" — aunque corra en la rama main. Sin esta segunda credential,
+# esos dos jobs fallan en azure/login con AADSTS700213 aunque la de arriba ya funcione.
+az ad app federated-credential create \
+  --id <APP_ID> \
+  --parameters '{
+    "name": "github-environment-azure-production",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:<TU_ORG>/<TU_REPO>:environment:azure-production",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
 ```
 
 ### Secretos a cargar en GitHub (paso 5)
@@ -163,7 +177,7 @@ del planeado.
 
 - [ ] Suscripción Azure activa, `az login` hecho
 - [ ] Resource group + storage account de remote state creados
-- [ ] App de Azure AD + federated credential OIDC configurados
+- [ ] App de Azure AD + **2 federated credentials** OIDC configuradas (rama `main` Y environment `azure-production` — son subjects distintos, ver paso 4)
 - [ ] Rol Contributor asignado a la app
 - [ ] Los 6 secretos cargados en GitHub Secrets
 - [ ] Environment `azure-production` con required reviewers configurado
