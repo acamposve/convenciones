@@ -1,0 +1,87 @@
+<?
+	$motivo=$_GET['motivo'];
+
+?>
+
+
+
+<style type="text/css">
+<!--
+.Estilo1 {font-size: 9px}
+
+.tex {
+	font-family: Bauhaus Md Bt;
+	font-size: 12px;
+	font-style: bold;
+	line-height: normal;
+	font-weight: normal;
+	font-variant: normal;
+	color: #ffffff;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px; }
+
+-->
+</style>
+<link href="styles.css" rel="stylesheet" type="text/css" />
+<style type="text/css">
+<!--
+.style2 {font-style: normal; line-height: normal; font-variant: normal; color: #ffffff; margin-left: 0px; margin-top: 0px; margin-right: 0px; margin-bottom: 0px; font-family: "Bauhaus Md Bt"; font-size: 12px;}
+
+.tex {
+	font-family: Bauhaus Md Bt;
+	font-size: 12px;
+	font-style: normal;
+	line-height: normal;
+	font-weight: bold;
+	font-variant: normal;
+	color: #ffffff;
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-bottom: 0px; }
+-->
+</style>
+<link href="../admin/modulos/login/styles.css" rel="stylesheet" type="text/css" />
+<link href="../plantillas/plantilla_admin/css/admin.css" rel="stylesheet" type="text/css" />
+<link href="file:///////plantillas/plantilla_admin/css/admin.css" rel="stylesheet" type="text/css" />
+<link href="../../../plantillas/plantilla_admin/css/admin.css" rel="stylesheet" type="text/css" />
+<script src="../../../Scripts/AC_RunActiveContent.js" type="text/javascript"></script>
+<form name="form1" method="post" action="">
+<table width="1010" height="585" border="0" align="center" cellpadding="0" cellspacing="0"  style="background-repeat:no-repeat" bgcolor="#ededed">
+		<tr>
+        <td width="209"  align="center" valign="top">
+        <?	
+			if  ($_SESSION["tipo"]==""){
+				?>
+                <img src="../../../plantillas/plantilla_admin/images/MENU.png" /><br /><br /><br /><br /><br />
+                <script type="text/javascript">
+AC_FL_RunContent( 'codebase','http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=9,0,28,0','width','162','height','59','title','Descargar Demo','src','../../../plantillas/plantilla_admin/images/aviso_importante_descarga','quality','high','pluginspage','http://www.adobe.com/shockwave/download/download.cgi?P1_Prod_Version=ShockwaveFlash','movie','../../../plantillas/plantilla_admin/images/aviso_importante_descarga' ); //end AC code
+</script><noscript><object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=9,0,28,0" width="162" height="59" title="Descargar Demo">
+                  <param name="movie" value="../../../plantillas/plantilla_admin/images/aviso_importante_descarga.swf" />
+                  <param name="quality" value="high" />
+                  <embed src="../../../plantillas/plantilla_admin/images/aviso_importante_descarga.swf" quality="high" pluginspage="http://www.adobe.com/shockwave/download/download.cgi?P1_Prod_Version=ShockwaveFlash" type="application/x-shockwave-flash" width="162" height="59"></embed>
+                </object></noscript>
+          <?
+			}
+		?>      </td>
+      <td  colspan="4" valign="top" background="../../../plantillas/plantilla_admin/images/introCCCOL.jpg"  style="background-repeat:repeat-x">
+			<input name="submit" type="hidden" value="1" />
+	        <input name="login" type="hidden" class="textfield" id="login" size="35">
+       		<input name="pass" type="hidden" class="textfield" id="pass" size="35">
+            <input name="Submit2" type="submit" class="entrar"  value="" />    
+		</td></tr>
+</table>
+        </form>        
+<? if ($motivo=="BLO"){
+
+	?>
+<script type="text/javascript" language="javascript">
+	    <!--
+    	alert("Su usuario se Encuentra Bloqueado");
+     	-->
+        </script>
+    <?
+	}
+?>

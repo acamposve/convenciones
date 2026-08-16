@@ -1,0 +1,67 @@
+name: Terraform Azure Infra
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ["infra/terraform/**"]
+  push:
+    branches: [main]
+    paths: ["infra/terraform/**"]
+
+permissions:
+  id-token: write # requerido para OIDC (azure/login)
+  contents: read
+  pull-requests: write # para postear el plan como comentario
+
+env:
+  TF_VAR_azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_postgres_admin_password: ${{ secrets.TF_VAR_postgres_admin_password }}
+  TF_VAR_jwt_signing_key: ${{ secrets.TF_VAR_jwt_signing_key }}
+  TF_VAR_anthropic_api_key: ${{ secrets.TF_VAR_anthropic_api_key }}
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+      - run: terraform fmt -check
+      - run: terraform validate
+      - run: terraform plan -no-color -out=tfplan
+      # El plan queda como artifact para revisión manual antes de mergear —
+      # revísalo tú mismo en la pestaña Actions antes de aprobar el PR.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/tfplan
+
+  apply:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # 🔴 MANUAL: este nombre de environment debe existir en Settings →
+    # Environments con "Required reviewers" activado — ver plan-publish-azure.md.
+    # Sin ese paso manual, este job NO se detiene a esperar aprobación.
+    environment: azure-production
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+      - run: terraform apply -auto-approve

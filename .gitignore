@@ -1,0 +1,18 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+service/storage/
+appsettings.Development.json
+appsettings.Local.json
+bin/
+obj/
+node_modules/
+web/dist/
+
+# Terraform (infra/terraform/) — *.tfvars no alcanza a *.tfvars.example (sufijo distinto)
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars

@@ -1,0 +1,420 @@
+{
+  "categorias": [
+    {
+      "id": 3,
+      "nombre": "GENERALES",
+      "descripcion": "Se agrupan cláusulas que establecen condiciones y definiciones entre las partes.",
+      "requiere_campo_comparacion_economica": false
+    },
+    {
+      "id": 4,
+      "nombre": "ECONOMICO",
+      "descripcion": "Se agrupan cláusulas que establecen pagos en dinero, especie o tiempo remunerado, que afectan o impactan Prestaciones Sociales y otros beneficios del trabajador.",
+      "requiere_campo_comparacion_economica": true
+    },
+    {
+      "id": 5,
+      "nombre": "SOCIOECONÓMICAS",
+      "descripcion": "Se agrupan cláusulas que establecen pagos en dinero o especie que no afectan o no inciden en Prestaciones sociales u otros beneficios.",
+      "requiere_campo_comparacion_economica": true
+    },
+    {
+      "id": 6,
+      "nombre": "SINDICALES",
+      "descripcion": "Se agrupan cláusulas que implican pagos en dinero o especie, entregadas a la Institución (Federaciones, Confederaciones y/o Sindicatos).",
+      "requiere_campo_comparacion_economica": true
+    },
+    {
+      "id": 7,
+      "nombre": "SEGURIDAD OCUPACIONAL",
+      "descripcion": "Se agrupan cláusulas orientadas a la salud y protección del trabajador en el ambiente laboral.",
+      "requiere_campo_comparacion_economica": true
+    }
+  ],
+  "titulos": [
+    {
+      "id": 2,
+      "nombre": "Trabajadores Cubiertos",
+      "descripcion": "Indica la categoría de trabajadores amparados por la Convención Colectiva(Empleados, Obreros, Profesionales, etc)",
+      "categoria_id": 3
+    },
+    {
+      "id": 3,
+      "nombre": "Vigencia/Duración",
+      "descripcion": "Indica el período de tiempo que establece la Convención (mínimo 2 años, máximo 3 años)",
+      "categoria_id": 3
+    },
+    {
+      "id": 4,
+      "nombre": "Jornada de Trabajo",
+      "descripcion": "Cantidad de horas semanales, turnos y horarios que establece la convención",
+      "categoria_id": 3
+    },
+    {
+      "id": 5,
+      "nombre": "Contratación de Trabajadores",
+      "descripcion": "Indica las condiciones de contratación y la fuente, si es a través del sindicato y en que porcentaje",
+      "categoria_id": 3
+    },
+    {
+      "id": 6,
+      "nombre": "Salario básico",
+      "descripcion": "Define la remuneración básica del trabajador, no incluye comisiones, horas extras ni primas",
+      "categoria_id": 3
+    },
+    {
+      "id": 7,
+      "nombre": "Salario Normal",
+      "descripcion": "Indica la remuneración que en forma regular y permanente percibe el trabajador",
+      "categoria_id": 3
+    },
+    {
+      "id": 46,
+      "nombre": "Salario (Integral)",
+      "descripcion": "Según art. 133 LOT",
+      "categoria_id": 3
+    },
+    {
+      "id": 62,
+      "nombre": "No Compara",
+      "descripcion": "La cláusula refiere a su duración, Acta y Auto",
+      "categoria_id": 3
+    },
+    {
+      "id": 75,
+      "nombre": "Servicio Militar",
+      "descripcion": "LLamado de las fuerzas armadas nacionales para prestar servicio militar",
+      "categoria_id": 3
+    },
+    {
+      "id": 76,
+      "nombre": "Detenciones",
+      "descripcion": "Detención del trabajador por motivo de averiguaciones policiales",
+      "categoria_id": 3
+    },
+    {
+      "id": 80,
+      "nombre": "Ambito de Aplicación",
+      "descripcion": "Que niveles de trabajadores cubre el Contrato",
+      "categoria_id": 3
+    },
+    {
+      "id": 8,
+      "nombre": "Salario Mínimo",
+      "descripcion": "Remuneración mínima que percibe el trabajador, según Decreto Presidencial o convenio contractual",
+      "categoria_id": 4
+    },
+    {
+      "id": 9,
+      "nombre": "Aumento de Salario",
+      "descripcion": "Cantidad en bolívares o porcentaje que incrementa el sueldo o salario del trabajador, en períodos determinados.",
+      "categoria_id": 4
+    },
+    {
+      "id": 10,
+      "nombre": "Vacaciones",
+      "descripcion": "Disfurte remunerado y pago anual por bonificación",
+      "categoria_id": 4
+    },
+    {
+      "id": 11,
+      "nombre": "Estado de Gravidez (Maternidad)",
+      "descripcion": "Período de reposo remunerado y condiciones de la trabajadora en estado de gravidez",
+      "categoria_id": 4
+    },
+    {
+      "id": 12,
+      "nombre": "Utilidades",
+      "descripcion": "Participación en porcentaje o días sobre las utilidades de la empresa, otorgadas al trabajador; llamadas \"Aguinaldos\" en la Administración Pública o \"Bono de fin de año\".",
+      "categoria_id": 4
+    },
+    {
+      "id": 13,
+      "nombre": "Horas Extras",
+      "descripcion": "Tiempo adicional a la jornada diaria pactada, la cual implica un recargo sobre el valor de la hora básica.",
+      "categoria_id": 4
+    },
+    {
+      "id": 14,
+      "nombre": "Bono Nocturno",
+      "descripcion": "Porcentaje de recargo al salario, por laborar durante la jornada nocturna",
+      "categoria_id": 4
+    },
+    {
+      "id": 15,
+      "nombre": "Trabajos en feriados o descanso (domingos)",
+      "descripcion": "Remuneración o pago adicional por trabajos en días feriados.",
+      "categoria_id": 4
+    },
+    {
+      "id": 16,
+      "nombre": "Permiso (Asueto) Remunerado",
+      "descripcion": "Dias de descanso remunerados decretados festivos u otra índole, nacionales o Regionales. Se incluyen los permisos por distintas causas (Matrimonio, Nacimiento, enfermedad, entre otros)",
+      "categoria_id": 4
+    },
+    {
+      "id": 17,
+      "nombre": "Tiempo de Viaje",
+      "descripcion": "Pago por el tiempo de viaje hasta el centro de trabajo.",
+      "categoria_id": 4
+    },
+    {
+      "id": 18,
+      "nombre": "Prestaciones Sociales (Liquidacion)",
+      "descripcion": "Pago por concepto de antigüedad anual o liquidación al finalizar la relación de trabajo.",
+      "categoria_id": 4
+    },
+    {
+      "id": 63,
+      "nombre": "Antiguedad y Fideicomiso",
+      "descripcion": "MONTOS BASES PARA EL CALCULO DE ANTIGUEDADES Y EL APORTE DEL FIDEICOMISO POR PARTE DE LA EMPRESA",
+      "categoria_id": 4
+    },
+    {
+      "id": 66,
+      "nombre": "Suplencias o Sustituciones",
+      "descripcion": "Cuando un trabajador sustituye a otro por cualquier circunstancia en un tiempo determinado (reposos, vacaciones, etc.) para cumplir funciones y labores inherentes del cargo.",
+      "categoria_id": 4
+    },
+    {
+      "id": 67,
+      "nombre": "Promociones o Asensos",
+      "descripcion": "Cuando se promuebe o asiende a un trabajor de un cargo de menor jerarquia a otro de mayor",
+      "categoria_id": 4
+    },
+    {
+      "id": 74,
+      "nombre": "Aguinaldos",
+      "descripcion": "Bonificacion que es entregada a fin de año en empresas publicas, asociaciones sin fines de lucro y todas aquellas organizaciones en donde el patrono no invierta capital ni obtenga utilidades de su ejercicio fiscal",
+      "categoria_id": 4
+    },
+    {
+      "id": 82,
+      "nombre": "Preaviso",
+      "descripcion": "Notificación previa para poner fin a la relación de trabajo",
+      "categoria_id": 4
+    },
+    {
+      "id": 19,
+      "nombre": "Nacimiento de Hijos",
+      "descripcion": "Pago o Bonificación por nacimiento de hijos y disfrute de días remunerados",
+      "categoria_id": 5
+    },
+    {
+      "id": 20,
+      "nombre": "Enfermedad o Accidente (IVSS)",
+      "descripcion": "Pagos y días de reposo causados por enfermedad o accidentes",
+      "categoria_id": 5
+    },
+    {
+      "id": 21,
+      "nombre": "Fallecimiento de Familiar",
+      "descripcion": "Contribución económica y días de permiso por fallecimiento de familiar del trabajador",
+      "categoria_id": 5
+    },
+    {
+      "id": 22,
+      "nombre": "Hospitalización, Cirujía y Maternidad (HCM)",
+      "descripcion": "Pago de primas, beneficiarios y familiares cubiertos por polizas de HCM.",
+      "categoria_id": 5
+    },
+    {
+      "id": 23,
+      "nombre": "Seguro de Vida y Accidente",
+      "descripcion": "Pago de polizas de seguro y porcentaje del pago de las primas.",
+      "categoria_id": 5
+    },
+    {
+      "id": 24,
+      "nombre": "Transporte",
+      "descripcion": "Medio utilizado para el traslado al centro de trabajo, otorgado por la empresa o su equivalente en bolívares.",
+      "categoria_id": 5
+    },
+    {
+      "id": 25,
+      "nombre": "Viaticos",
+      "descripcion": "Pago o reintegro de gastos incurridos por trabajos realizados fuera del centro habitual donde presta servicios el trabajador.",
+      "categoria_id": 5
+    },
+    {
+      "id": 26,
+      "nombre": "Refrigerio o Lunch, transporte En horas extras",
+      "descripcion": "Pago u otorgamiento del alimento y/o transporte, en labores de sobretiempo.",
+      "categoria_id": 5
+    },
+    {
+      "id": 27,
+      "nombre": "Ticket para comida",
+      "descripcion": "Pago o bono para comida, según los turnos de trabajo.",
+      "categoria_id": 5
+    },
+    {
+      "id": 28,
+      "nombre": "Comedores",
+      "descripcion": "Espacio diseñado para las comidas, con otorgamiento de los alimentos o pago subsidiado",
+      "categoria_id": 5
+    },
+    {
+      "id": 29,
+      "nombre": "Becas",
+      "descripcion": "Ayuda económica para la educación de los trabajadores o hijos de estos.",
+      "categoria_id": 5
+    },
+    {
+      "id": 30,
+      "nombre": "Utiles Escolares",
+      "descripcion": "Contribución de los materiale y útiles requeridos según el nivel de educación, normalmente para los hijos de los trabajadores.",
+      "categoria_id": 5
+    },
+    {
+      "id": 31,
+      "nombre": "Plan de Ahorro (Cajas de Ahorro)",
+      "descripcion": "Contribución o aporte de la empresa para la Caja de Ahorros o Fondos de Ahorro.",
+      "categoria_id": 5
+    },
+    {
+      "id": 32,
+      "nombre": "Matrimonio",
+      "descripcion": "Contribución y permiso para contraer matrimonio.",
+      "categoria_id": 5
+    },
+    {
+      "id": 33,
+      "nombre": "Deportes",
+      "descripcion": "Contribución con implementos o pago de útiles para las practicas deportivas de los trabajadores",
+      "categoria_id": 5
+    },
+    {
+      "id": 34,
+      "nombre": "Juguetes",
+      "descripcion": "Contribución para los hijos de los trabajadores hasta cierta edad, como regalo de fin de año",
+      "categoria_id": 5
+    },
+    {
+      "id": 35,
+      "nombre": "Fallecimiento del Trabajador",
+      "descripcion": "Contribución para gastos de entierro, pagaderos a los familiares directos.",
+      "categoria_id": 5
+    },
+    {
+      "id": 64,
+      "nombre": "Capacitacion y Desarrollo",
+      "descripcion": "ASPECTOS CONSERNIENTES AL ADIESTRAMIENTO CAPACITACION Y DESARROLLO DE LOS TRABAJADORES",
+      "categoria_id": 5
+    },
+    {
+      "id": 65,
+      "nombre": "Creditos o Prestamos",
+      "descripcion": "PRESTAMOS DE DINERO A PLAZO Y CUOTAS ESPECIALES",
+      "categoria_id": 5
+    },
+    {
+      "id": 68,
+      "nombre": "Bonificación por Antiguedad",
+      "descripcion": "Bonificacion especial que se da a los trabajadores cuando cumplan años de antiguedad. Dicho tiempo será determinado por la empresa",
+      "categoria_id": 5
+    },
+    {
+      "id": 69,
+      "nombre": "Bonificación a Cobradores",
+      "descripcion": "Bonificación a cobradores por giros recibidos o cancelados",
+      "categoria_id": 5
+    },
+    {
+      "id": 70,
+      "nombre": "Cooperativas",
+      "descripcion": "Cooperativas debidamente constituidas por el sindicato, para el disfrute exclusivo de los trabajadores de la institución",
+      "categoria_id": 5
+    },
+    {
+      "id": 71,
+      "nombre": "Bono de Productividad",
+      "descripcion": "Bono otorgagado por la institucion por el aumento de la productividad o calificaciones de desempeño",
+      "categoria_id": 5
+    },
+    {
+      "id": 72,
+      "nombre": "Bonificación de Fin de Año",
+      "descripcion": "Bonificación de fin de año otorgada a los trabajadores",
+      "categoria_id": 5
+    },
+    {
+      "id": 73,
+      "nombre": "Jubilación",
+      "descripcion": "Programas o planes de jubilación",
+      "categoria_id": 5
+    },
+    {
+      "id": 85,
+      "nombre": "Vivienda",
+      "descripcion": "Convenciones Colectivas que establecen planes de vivienda para sus trabajadores.",
+      "categoria_id": 5
+    },
+    {
+      "id": 87,
+      "nombre": "Guarderia Infantil",
+      "descripcion": "Guardería  infantil previsto, son aquéllos elegibles de conformidad con lo dispuesto en el artículo 101 del RLOT.",
+      "categoria_id": 5
+    },
+    {
+      "id": 36,
+      "nombre": "Contribución a Confederaciónes",
+      "descripcion": "Pagos a la Confederación a la cual pertenece el sindicato de la empresa, como contribución para gastos de mantenimiento.",
+      "categoria_id": 6
+    },
+    {
+      "id": 37,
+      "nombre": "Contribución a Federaciónes",
+      "descripcion": "Pagos a la Federación a la cual pertenece el sindicato de la empresa, como contribución para gastos de mantenimiento.",
+      "categoria_id": 6
+    },
+    {
+      "id": 38,
+      "nombre": "Contribución a Sindicato",
+      "descripcion": "Pagos o ayudas al sindicato que suscribe la Convención Colectiva, para el mantenimiento de sus gastos.",
+      "categoria_id": 6
+    },
+    {
+      "id": 39,
+      "nombre": "Primero de Mayo",
+      "descripcion": "Contribución anual, para la conmemoración y actos con motivo del primero de mayo.",
+      "categoria_id": 6
+    },
+    {
+      "id": 40,
+      "nombre": "Contribución al Instituto de Previsión Social",
+      "descripcion": "Aporte o contribución al Instituto de Previsión Social del Sindicato.",
+      "categoria_id": 6
+    },
+    {
+      "id": 41,
+      "nombre": "Local Sindical",
+      "descripcion": "Asignación de espacio físico o aportes económicos para el mantenimiento del local u oficina del sindicato.",
+      "categoria_id": 6
+    },
+    {
+      "id": 42,
+      "nombre": "Comités de Higiene y Seguridad Industrial",
+      "descripcion": "Conformación y condiciones de los miembros que conforman el comité.",
+      "categoria_id": 7
+    },
+    {
+      "id": 43,
+      "nombre": "Inspecciones de Seguridad",
+      "descripcion": "Permisos para inspeccionar las instalaciones con la finalidad de verificar las condiciones de higiene y seguridad industrial.",
+      "categoria_id": 7
+    },
+    {
+      "id": 44,
+      "nombre": "Dotación de Implementos de Trabajo",
+      "descripcion": "Entrega de uniformes, equipos e implementos de trabajo.",
+      "categoria_id": 7
+    },
+    {
+      "id": 45,
+      "nombre": "Higiene y Seguridad - LOPCYMAT",
+      "descripcion": "Higiene y seguridad Laboral, de acuerdo a lo establecido en la LOPCYMAT",
+      "categoria_id": 7
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Comparador.Api.Tests vive como subcarpeta de este proyecto — sin este exclude,
+         el glob por defecto del SDK (**/*.cs) tambien compila los .cs del test project
+         dentro de este ensamblado, y choca con sus propias referencias a xunit. -->
+    <Compile Remove="Comparador.Api.Tests/**" />
+    <Content Remove="Comparador.Api.Tests/**" />
+    <EmbeddedResource Remove="Comparador.Api.Tests/**" />
+    <None Remove="Comparador.Api.Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
+    <PackageReference Include="EFCore.NamingConventions" Version="8.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+  </ItemGroup>
+
+</Project>
