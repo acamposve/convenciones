@@ -2,10 +2,13 @@ name: Terraform Azure Infra
 
 on:
   pull_request:
-    branches: [main]
+    # La rama por defecto de este repo es "master" (confirmado via `git branch -r` /
+    # github/HEAD -> github/master), no "main" — con [main] este workflow nunca disparaba,
+    # ni en PRs ni al mergear (PR #1 se mergeo a master y no corrio nada).
+    branches: [master]
     paths: ["infra/terraform/**"]
   push:
-    branches: [main]
+    branches: [master]
     paths: ["infra/terraform/**"]
 
 permissions:
