@@ -9,6 +9,10 @@ on:
   push:
     branches: [main]
     paths: ["infra/terraform/**"]
+  # Permite correr el "plan" a mano (Actions -> Terraform Azure Infra -> Run workflow) sin
+  # depender de que un PR o push toque infra/terraform/** — util para confirmar que OIDC/
+  # secrets ya estan bien configurados antes de abrir el primer PR de infra real.
+  workflow_dispatch: {}
 
 permissions:
   id-token: write # requerido para OIDC (azure/login)
@@ -23,7 +27,7 @@ env:
 
 jobs:
   plan:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
