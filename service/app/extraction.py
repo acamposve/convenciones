@@ -1,6 +1,10 @@
-"""Extraccion de texto (Art IV.3): parseo nativo de PDF/Word, OCR si el PDF es escaneado."""
+"""Extraccion de texto (Art IV.3): parseo nativo de PDF/Word, OCR si el PDF es escaneado.
+
+Opera sobre bytes en memoria, no sobre una ruta en disco: el original puede vivir en Azure
+Blob Storage (app/storage.py, Art V/VI.3), y el pipeline ya tiene los bytes en memoria desde
+la ingesta (main.py), asi que no hay razon para volver a tocar el filesystem para procesarlo.
+"""
 import io
-from pathlib import Path
 
 import pymupdf as fitz  # PyMuPDF
 from docx import Document as DocxDocument
@@ -13,17 +17,17 @@ class ExtractionError(Exception):
     pass
 
 
-def extract_text(ruta_archivo: str) -> str:
-    ext = Path(ruta_archivo).suffix.lower()
+def extract_text(contenido: bytes, extension: str) -> str:
+    ext = extension.lower()
     if ext == ".pdf":
-        return _extract_pdf(ruta_archivo)
+        return _extract_pdf(contenido)
     if ext == ".docx":
-        return _extract_docx(ruta_archivo)
+        return _extract_docx(contenido)
     raise ExtractionError(f"Formato de archivo no soportado para extraccion: '{ext}'")
 
 
-def _extract_pdf(ruta_archivo: str) -> str:
-    doc = fitz.open(ruta_archivo)
+def _extract_pdf(contenido: bytes) -> str:
+    doc = fitz.open(stream=contenido, filetype="pdf")
     try:
         texto_nativo = "\n".join(page.get_text("text") for page in doc)
         if len(texto_nativo.strip()) >= MIN_CHARS_PER_PAGE * doc.page_count:
@@ -54,6 +58,6 @@ def _ocr_pdf(doc: "fitz.Document") -> str:
     return "\n".join(textos)
 
 
-def _extract_docx(ruta_archivo: str) -> str:
-    doc = DocxDocument(ruta_archivo)
+def _extract_docx(contenido: bytes) -> str:
+    doc = DocxDocument(io.BytesIO(contenido))
     return "\n".join(p.text for p in doc.paragraphs if p.text.strip())

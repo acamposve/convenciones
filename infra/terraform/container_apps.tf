@@ -3,20 +3,20 @@ locals {
   # Mismo servidor/base que postgres_connection_string arriba, pero en formato URL — el
   # microservicio Python (service/app/db.py, via psycopg) espera DATABASE_URL como
   # postgresql://usuario:password@host/db, no la sintaxis Host=...;Database=... de .NET.
-  postgres_connection_url    = "postgresql://${var.postgres_admin_username}:${var.postgres_admin_password}@${azurerm_postgresql_flexible_server.main.fqdn}/${azurerm_postgresql_flexible_server_database.main.name}?sslmode=require"
-  storage_connection_string  = azurerm_storage_account.documentos.primary_connection_string
+  postgres_connection_url   = "postgresql://${var.postgres_admin_username}:${urlencode(var.postgres_admin_password)}@${azurerm_postgresql_flexible_server.main.fqdn}/${azurerm_postgresql_flexible_server_database.main.name}?sslmode=require"
+  storage_connection_string = azurerm_storage_account.documentos.primary_connection_string
 }
 
 resource "azurerm_container_app" "api" {
   name                         = "ca-${var.project_name}-api"
-  resource_group_name         = azurerm_resource_group.main.name
+  resource_group_name          = azurerm_resource_group.main.name
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
   registry {
     server               = azurerm_container_registry.main.login_server
-    username              = azurerm_container_registry.main.admin_username
-    password_secret_name  = "acr-password"
+    username             = azurerm_container_registry.main.admin_username
+    password_secret_name = "acr-password"
   }
 
   secret {
@@ -42,7 +42,7 @@ resource "azurerm_container_app" "api" {
 
     container {
       name   = "api"
-      image  = "${azurerm_container_registry.main.login_server}/comparador-api:${var.image_tag}"
+      image  = var.bootstrap_image
       cpu    = 0.5
       memory = "1Gi"
 
@@ -54,33 +54,55 @@ resource "azurerm_container_app" "api" {
         name        = "Jwt__SigningKey"
         secret_name = "jwt-signing-key"
       }
+      # Sin appsettings.json de produccion (solo existe appsettings.Development.json, que
+      # ASP.NET Core no carga bajo ASPNETCORE_ENVIRONMENT=Production, el default del
+      # Dockerfile), Jwt:Issuer/Jwt:Audience quedarian null: TokenService.cs emitiria
+      # tokens sin claims iss/aud, y service/app/auth.py (que exige issuer="comparador-api"
+      # / audience="comparador-web", hardcodeado en config.py) los rechazaria con 401 en
+      # todo endpoint del pipeline. Mismos valores que ya usa docker-compose.yml en local.
+      env {
+        name  = "Jwt__Issuer"
+        value = "comparador-api"
+      }
+      env {
+        name  = "Jwt__Audience"
+        value = "comparador-web"
+      }
       env {
         name        = "Storage__ConnectionString"
         secret_name = "storage-connection-string"
       }
+      env {
+        name  = "Cors__WebOrigin"
+        value = "https://${azurerm_container_app.frontend.latest_revision_fqdn}"
+      }
     }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
   }
 
   ingress {
     external_enabled = true
-    target_port       = 8080
+    target_port      = 8080
     traffic_weight {
       latest_revision = true
-      percentage       = 100
+      percentage      = 100
     }
   }
 }
 
 resource "azurerm_container_app" "ai_service" {
   name                         = "ca-${var.project_name}-ai"
-  resource_group_name         = azurerm_resource_group.main.name
+  resource_group_name          = azurerm_resource_group.main.name
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
   registry {
     server               = azurerm_container_registry.main.login_server
-    username              = azurerm_container_registry.main.admin_username
-    password_secret_name  = "acr-password"
+    username             = azurerm_container_registry.main.admin_username
+    password_secret_name = "acr-password"
   }
 
   secret {
@@ -113,7 +135,7 @@ resource "azurerm_container_app" "ai_service" {
 
     container {
       name   = "ai-service"
-      image  = "${azurerm_container_registry.main.login_server}/comparador-ai-service:${var.image_tag}"
+      image  = var.bootstrap_image
       cpu    = 0.5
       memory = "1Gi"
 
@@ -149,24 +171,28 @@ resource "azurerm_container_app" "ai_service" {
   # publico igual que "api" y "frontend".
   ingress {
     external_enabled = true
-    target_port       = 8000
+    target_port      = 8000
     traffic_weight {
       latest_revision = true
-      percentage       = 100
+      percentage      = 100
     }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
   }
 }
 
 resource "azurerm_container_app" "frontend" {
   name                         = "ca-${var.project_name}-frontend"
-  resource_group_name         = azurerm_resource_group.main.name
+  resource_group_name          = azurerm_resource_group.main.name
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
 
   registry {
     server               = azurerm_container_registry.main.login_server
-    username              = azurerm_container_registry.main.admin_username
-    password_secret_name  = "acr-password"
+    username             = azurerm_container_registry.main.admin_username
+    password_secret_name = "acr-password"
   }
 
   secret {
@@ -180,7 +206,7 @@ resource "azurerm_container_app" "frontend" {
 
     container {
       name   = "frontend"
-      image  = "${azurerm_container_registry.main.login_server}/comparador-frontend:${var.image_tag}"
+      image  = var.bootstrap_image
       cpu    = 0.25
       memory = "0.5Gi"
 
@@ -193,10 +219,14 @@ resource "azurerm_container_app" "frontend" {
 
   ingress {
     external_enabled = true
-    target_port       = 80
+    target_port      = 80
     traffic_weight {
       latest_revision = true
-      percentage       = 100
+      percentage      = 100
     }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
   }
 }

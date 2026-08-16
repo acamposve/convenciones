@@ -27,6 +27,12 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "bootstrap_image" {
+  description = "Imagen pública temporal usada para crear las Container Apps antes del primer push al ACR."
+  type        = string
+  default     = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+}
+
 # --- Secretos: NUNCA poner un valor real en terraform.tfvars versionado.
 # Estos llegan como variables de entorno TF_VAR_<nombre> desde GitHub Secrets.
 

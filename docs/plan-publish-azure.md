@@ -71,7 +71,7 @@ az ad app federated-credential create \
 | `AZURE_CLIENT_ID` | `appId` del paso 4 | |
 | `AZURE_TENANT_ID` | de `az account show` | |
 | `AZURE_SUBSCRIPTION_ID` | de `az account show` | |
-| `TF_VAR_postgres_admin_password` | 🔴 **MANUAL** — generá una contraseña fuerte tú mismo | Nunca en `terraform.tfvars` |
+| `TF_VAR_postgres_admin_password` | 🔴 **MANUAL** — generá una contraseña fuerte URL-safe (solo letras, números y `-_`) | Nunca en `terraform.tfvars` |
 | `TF_VAR_jwt_signing_key` | 🔴 **MANUAL** — generá 64 bytes aleatorios (`openssl rand -base64 48`) | Debe coincidir con lo que espera `TokenService.cs` |
 | `TF_VAR_anthropic_api_key` | 🔴 **MANUAL** — tu API key de Claude para el servicio de clasificación | Ver `product-self-knowledge` si necesitas confirmar cómo generarla en console.anthropic.com |
 
@@ -100,7 +100,7 @@ Automatizado, sin intervención manual una vez configurado el paso 0:
 |---|---|---|
 | `ci.yml` | Cualquier PR | Build + test de API (.NET), servicio IA (Python) y frontend (React). No toca Azure. |
 | `terraform.yml` | PR que toca `infra/terraform/**` → `plan`. Push a `main` → `apply` | Aplica la infraestructura. El `apply` requiere aprobación manual (ver 🔴 abajo) |
-| `deploy-apps.yml` | Push a `main` que toca `api/**`, `service/**` o `web/**` | Build de las 3 imágenes Docker, push a ACR, actualiza las Container Apps, aplica `db/schema.sql` (solo en base nueva) y corre `db/seed_admin_user.py` |
+| `deploy-apps.yml` | Push a `main` que toca `api/**`, `service/**` o `web/**` | Build de las 3 imágenes Docker, push a ACR, actualiza las Container Apps, aplica `db/schema.sql` o la migración legacy necesaria y corre los seeds de taxonomía y AdminTenant |
 
 ### 🔴 MANUAL — Configurar el Environment de aprobación
 
@@ -117,9 +117,11 @@ no en código.
 3. Mergear a `main` → el `apply` queda pendiente de tu aprobación en el Environment
 4. 🔴 **MANUAL** — Aprobar el `apply` en la pestaña Actions de GitHub
 5. Una vez que la infra existe, mergear o re-disparar `deploy-apps.yml` → build, push,
-   deploy de las 3 apps, schema y seed corren solos
-6. 🔴 **MANUAL** — Verificar el login con `admin@empresademo.local` / la contraseña que
-   imprime `service/db/seed_admin_user.py` en los logs de Actions (job `migrate-database`),
+   deploy de las 3 apps, schema/migración y seeds corren solos. Terraform crea primero las
+   apps con una imagen pública temporal; el workflow la reemplaza con las imágenes del ACR.
+6. 🔴 **MANUAL** — Verificar el login con `admin@empresademo.local` / la contraseña
+  temporal `CambiarAhora123!` que imprime `service/db/seed_admin_user.py` en los logs de
+  Actions (job `migrate-database`),
    y confirmar que pide cambio de contraseña (Art. VI.4 — ver también el email logueado,
    no enviado todavía, para `director@presenciavirtual.net`)
 7. 🔴 **MANUAL** — Correr el pipeline completo con un PDF real de los 403 del dataset
@@ -158,6 +160,7 @@ del planeado.
 - [ ] Environment `azure-production` con required reviewers configurado
 - [ ] PR de Terraform revisado y mergeado
 - [ ] `terraform apply` aprobado manualmente en Actions
+- [ ] Taxonomía venezolana sembrada (5 categorías y ~60 títulos)
 - [ ] Login de `admin@empresademo.local` verificado post-deploy
 - [ ] Pipeline completo probado con un PDF real antes del demo
 - [ ] (Opcional) DNS + dominio propio configurado

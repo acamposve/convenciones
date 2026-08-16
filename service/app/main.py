@@ -5,7 +5,6 @@ sin cola de revision, sin publicacion (spec-mvp-demo.md). Se ejecuta de forma si
 dentro de POST /documentos, sin cola de tareas — simplificacion de demo señalada
 explicitamente frente al Art V de la constitucion.
 """
-import os
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -14,9 +13,10 @@ import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import storage
 from app.auth import require_role
 from app.classification import build_system_prompt, classify_clause
-from app.config import STORAGE_DIR, WEB_ORIGIN
+from app.config import WEB_ORIGIN
 from app.db import get_conn
 from app.extraction import ExtractionError, extract_text
 from app.segmentation import segment_clauses
@@ -96,15 +96,6 @@ def _validar_url_publica(url: str) -> None:
         )
 
 
-def _guardar_archivo(tenant_id: uuid.UUID, filename: str, contenido: bytes) -> str:
-    safe_name = os.path.basename(filename)
-    destino_dir = STORAGE_DIR / str(tenant_id)
-    destino_dir.mkdir(parents=True, exist_ok=True)
-    destino = destino_dir / f"{uuid.uuid4().hex}_{safe_name}"
-    destino.write_bytes(contenido)
-    return str(destino)
-
-
 def _descargar_url(url: str) -> tuple[bytes, str]:
     try:
         resp = httpx.get(url, timeout=30.0, follow_redirects=True)
@@ -153,10 +144,16 @@ def crear_documento(
     if es_publico:
         _validar_url_publica(url_origen)
 
+    # contenido/extension se mantienen en memoria para el pipeline (extraction.py) — nunca
+    # se vuelve a leer el original desde su ubicacion persistida (storage.guardar) para
+    # procesarlo, asi que scale-to-zero o una replica distinta entre requests no rompe nada.
     ruta_archivo = None
+    contenido = None
+    extension = None
     if origen == "archivo":
         contenido = archivo.file.read()
-        ruta_archivo = _guardar_archivo(tenant_id, archivo.filename, contenido)
+        extension = Path(archivo.filename).suffix
+        ruta_archivo = storage.guardar(tenant_id, archivo.filename, contenido)
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
@@ -172,12 +169,13 @@ def crear_documento(
 
     if origen == "url":
         contenido, nombre = _descargar_url(url_origen)
-        ruta_archivo = _guardar_archivo(tenant_id, nombre, contenido)
+        extension = Path(nombre).suffix
+        ruta_archivo = storage.guardar(tenant_id, nombre, contenido)
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("UPDATE documentos SET ruta_archivo = %s WHERE id = %s", (ruta_archivo, documento_id))
             conn.commit()
 
-    _procesar_pipeline(documento_id, tenant_id, ruta_archivo)
+    _procesar_pipeline(documento_id, tenant_id, contenido, extension)
 
     return _obtener_documento(documento_id, tenant_id)
 
@@ -191,9 +189,9 @@ def _marcar_error(documento_id: int, mensaje: str) -> None:
         conn.commit()
 
 
-def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, ruta_archivo: str) -> None:
+def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes, extension: str) -> None:
     try:
-        texto = extract_text(ruta_archivo)
+        texto = extract_text(contenido, extension)
     except ExtractionError as exc:
         _marcar_error(documento_id, str(exc))
         return

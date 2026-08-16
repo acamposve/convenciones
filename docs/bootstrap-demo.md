@@ -38,7 +38,8 @@ docker compose up --build
    Idempotente: correrlo de nuevo (o reiniciar el compose) no duplica nada ni vuelve a
    loguear el email.
 3. **`api`** (.NET, puerto `API_PORT`, default `5080`) y **`web`** (React, puerto
-   `WEB_PORT`, default `5173`) — como antes.
+  `WEB_PORT`, default `5173`) — como antes. Este compose local todavía no declara el
+  contenedor `service`.
 
 Con eso ya podés ir a `http://localhost:${WEB_PORT}/login`, loguearte con las credenciales
 de arriba, definir la contraseña nueva cuando te lo pida, y llegar a la pantalla de carga
@@ -46,11 +47,15 @@ de documentos — sin ningún curl manual a `POST /tenants` ni correr el script 
 La UI ahora es enteramente React: la vieja UI server-rendered en Jinja2
 (`service/app/ui.py` + `templates/`) se eliminó — React (`web/`) es el único frontend.
 
-## Lo que sigue siendo manual (fuera de alcance de este cambio)
+## Servicio Python
 
 El microservicio Python (`service/app/main.py` — ingesta, extracción, segmentación,
-clasificación, Art. IV pasos 1-5) **no está containerizado** — no tiene `Dockerfile` y no
-corre dentro de este `docker-compose.yml`. Sigue arrancando local:
+clasificación, Art. IV pasos 1-5) **sí está containerizado** mediante
+[`service/Dockerfile`](../service/Dockerfile). El workflow de Azure construye esa imagen y
+la publica como `comparador-ai-service`.
+
+Para el demo local, `service/docker-compose.yml` todavía no lo levanta automáticamente.
+Puedes iniciarlo en otro terminal con Python:
 
 ```bash
 cd service
@@ -58,22 +63,37 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Necesita `service/.env` con `DATABASE_URL` apuntando al Postgres publicado
-(`localhost:${POSTGRES_PORT:-5433}`, no `db:5432` — ese hostname solo existe dentro de la
-red de Docker) y `ANTHROPIC_API_KEY` seteada para que la clasificación (Art. IV.5) funcione.
+Necesita `service/.env` con `DATABASE_URL` apuntando al Postgres publicado. Usa el valor de
+`POSTGRES_PORT` definido en `service/.env` (en tu configuración actual es `5433`; si no lo
+defines, el compose usa `5432`). No uses `db:5432` desde un proceso local: ese hostname
+solo existe dentro de la red de Docker. También necesita `ANTHROPIC_API_KEY` para que la
+clasificación (Art. IV.5) funcione.
+
+Para ejecutarlo como contenedor de forma independiente:
+
+```bash
+cd service
+docker build -t comparador-ai-service .
+docker run --rm --env-file .env -p 8000:8000 comparador-ai-service
+```
+
+En ese caso, `DATABASE_URL` debe usar `host.docker.internal` y el puerto publicado por el
+compose (`5433` en tu configuración actual), por ejemplo:
+
+`postgresql://convenciones:convenciones@host.docker.internal:5433/convenciones`
 
 Es el servicio que sirve `/tenants` y `/documentos` — **la pantalla de carga y lista de
 documentos en `web/` no funciona sin este proceso corriendo**, aparte de `api/`. Tiene su
 propio CORS (`WEB_ORIGIN` en `.env`, default `http://localhost:5173`) para aceptar
 llamadas directas desde el navegador en ese origen.
 
-Tampoco se automatizó la siembra de la taxonomía (`db/seed_taxonomia.py`, ~60 títulos reales
-de Venezuela) — no formaba parte de lo pedido (bootstrap de tenant/login) y tocarla implica
-decidir si se ejecuta contra el mismo volumen nuevo o no; se deja fuera a propósito.
+La siembra de la taxonomía (`db/seed_taxonomia.py`, ~60 títulos reales de Venezuela) no se
+ejecuta desde este compose local; el workflow de Azure sí la ejecuta antes de sembrar el
+usuario AdminTenant. Para una base local ya creada, ejecútala manualmente desde `service/`.
 
 ## Decisión que vale la pena señalar
 
-Containerizar el servicio Python (agregarle `Dockerfile` + servicio en este compose) no se
-hizo acá porque no fue parte de lo pedido y es un cambio de alcance mayor (empaqueta
-`pymupdf`/`pytesseract`/OCR, credenciales de `ANTHROPIC_API_KEY`, red interna vs. puerto de
-Postgres publicado). Si se quiere, es un paso natural siguiente pero separado de este.
+El `Dockerfile` del servicio Python empaqueta `pymupdf`, `pytesseract` y Tesseract OCR para
+Azure. La decisión pendiente para desarrollo local es agregarlo al mismo compose, porque
+eso requiere definir el uso de `db:5432` dentro de la red Docker y cómo se inyectará
+`ANTHROPIC_API_KEY`; por ahora se ejecuta como proceso local o como contenedor independiente.

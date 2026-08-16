@@ -14,9 +14,9 @@ permissions:
   contents: read
 
 env:
-  RESOURCE_GROUP: rg-comparador-demo
-  ACR_NAME: comparadordemoacr
-  POSTGRES_SERVER: psql-comparador-demo
+  PROJECT_NAME: comparador
+  ENVIRONMENT: demo
+  POSTGRES_ADMIN_USERNAME: comparador_admin
 
 jobs:
   build-and-push:
@@ -34,17 +34,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - run: az acr login --name ${{ env.ACR_NAME }}
+      - run: az acr login --name ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr
 
       - name: Build & push API
         run: |
-          docker build -t ${{ env.ACR_NAME }}.azurecr.io/comparador-api:${{ steps.tag.outputs.tag }} api
-          docker push ${{ env.ACR_NAME }}.azurecr.io/comparador-api:${{ steps.tag.outputs.tag }}
+          docker build -t ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-api:${{ steps.tag.outputs.tag }} api
+          docker push ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-api:${{ steps.tag.outputs.tag }}
 
       - name: Build & push AI service
         run: |
-          docker build -t ${{ env.ACR_NAME }}.azurecr.io/comparador-ai-service:${{ steps.tag.outputs.tag }} service
-          docker push ${{ env.ACR_NAME }}.azurecr.io/comparador-ai-service:${{ steps.tag.outputs.tag }}
+          docker build -t ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-ai-service:${{ steps.tag.outputs.tag }} service
+          docker push ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-ai-service:${{ steps.tag.outputs.tag }}
 
       # Vite bakea las VITE_* en el bundle en build time (no las lee en runtime), asi que
       # el frontend necesita las URLs reales de "api" y "ai-service" ANTES de buildear su
@@ -55,8 +55,8 @@ jobs:
       - name: Resolver URLs de api y ai-service
         id: urls
         run: |
-          API_FQDN=$(az containerapp show --name ca-comparador-api --resource-group ${{ env.RESOURCE_GROUP }} --query properties.configuration.ingress.fqdn -o tsv)
-          AI_FQDN=$(az containerapp show --name ca-comparador-ai --resource-group ${{ env.RESOURCE_GROUP }} --query properties.configuration.ingress.fqdn -o tsv)
+          API_FQDN=$(az containerapp show --name ca-${{ env.PROJECT_NAME }}-api --resource-group rg-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} --query properties.configuration.ingress.fqdn -o tsv)
+          AI_FQDN=$(az containerapp show --name ca-${{ env.PROJECT_NAME }}-ai --resource-group rg-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} --query properties.configuration.ingress.fqdn -o tsv)
           echo "api_url=https://$API_FQDN" >> "$GITHUB_OUTPUT"
           echo "ai_url=https://$AI_FQDN" >> "$GITHUB_OUTPUT"
 
@@ -65,8 +65,8 @@ jobs:
           docker build \
             --build-arg VITE_API_BASE_URL=${{ steps.urls.outputs.api_url }} \
             --build-arg VITE_DOCUMENT_API_BASE_URL=${{ steps.urls.outputs.ai_url }} \
-            -t ${{ env.ACR_NAME }}.azurecr.io/comparador-frontend:${{ steps.tag.outputs.tag }} web
-          docker push ${{ env.ACR_NAME }}.azurecr.io/comparador-frontend:${{ steps.tag.outputs.tag }}
+            -t ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-frontend:${{ steps.tag.outputs.tag }} web
+          docker push ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-frontend:${{ steps.tag.outputs.tag }}
 
   migrate-database:
     needs: build-and-push
@@ -91,8 +91,8 @@ jobs:
           RUNNER_IP=$(curl -s https://api.ipify.org)
           echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
           az postgres flexible-server firewall-rule create \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name ${{ env.POSTGRES_SERVER }} \
+            --resource-group rg-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} \
+            --name psql-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} \
             --rule-name github-actions-temp \
             --start-ip-address "$RUNNER_IP" \
             --end-ip-address "$RUNNER_IP"
@@ -109,21 +109,28 @@ jobs:
             echo "Base nueva — aplicando db/schema.sql"
             psql "$DATABASE_URL" -f db/schema.sql
           else
-            echo "Schema ya existe — si hay migraciones nuevas en db/migrations/, aplicalas a mano (🔴 MANUAL, ver docs/plan-publish-azure.md)."
+            TENANT_ID_TYPE=$(psql "$DATABASE_URL" -tAc "SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'id'")
+            if [ "$TENANT_ID_TYPE" = "integer" ]; then
+              echo "Schema legado detectado — aplicando db/migrations/002_auth.sql"
+              psql "$DATABASE_URL" -f db/migrations/002_auth.sql
+            else
+              echo "Schema actual detectado — no se reaplican migraciones históricas."
+            fi
           fi
+          python db/seed_taxonomia.py
           python db/seed_admin_user.py
         env:
           # 🔴 MANUAL: confirmar que el usuario ("comparador_admin" abajo)
           # coincide con var.postgres_admin_username en Terraform si lo
           # cambiaste del default. ubuntu-latest ya trae `psql` instalado.
-          DATABASE_URL: "postgresql://comparador_admin:${{ secrets.TF_VAR_postgres_admin_password }}@${{ env.POSTGRES_SERVER }}.postgres.database.azure.com/comparador?sslmode=require"
+          DATABASE_URL: "postgresql://${{ env.POSTGRES_ADMIN_USERNAME }}:${{ secrets.TF_VAR_postgres_admin_password }}@psql-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}.postgres.database.azure.com/comparador?sslmode=require"
 
       - name: Cerrar firewall temporal
         if: always() # se ejecuta incluso si la migración falló arriba
         run: |
           az postgres flexible-server firewall-rule delete \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name ${{ env.POSTGRES_SERVER }} \
+            --resource-group rg-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} \
+            --name psql-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} \
             --rule-name github-actions-temp \
             --yes
 
@@ -140,9 +147,9 @@ jobs:
       - name: Actualizar las 3 Container Apps con la nueva imagen
         run: |
           TAG=${{ needs.build-and-push.outputs.image_tag }}
-          az containerapp update --name ca-comparador-api --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_NAME }}.azurecr.io/comparador-api:$TAG
-          az containerapp update --name ca-comparador-ai --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_NAME }}.azurecr.io/comparador-ai-service:$TAG
-          az containerapp update --name ca-comparador-frontend --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.ACR_NAME }}.azurecr.io/comparador-frontend:$TAG
+          az containerapp update --name ca-${{ env.PROJECT_NAME }}-api --resource-group rg-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} \
+            --image ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-api:$TAG
+          az containerapp update --name ca-${{ env.PROJECT_NAME }}-ai --resource-group rg-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} \
+            --image ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-ai-service:$TAG
+          az containerapp update --name ca-${{ env.PROJECT_NAME }}-frontend --resource-group rg-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }} \
+            --image ${{ env.PROJECT_NAME }}${{ env.ENVIRONMENT }}acr.azurecr.io/comparador-frontend:$TAG
