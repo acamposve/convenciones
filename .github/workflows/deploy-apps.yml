@@ -133,7 +133,19 @@ jobs:
           # 🔴 MANUAL: confirmar que el usuario ("comparador_admin" abajo)
           # coincide con var.postgres_admin_username en Terraform si lo
           # cambiaste del default. ubuntu-latest ya trae `psql` instalado.
-          DATABASE_URL: "postgresql://${{ env.POSTGRES_ADMIN_USERNAME }}:${{ secrets.TF_VAR_postgres_admin_password }}@psql-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}.postgres.database.azure.com/comparador?sslmode=require"
+          #
+          # DATABASE_URL va en formato keyword/value de libpq, NO como URL, y el password
+          # viaja aparte en PGPASSWORD. Motivo: un password con "/", "+" o "=" (lo que
+          # genera `openssl rand -base64`) rompe el parseo de una URL — psql tomaba el
+          # primer tramo del password como el puerto y fallaba con "invalid integer value
+          # ... for connection option port". URL-encodear el password tambien lo
+          # arreglaria (es lo que hace container_apps.tf con urlencode()), pero entonces
+          # la forma encodeada ya no coincide con el secret y GitHub deja de enmascararla
+          # en los logs. Asi el password nunca entra en una cadena que haya que escapar.
+          # psql y psycopg (db/seed_*.py) aceptan los dos este formato y toman PGPASSWORD
+          # del entorno para lo que no este en la cadena.
+          PGPASSWORD: ${{ secrets.TF_VAR_postgres_admin_password }}
+          DATABASE_URL: "host=psql-${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}.postgres.database.azure.com dbname=comparador user=${{ env.POSTGRES_ADMIN_USERNAME }} sslmode=require"
 
       - name: Cerrar firewall temporal
         if: always() # se ejecuta incluso si la migración falló arriba
