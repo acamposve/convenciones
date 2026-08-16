@@ -22,6 +22,16 @@ resource "azurerm_postgresql_flexible_server" "main" {
   # Sin alta disponibilidad ni backups extendidos — aceptable para demo,
   # no para Fase 1 de producción real.
   backup_retention_days = 7
+
+  lifecycle {
+    # Sin "zone" en el config (arriba), Azure asigna una al crear el servidor. En applies
+    # posteriores, Terraform compara "config sin zone" contra "state con la zona ya
+    # asignada" y lo trata como un intento de cambio de zona — algo que Postgres Flexible
+    # Server no permite hacer directo (exige alta disponibilidad + swap de zona standby).
+    # Mismo patron que ya usa container_apps.tf para "image": ignorar el atributo que un
+    # sistema externo asigna, para no pelear con el en cada plan/apply.
+    ignore_changes = [zone]
+  }
 }
 
 resource "azurerm_postgresql_flexible_server_database" "main" {
