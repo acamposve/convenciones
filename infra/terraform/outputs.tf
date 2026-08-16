@@ -21,3 +21,5 @@ output "postgres_fqdn" {
 output "resource_group_name" {
   value = azurerm_resource_group.main.name
 }
+
+# Cambio trivial: smoke test del pipeline de terraform.yml, primera prueba en Azure.

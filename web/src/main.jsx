@@ -11,6 +11,7 @@ import { DocumentDetail } from "./documentos/DocumentDetail";
 
 // Alcance actual (spec-mvp-demo.md): solo carga y lectura de documentos clasificados.
 // Sin cola de revision, sin reportes, sin selector — eso es fase posterior (Art X).
+// (cambio trivial: smoke test del pipeline de deploy-apps.yml, primera prueba en Azure)
 function DocumentosPage() {
   const { rol, logout } = useAuth();
   const [reloadToken, setReloadToken] = useState(0);
