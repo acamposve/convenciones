@@ -1,6 +1,11 @@
 # NOTA: los nombres de recurso (ACR, resource group, container apps) deben
 # coincidir con lo que Terraform realmente creó — confirmar tras el primer
 # `terraform apply` si los nombres difieren.
+
+
+#modificado al 16/08/2026
+
+
 name: Deploy Apps to Azure
 
 on:
