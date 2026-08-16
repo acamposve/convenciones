@@ -6,7 +6,12 @@ variable "azure_subscription_id" {
 variable "location" {
   description = "Región de Azure para todos los recursos."
   type        = string
-  default     = "eastus"
+  # "eastus" tiene el aprovisionamiento de Postgres Flexible Server restringido para esta
+  # suscripción (confirmado con `az postgres flexible-server list-skus --location eastus`:
+  # reason="Provisioning is restricted in this region..." y supportedServerVersions=[]).
+  # brazilsouth no tiene esa restriccion y ademas es la region mas cercana a Venezuela
+  # (audiencia del proyecto) de las que se probaron.
+  default = "brazilsouth"
 }
 
 variable "project_name" {

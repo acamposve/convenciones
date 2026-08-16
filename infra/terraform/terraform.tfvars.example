@@ -2,7 +2,7 @@
 # van como variables de entorno TF_VAR_<nombre> desde GitHub Secrets
 # (ver plan-publish-azure.md sección 0).
 
-location     = "eastus"
+location     = "brazilsouth" # eastus tiene Postgres Flexible Server restringido, ver variables.tf
 project_name = "comparador"
 environment  = "demo"
 
