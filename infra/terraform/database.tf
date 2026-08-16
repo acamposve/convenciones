@@ -12,7 +12,12 @@ resource "azurerm_postgresql_flexible_server" "main" {
   administrator_login    = var.postgres_admin_username
   administrator_password = var.postgres_admin_password
 
-  zone = "1"
+  # Sin "zone" fijo a proposito: pedir zone="1" explicito causaba
+  # 'ParameterOutOfRange: Version should be in: []' en eastus — la combinacion
+  # sku_name=B_Standard_B1ms + esa zona no tenia capacidad disponible al momento
+  # del primer apply, y la API de Postgres Flexible Server devuelve esa lista
+  # vacia de versiones en vez de un error de capacidad claro. Sin "zone", Azure
+  # elige automaticamente una zona con disponibilidad.
 
   # Sin alta disponibilidad ni backups extendidos — aceptable para demo,
   # no para Fase 1 de producción real.
