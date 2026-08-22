@@ -5,6 +5,12 @@ const AuthContext = createContext(null);
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5080";
 const DOCUMENT_API_BASE = import.meta.env.VITE_DOCUMENT_API_BASE_URL ?? "http://localhost:8000";
 
+// api/Services/TokenService.cs emite el rol con `new Claim(ClaimTypes.Role, ...)`, y eso
+// se serializa en el JWT con esta URI larga — NO como "role" a secas. Leerlo como
+// claims.role daba undefined, y la UI bloqueaba la carga de documentos con
+// "Tu rol () no tiene permiso". Misma constante que ya usa service/app/auth.py.
+const ROLE_CLAIM = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
+
 function decodeJwt(token) {
   const payload = token.split(".")[1];
   return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
@@ -15,7 +21,7 @@ export function AuthProvider({ children }) {
   // Trade-off: se pierde la sesión al refrescar la página (aceptable para MVP,
   // ver auth-spec.md §6 pendientes de TTL/refresh).
   const [accessToken, setAccessToken] = useState(null);
-  const [claims, setClaims] = useState(null); // { user_id, tenant_id, role, pais }
+  const [claims, setClaims] = useState(null); // { user_id, tenant_id, [ROLE_CLAIM], pais }
   const [resetPending, setResetPending] = useState(null);
 
   const login = useCallback(async (email, password) => {
@@ -57,7 +63,7 @@ export function AuthProvider({ children }) {
 
   // Rol viene del claim, nunca de estado local editable — evita escalar
   // permisos manipulando el store del cliente.
-  const rol = claims?.role ?? null;
+  const rol = claims?.[ROLE_CLAIM] ?? null;
   const tenantId = claims?.tenant_id ?? null;
 
   const authFetch = useCallback(
