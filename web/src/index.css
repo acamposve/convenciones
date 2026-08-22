@@ -1,0 +1,324 @@
+/* Sistema de estilos minimo para el demo MVP. Antes de esto no habia ningun CSS en el
+   proyecto (el scaffold de auth solo traia estilos inline puntuales) — no es una
+   regresion visual, es la primera pasada de diseño. */
+
+:root {
+  --color-bg: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-border: #dfe2e7;
+  --color-text: #1c2333;
+  --color-text-muted: #5b6472;
+
+  --color-primary: #1f3a5c;
+  --color-primary-hover: #16283f;
+
+  --color-warning-bg: #fff6da;
+  --color-warning-border: #eecb52;
+  --color-warning-text: #6b5900;
+
+  --color-danger-bg: #fdecea;
+  --color-danger-border: #f2b8b5;
+  --color-danger-text: #8a2c25;
+
+  --color-success-bg: #e3f5e6;
+  --color-success-border: #b7e0bd;
+  --color-success-text: #1e6b30;
+
+  --radius: 8px;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --font-sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1, h2 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 0.25rem;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+/* --- Layout --- */
+
+.page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.page-wide {
+  max-width: 1080px;
+}
+
+.page-narrow {
+  max-width: 380px;
+  padding-top: 4rem;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1.5rem;
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+}
+
+.role-tag {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* --- Banners / alerts --- */
+
+.banner {
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid transparent;
+}
+
+.banner-warning {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning-text);
+  font-weight: 600;
+}
+
+.banner-error {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+.banner-muted {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+/* --- Tarjetas / fieldsets --- */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+
+.card > legend,
+.card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0 0.4rem;
+  margin-left: 0.6rem;
+}
+
+.card-body {
+  padding: 0.9rem 1.1rem 1.1rem;
+}
+
+/* --- Formularios --- */
+
+.field {
+  display: block;
+  margin-bottom: 0.9rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  color: var(--color-text);
+}
+
+.field-hint {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="text"],
+input[type="file"] {
+  width: 100%;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.55rem 0.7rem;
+}
+
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="url"]:focus,
+input[type="text"]:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--color-text);
+  margin: 0.7rem 0;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  padding: 0.55rem 1.1rem;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+/* --- Tablas --- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.table td {
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid #eef0f3;
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table-empty {
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 1.5rem 0.7rem;
+}
+
+/* --- Badges de estado --- */
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #eef0f3;
+  color: var(--color-text-muted);
+}
+
+.badge-clasificado {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.badge-error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+/* --- Detalle de documento --- */
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.25rem;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.clause-titulo {
+  font-weight: 600;
+}
+
+.clause-categoria {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.clause-sin-clasificar {
+  color: var(--color-danger-text);
+  font-style: italic;
+}
+
+.clause-texto {
+  white-space: pre-wrap;
+  max-width: 480px;
+}

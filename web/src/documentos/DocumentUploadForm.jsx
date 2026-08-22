@@ -16,7 +16,7 @@ export function DocumentUploadForm({ onUploaded }) {
 
   if (!PUEDE_CARGAR.includes(rol)) {
     return (
-      <p style={{ color: "#555", fontSize: "0.9rem" }}>
+      <p className="banner-muted">
         Tu rol ({rol}) no tiene permiso para cargar documentos (auth-spec.md §5).
       </p>
     );
@@ -59,48 +59,43 @@ export function DocumentUploadForm({ onUploaded }) {
   }
 
   return (
-    <div style={{ marginBottom: "1.5rem" }}>
-      {error && (
-        <div style={{ background: "#fde2e2", border: "1px solid #e07a7a", padding: "0.6rem 0.9rem", borderRadius: 6, marginBottom: "1rem" }}>
-          {error}
-        </div>
-      )}
+    <div>
+      {error && <div className="banner banner-error">{error}</div>}
 
-      <fieldset style={{ border: "1px solid #ddd", borderRadius: 8, marginBottom: "1.2rem" }}>
-        <legend style={{ padding: "0 0.4rem", fontWeight: 600 }}>Subir documento (archivo PDF o Word)</legend>
-        <form onSubmit={onSubmitArchivo} style={{ padding: "0.6rem 0.9rem 0.9rem" }}>
+      <fieldset className="card">
+        <legend>Subir documento (archivo PDF o Word)</legend>
+        <form onSubmit={onSubmitArchivo} className="card-body">
           <input
             type="file"
             accept=".pdf,.docx"
             required
             onChange={(e) => setArchivo(e.target.files[0] ?? null)}
           />
-          <button type="submit" disabled={enviando} style={{ display: "block", marginTop: "0.8rem" }}>
-            Ingestar archivo
+          <button className="btn-primary btn-block" type="submit" disabled={enviando}>
+            {enviando ? "Ingestando…" : "Ingestar archivo"}
           </button>
         </form>
       </fieldset>
 
-      <fieldset style={{ border: "1px solid #ddd", borderRadius: 8 }}>
-        <legend style={{ padding: "0 0.4rem", fontWeight: 600 }}>Ingresar documento por URL</legend>
-        <form onSubmit={onSubmitUrl} style={{ padding: "0.6rem 0.9rem 0.9rem" }}>
-          <label style={{ display: "block", marginBottom: "0.2rem", fontSize: "0.9rem" }}>
-            URL del documento (PDF o Word)
+      <fieldset className="card">
+        <legend>Ingresar documento por URL</legend>
+        <form onSubmit={onSubmitUrl} className="card-body">
+          <label className="field">
+            <span className="field-label">URL del documento (PDF o Word)</span>
+            <input
+              type="url"
+              required
+              placeholder="https://..."
+              value={urlOrigen}
+              onChange={(e) => setUrlOrigen(e.target.value)}
+            />
           </label>
-          <input
-            type="url"
-            required
-            placeholder="https://..."
-            value={urlOrigen}
-            onChange={(e) => setUrlOrigen(e.target.value)}
-            style={{ width: "100%", padding: "0.4rem", boxSizing: "border-box" }}
-          />
-          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.6rem", fontSize: "0.9rem" }}>
+          <label className="checkbox-field">
             <input type="checkbox" checked={esPublico} onChange={(e) => setEsPublico(e.target.checked)} />
             Marcar como público (se valida que la URL responda sin autenticación antes de aceptarlo)
           </label>
-          <button type="submit" disabled={enviando} style={{ display: "block", marginTop: "0.8rem" }}>
-            Ingestar por URL
+          <button className="btn-primary btn-block" type="submit" disabled={enviando}>
+            {enviando ? "Ingestando…" : "Ingestar por URL"}
           </button>
         </form>
       </fieldset>

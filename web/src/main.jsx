@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import "./index.css";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { LoginPage } from "./auth/LoginPage";
@@ -17,27 +18,31 @@ function DocumentosPage() {
   const [reloadToken, setReloadToken] = useState(0);
 
   return (
-    <div style={{ maxWidth: 860, margin: "2rem auto", padding: "0 1rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1 style={{ fontSize: "1.4rem" }}>
-          Comparador de Documentos Legales <span style={{ fontSize: "0.8rem", color: "#555" }}>({rol})</span>
+    <div className="page">
+      <div className="app-header">
+        <h1>
+          Comparador de Documentos Legales <span className="role-tag">({rol})</span>
         </h1>
-        <button onClick={logout} style={{ fontSize: "0.85rem" }}>Cerrar sesión</button>
+        <button className="btn-secondary" onClick={logout}>Cerrar sesión</button>
       </div>
-      <div style={{ background: "#fff3cd", border: "1px solid #f0c040", padding: "0.6rem 0.9rem", borderRadius: 6, fontSize: "0.9rem", margin: "1rem 0 1.5rem" }}>
+      <div className="banner banner-warning">
         Clasificación automática por IA — sin revisión humana. Demo interna, no publicada.
       </div>
 
       <DocumentUploadForm onUploaded={() => setReloadToken((t) => t + 1)} />
 
-      <h2 style={{ fontSize: "1.1rem" }}>Documentos</h2>
+      <h2>Documentos</h2>
       <DocumentList reloadToken={reloadToken} />
     </div>
   );
 }
 
 function NoAutorizado() {
-  return <h1>No tenés permiso para ver esta sección</h1>;
+  return (
+    <div className="page page-narrow">
+      <h1>No tenés permiso para ver esta sección</h1>
+    </div>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(

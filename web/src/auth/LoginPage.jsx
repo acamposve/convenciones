@@ -27,18 +27,22 @@ export function LoginPage() {
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ maxWidth: 360, margin: "4rem auto" }}>
-      <h1>Iniciar sesión</h1>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      <label>
-        Email
-        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
-      </label>
-      <label>
-        Contraseña
-        <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
-      </label>
-      <button type="submit">Entrar</button>
-    </form>
+    <div className="page page-narrow">
+      <form className="card" onSubmit={onSubmit}>
+        <div className="card-body">
+          <h1>Iniciar sesión</h1>
+          {error && <div className="banner banner-error">{error}</div>}
+          <label className="field">
+            <span className="field-label">Email</span>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
+          </label>
+          <label className="field">
+            <span className="field-label">Contraseña</span>
+            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+          </label>
+          <button className="btn-primary btn-block" type="submit">Entrar</button>
+        </div>
+      </form>
+    </div>
   );
 }
