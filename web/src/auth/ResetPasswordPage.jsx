@@ -34,23 +34,31 @@ export function ResetPasswordPage() {
   }
 
   if (ok) {
-    return <p style={{ maxWidth: 360, margin: "4rem auto" }}>Contraseña actualizada. Redirigiendo a iniciar sesión…</p>;
+    return (
+      <div className="page page-narrow">
+        <div className="banner banner-warning">Contraseña actualizada. Redirigiendo a iniciar sesión…</div>
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ maxWidth: 360, margin: "4rem auto" }}>
-      <h1>Definir nueva contraseña</h1>
-      <p>Es tu primer inicio de sesión (o tu contraseña fue reseteada). Elegí una nueva.</p>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      <label>
-        Nueva contraseña
-        <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required minLength={8} />
-      </label>
-      <label>
-        Confirmar contraseña
-        <input value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} type="password" required minLength={8} />
-      </label>
-      <button type="submit">Guardar</button>
-    </form>
+    <div className="page page-narrow">
+      <form className="card" onSubmit={onSubmit}>
+        <div className="card-body">
+          <h1>Definir nueva contraseña</h1>
+          <p className="banner-muted">Es tu primer inicio de sesión (o tu contraseña fue reseteada). Elegí una nueva.</p>
+          {error && <div className="banner banner-error">{error}</div>}
+          <label className="field">
+            <span className="field-label">Nueva contraseña</span>
+            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required minLength={8} />
+          </label>
+          <label className="field">
+            <span className="field-label">Confirmar contraseña</span>
+            <input value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} type="password" required minLength={8} />
+          </label>
+          <button className="btn-primary btn-block" type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
   );
 }

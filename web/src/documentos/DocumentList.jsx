@@ -2,11 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const ESTADO_BG = {
-  clasificado: "#d9f2d9",
-  error: "#fde2e2",
-};
-
 // Estados en los que el pipeline ya termino y no hay nada mas que esperar.
 const ESTADOS_FINALES = ["clasificado", "error"];
 const POLL_MS = 4000;
@@ -49,48 +44,44 @@ export function DocumentList({ reloadToken }) {
   }, [docFetch, reloadToken, tick]);
 
   if (error) {
-    return <div style={{ background: "#fde2e2", border: "1px solid #e07a7a", padding: "0.6rem 0.9rem", borderRadius: 6 }}>{error}</div>;
+    return <div className="banner banner-error">{error}</div>;
   }
 
   if (documentos === null) {
-    return <p style={{ color: "#555" }}>Cargando documentos…</p>;
+    return <p className="banner-muted">Cargando documentos…</p>;
   }
 
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "0.5rem" }}>
+    <table className="table">
       <thead>
         <tr>
-          <th style={celda}>ID</th>
-          <th style={celda}>Origen</th>
-          <th style={celda}>Estado</th>
-          <th style={celda}>Público</th>
-          <th style={celda}>Creado</th>
+          <th>ID</th>
+          <th>Origen</th>
+          <th>Estado</th>
+          <th>Público</th>
+          <th>Creado</th>
         </tr>
       </thead>
       <tbody>
         {documentos.length === 0 && (
           <tr>
-            <td style={celda} colSpan={5}>Todavía no hay documentos para esta empresa.</td>
+            <td className="table-empty" colSpan={5}>Todavía no hay documentos para esta empresa.</td>
           </tr>
         )}
         {documentos.map((d) => (
           <tr key={d.id}>
-            <td style={celda}>
+            <td>
               <Link to={`/documentos/${d.id}`}>{d.id}</Link>
             </td>
-            <td style={celda}>{d.origen}</td>
-            <td style={celda}>
-              <span style={{ padding: "0.1rem 0.5rem", borderRadius: 4, fontSize: "0.8rem", background: ESTADO_BG[d.estado] ?? "#eee" }}>
-                {d.estado}
-              </span>
+            <td>{d.origen}</td>
+            <td>
+              <span className={`badge badge-${d.estado}`}>{d.estado}</span>
             </td>
-            <td style={celda}>{d.es_publico ? "sí" : "no"}</td>
-            <td style={celda}>{new Date(d.created_at).toLocaleString()}</td>
+            <td>{d.es_publico ? "sí" : "no"}</td>
+            <td>{new Date(d.created_at).toLocaleString()}</td>
           </tr>
         ))}
       </tbody>
     </table>
   );
 }
-
-const celda = { textAlign: "left", padding: "0.4rem 0.5rem", borderBottom: "1px solid #eee", fontSize: "0.9rem" };
