@@ -7,12 +7,28 @@ const ESTADO_BG = {
   error: "#fde2e2",
 };
 
+// Estados en los que el pipeline ya termino y no hay nada mas que esperar.
+const ESTADOS_FINALES = ["clasificado", "error"];
+const POLL_MS = 4000;
+
 // reloadToken: cambia cada vez que el padre quiere forzar un refetch (ej. tras subir
 // un documento nuevo), espejo de la tabla que antes vivia en index.html.
 export function DocumentList({ reloadToken }) {
   const { docFetch } = useAuth();
   const [documentos, setDocumentos] = useState(null);
   const [error, setError] = useState(null);
+  const [tick, setTick] = useState(0);
+
+  // El pipeline corre en segundo plano del lado del servicio Python (POST /documentos
+  // responde 201 enseguida), asi que el estado avanza solo. Se refresca mientras haya
+  // algun documento en vuelo y se corta al terminar — sin recargar la pagina a mano.
+  const enProceso = documentos?.some((d) => !ESTADOS_FINALES.includes(d.estado)) ?? false;
+
+  useEffect(() => {
+    if (!enProceso) return undefined;
+    const id = setInterval(() => setTick((t) => t + 1), POLL_MS);
+    return () => clearInterval(id);
+  }, [enProceso]);
 
   useEffect(() => {
     let cancelado = false;
@@ -30,7 +46,7 @@ export function DocumentList({ reloadToken }) {
     return () => {
       cancelado = true;
     };
-  }, [docFetch, reloadToken]);
+  }, [docFetch, reloadToken, tick]);
 
   if (error) {
     return <div style={{ background: "#fde2e2", border: "1px solid #e07a7a", padding: "0.6rem 0.9rem", borderRadius: 6 }}>{error}</div>;

@@ -1,16 +1,23 @@
 """Servicio FastAPI — ingesta, extraccion, segmentacion y clasificacion (Art IV, pasos 1-5).
 
 El pipeline se detiene despues de la clasificacion (paso 5): sin score de confianza,
-sin cola de revision, sin publicacion (spec-mvp-demo.md). Se ejecuta de forma sincrona
-dentro de POST /documentos, sin cola de tareas — simplificacion de demo señalada
-explicitamente frente al Art V de la constitucion.
+sin cola de revision, sin publicacion (spec-mvp-demo.md).
+
+POST /documentos responde 201 apenas persiste el documento y corre el pipeline en una
+tarea en segundo plano (BackgroundTasks), NO dentro de la request: la clasificacion hace
+una llamada al modelo por clausula, y en un documento real eso excede el timeout del
+ingress de Container Apps — la request moria y el navegador lo reportaba como un error de
+CORS (la respuesta de error del proxy no lleva cabeceras CORS). El avance se sigue por la
+columna `estado` (pendiente -> extraido -> segmentado -> clasificado | error), que ya
+existia para eso. Sigue sin haber cola de tareas (Azure Service Bus, Art V) — sigue siendo
+la simplificacion de demo señalada explicitamente.
 """
 import uuid
 from pathlib import Path
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import storage
@@ -116,6 +123,7 @@ def _descargar_url(url: str) -> tuple[bytes, str]:
 @app.post("/documentos", status_code=201)
 def crear_documento(
     request: Request,
+    background: BackgroundTasks,
     origen: str = Form(...),
     url_origen: Optional[str] = Form(None),
     es_publico: bool = Form(False),
@@ -175,7 +183,9 @@ def crear_documento(
             cur.execute("UPDATE documentos SET ruta_archivo = %s WHERE id = %s", (ruta_archivo, documento_id))
             conn.commit()
 
-    _procesar_pipeline(documento_id, tenant_id, contenido, extension)
+    # En segundo plano, despues de responder: el documento queda en 'pendiente' y el
+    # cliente sigue el avance por la columna `estado` (la lista se refresca sola).
+    background.add_task(_procesar_pipeline, documento_id, tenant_id, contenido, extension)
 
     return _obtener_documento(documento_id, tenant_id)
 
