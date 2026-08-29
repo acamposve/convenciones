@@ -38,9 +38,13 @@ export function AuthProvider({ children }) {
       return { resetRequired: true };
     }
 
+    const decoded = decodeJwt(data.accessToken);
     setAccessToken(data.accessToken);
-    setClaims(decodeJwt(data.accessToken));
-    return { resetRequired: false };
+    setClaims(decoded);
+    // Fase 5: un usuario de Plataforma no tiene tenant_id -- el llamador (LoginPage) usa
+    // el rol para decidir a donde navegar (/plataforma en vez de /), sin esperar un
+    // segundo render para leerlo del contexto.
+    return { resetRequired: false, rol: decoded[ROLE_CLAIM] };
   }, []);
 
   const logout = useCallback(() => {

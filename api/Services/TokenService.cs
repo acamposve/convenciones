@@ -19,15 +19,27 @@ public class TokenService
     // Claims mínimos según auth-spec.md §2: user_id, tenant_id, role, pais.
     // El tenant_id acá es la única fuente de verdad para el filtro de aislamiento (Art. VI.2) —
     // nunca se lee tenant_id de query params ni de body.
-    public string GenerarAccessToken(Usuario usuario, string paisCodigo)
+    //
+    // Fase 5 (spec-plataforma.md): un usuario de Plataforma no tiene tenant ni pais propio
+    // -- paisCodigo llega null en ese caso. Omitimos ambos claims en vez de emitir un string
+    // vacio (Nullable<Guid>.ToString() da "", que un consumidor descuidado podria confundir
+    // con un tenant_id real); el middleware de Program.cs y require_role() del lado Python
+    // ya tratan la ausencia del claim como "sin tenant", no como string vacio.
+    public string GenerarAccessToken(Usuario usuario, string? paisCodigo)
     {
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim("user_id", usuario.Id.ToString()),
-            new Claim("tenant_id", usuario.TenantId.ToString()),
             new Claim(ClaimTypes.Role, usuario.Rol.ToString()),
-            new Claim("pais", paisCodigo),
         };
+        if (usuario.TenantId is { } tenantId)
+        {
+            claims.Add(new Claim("tenant_id", tenantId.ToString()));
+        }
+        if (paisCodigo != null)
+        {
+            claims.Add(new Claim("pais", paisCodigo));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:SigningKey"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

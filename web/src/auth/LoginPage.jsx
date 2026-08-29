@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export function LoginPage() {
@@ -13,11 +13,13 @@ export function LoginPage() {
     e.preventDefault();
     setError(null);
     try {
-      const { resetRequired } = await login(email, password);
+      const { resetRequired, rol } = await login(email, password);
       if (resetRequired) {
         // Usuario migrado del legado (Art. VI.4): no tiene sesión completa
         // hasta que fije una contraseña nueva.
         navigate("/reset-password");
+      } else if (rol?.startsWith("Plataforma")) {
+        navigate("/plataforma");
       } else {
         navigate("/");
       }
@@ -41,6 +43,9 @@ export function LoginPage() {
             <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
           </label>
           <button className="btn-primary btn-block" type="submit">Entrar</button>
+          <p className="banner-muted">
+            <Link to="/registro">¿Todavía no tenés cuenta? Crear una</Link>
+          </p>
         </div>
       </form>
     </div>

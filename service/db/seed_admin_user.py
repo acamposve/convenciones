@@ -1,6 +1,12 @@
 """Bootstrap del demo: crea el tenant inicial (si no existe) y el usuario AdminTenant
 para poder loguearse por primera vez.
 
+Fase 5 (spec-plataforma.md): el camino real para un operador nuevo es el registro
+self-service (`POST /tenants` desde `web/src/auth/RegisterPage.jsx`), que crea el tenant y
+su AdminTenant en un solo paso sin pasar por este script. Este script queda como atajo de
+desarrollo/demo -- para tener credenciales fijas y predecibles al levantar el compose desde
+cero, sin llenar el formulario cada vez.
+
 Este es el paso que debe correr ANTES del primer login (docs/auth-spec.md §4): sin un
 usuario sembrado, POST /api/auth/login siempre devuelve Unauthorized. Antes, crear el
 tenant requeria un curl a mano contra POST /tenants (servicio Python) antes de correr
@@ -61,13 +67,19 @@ def _obtener_o_crear_tenant(cur) -> tuple:
         """
         INSERT INTO tenants (nombre_empresa, pais_id)
         SELECT %s, id FROM paises WHERE codigo = 'VE'
-        RETURNING id, nombre_empresa
+        RETURNING id, nombre_empresa, pais_id
         """,
         (TENANT_DEMO_NOMBRE,),
     )
     tenant = cur.fetchone()
+    # Fase 5: mismo comportamiento que el registro self-service -- el tenant arranca
+    # habilitado para su propio pais (panel de Plataforma, spec-plataforma.md §3).
+    cur.execute(
+        "INSERT INTO tenant_paises_habilitados (tenant_id, pais_id) VALUES (%s, %s)",
+        (tenant[0], tenant[2]),
+    )
     print(f"[seed] Tenant demo creado: '{tenant[1]}' ({tenant[0]}).")
-    return tenant
+    return tenant[:2]
 
 
 def main() -> None:

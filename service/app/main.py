@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+import bcrypt
 import httpx
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,7 +48,22 @@ app.add_middleware(
 
 
 @app.post("/tenants", status_code=201)
-def crear_tenant(nombre_empresa: str = Form(...)):
+def crear_tenant(
+    nombre_empresa: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    # Registro self-service (Fase 5, spec-plataforma.md §3/§6 Bloque B): endpoint publico,
+    # sin autenticacion -- crea el Tenant y su primer Usuario AdminTenant en una sola
+    # transaccion, sin intervencion de Plataforma. A diferencia de seed_admin_user.py (que
+    # arranca con una password temporal + reset obligatorio, porque alguien mas la genero),
+    # aca el propio usuario elige su password en el momento, asi que requiere_reset_password
+    # queda en false.
+    if "@" not in email:
+        raise HTTPException(422, "email invalido")
+    if len(password) < 8:
+        raise HTTPException(422, "la contraseña debe tener al menos 8 caracteres")
+
     with get_conn() as conn, conn.cursor() as cur:
         # Pais fijo Venezuela para este MVP (Art I.3): sin selector, se resuelve el unico
         # pais activo de la tabla paises en vez de pedirlo en el form.
@@ -60,6 +76,22 @@ def crear_tenant(nombre_empresa: str = Form(...)):
             (nombre_empresa,),
         )
         tenant = cur.fetchone()
+
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        cur.execute(
+            """
+            INSERT INTO usuarios (tenant_id, email, password_hash, rol, requiere_reset_password)
+            VALUES (%s, %s, %s, 'AdminTenant', false)
+            """,
+            (tenant["id"], email, password_hash),
+        )
+
+        # El tenant nuevo arranca habilitado solo para su propio pais (spec-plataforma.md
+        # §3, nota de coherencia) -- Plataforma agrega paises adicionales despues (Bloque C).
+        cur.execute(
+            "INSERT INTO tenant_paises_habilitados (tenant_id, pais_id) VALUES (%s, %s)",
+            (tenant["id"], tenant["pais_id"]),
+        )
         conn.commit()
     return tenant
 

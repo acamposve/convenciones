@@ -5,6 +5,7 @@ import "./index.css";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { LoginPage } from "./auth/LoginPage";
+import { RegisterPage } from "./auth/RegisterPage";
 import { ResetPasswordPage } from "./auth/ResetPasswordPage";
 import { DocumentUploadForm } from "./documentos/DocumentUploadForm";
 import { DocumentList } from "./documentos/DocumentList";
@@ -14,6 +15,7 @@ import { RevisionPage } from "./revision/RevisionPage";
 import { ComparadorPage } from "./comparador/ComparadorPage";
 import { NegociacionesPage } from "./negociacion/NegociacionesPage";
 import { NegociacionDetailPage } from "./negociacion/NegociacionDetailPage";
+import { PlataformaPage } from "./plataforma/PlataformaPage";
 
 // Fase 2 (constitution.md v2.0.0): Empresa + cola de revisión (Art IV.8) + comparador
 // intra-tenant (Art IV.9) ya conviven con el pipeline de ingesta/clasificación de la
@@ -61,6 +63,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/registro" element={<RegisterPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/no-autorizado" element={<NoAutorizado />} />
           <Route
@@ -116,6 +119,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             element={
               <ProtectedRoute>
                 <NegociacionDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/plataforma"
+            element={
+              <ProtectedRoute>
+                <PlataformaPage />
               </ProtectedRoute>
             }
           />
