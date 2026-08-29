@@ -54,12 +54,16 @@ builder.Services.AddAuthorization(AuthorizationPolicies.Configurar);
 // login con "No 'Access-Control-Allow-Origin' header" aunque la API funcione perfecto por
 // curl/Postman. Origen configurable (Cors__WebOrigin) para no hardcodear localhost cuando
 // esto corra en docker-compose bajo otro host/puerto.
+// Lista separada por coma, no un origen único: el frontend en Azure quedó accesible tanto
+// por el FQDN largo de Container Apps como por un dominio propio (presenciavirtual.com.uy),
+// y ambos necesitan poder loguearse desde el navegador.
 const string CorsPolicyWeb = "web";
-var webOrigin = builder.Configuration["Cors:WebOrigin"] ?? "http://localhost:5173";
+var webOrigins = (builder.Configuration["Cors:WebOrigin"] ?? "http://localhost:5173")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 builder.Services.AddCors(opt =>
 {
     opt.AddPolicy(CorsPolicyWeb, policy =>
-        policy.WithOrigins(webOrigin).AllowAnyHeader().AllowAnyMethod());
+        policy.WithOrigins(webOrigins).AllowAnyHeader().AllowAnyMethod());
 });
 
 builder.Services.AddControllers();

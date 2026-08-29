@@ -5,6 +5,15 @@ locals {
   # postgresql://usuario:password@host/db, no la sintaxis Host=...;Database=... de .NET.
   postgres_connection_url   = "postgresql://${var.postgres_admin_username}:${urlencode(var.postgres_admin_password)}@${azurerm_postgresql_flexible_server.main.fqdn}/${azurerm_postgresql_flexible_server_database.main.name}?sslmode=require"
   storage_connection_string = azurerm_storage_account.documentos.primary_connection_string
+
+  # Dominio propio del frontend (presenciavirtual.com.uy), agregado a mano por fuera de
+  # Terraform: `az containerapp hostname bind` con validation-method HTTP (el certificado
+  # gratis gestionado por Azure no tiene un recurso azurerm estable en este provider para
+  # manejarlo declarativamente todavia -- ver nota en container_apps.tf del frontend). Se
+  # listan ambos orígenes separados por coma porque Program.cs (.NET) y main.py (Python)
+  # ahora parsean Cors__WebOrigin/WEB_ORIGIN como una lista, no un string único -- así la
+  # URL vieja de Azure sigue funcionando mientras el dominio nuevo se termina de asentar.
+  frontend_allowed_origins = "https://${azurerm_container_app.frontend.ingress[0].fqdn},https://presenciavirtual.com.uy"
 }
 
 resource "azurerm_container_app" "api" {
@@ -79,7 +88,7 @@ resource "azurerm_container_app" "api" {
       # Access-Control-Allow-Origin — el login moria con error de CORS.
       env {
         name  = "Cors__WebOrigin"
-        value = "https://${azurerm_container_app.frontend.ingress[0].fqdn}"
+        value = local.frontend_allowed_origins
       }
     }
   }
@@ -167,7 +176,7 @@ resource "azurerm_container_app" "ai_service" {
       # en la app "api" de arriba.
       env {
         name  = "WEB_ORIGIN"
-        value = "https://${azurerm_container_app.frontend.ingress[0].fqdn}"
+        value = local.frontend_allowed_origins
       }
     }
   }
