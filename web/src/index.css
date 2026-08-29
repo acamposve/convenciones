@@ -297,6 +297,11 @@ button:disabled {
   text-decoration: underline;
 }
 
+.table-link-secondary {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
 .doc-meta {
   display: flex;
   flex-wrap: wrap;

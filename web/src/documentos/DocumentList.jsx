@@ -5,11 +5,12 @@ import { useAuth } from "../context/AuthContext";
 // Estados en los que el pipeline ya termino y no hay nada mas que esperar.
 const ESTADOS_FINALES = ["clasificado", "error"];
 const POLL_MS = 4000;
+const VER_NEGOCIACION = ["AdminTenant", "Revisor", "Editor"]; // spec-negociacion.md §4
 
 // reloadToken: cambia cada vez que el padre quiere forzar un refetch (ej. tras subir
 // un documento nuevo), espejo de la tabla que antes vivia en index.html.
 export function DocumentList({ reloadToken }) {
-  const { docFetch } = useAuth();
+  const { rol, docFetch } = useAuth();
   const [documentos, setDocumentos] = useState(null);
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
@@ -74,7 +75,17 @@ export function DocumentList({ reloadToken }) {
             <td>
               <Link to={`/documentos/${d.id}`}>{d.id}</Link>
             </td>
-            <td>{d.empresa_nombre}</td>
+            <td>
+              {d.empresa_nombre}
+              {VER_NEGOCIACION.includes(rol) && (
+                <>
+                  {" "}
+                  <Link className="table-link-secondary" to={`/empresas/${d.empresa_id}/negociaciones`}>
+                    (negociaciones)
+                  </Link>
+                </>
+              )}
+            </td>
             <td>{d.origen}</td>
             <td>
               <span className={`badge badge-${d.estado}`}>{d.estado}</span>

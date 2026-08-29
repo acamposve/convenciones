@@ -55,7 +55,7 @@ Nota: `Usuario` ya existía como entidad conceptual en Art. III ("Usuario / Rol"
    - verifica que el rol tenga permiso para la acción (ver matriz §5).
 5. Todo intento (éxito o fallo) se escribe en `BitacoraAcceso`.
 
-## 5. Matriz de permisos (Fase 1 + Fase 2, `spec-empresas-comparacion.md` §3)
+## 5. Matriz de permisos (Fase 1 + Fase 2 + Fase 3, `spec-empresas-comparacion.md` §3 / `spec-negociacion.md` §4)
 
 | Acción | Admin Tenant | Revisor | Editor | Visualizador |
 |---|---|---|---|---|
@@ -66,8 +66,16 @@ Nota: `Usuario` ya existía como entidad conceptual en Art. III ("Usuario / Rol"
 | Aprobar/corregir cláusula (Art. IV.8) | ✅ | ✅ | ❌ | ❌ |
 | Ver comparador / reporte publicado | ✅ | ✅ | ✅ | ✅ |
 | Exportar PDF | ✅ | ✅ | ✅ | ❌ |
+| Ver negociación (Fase 3, Art. IV bis) | ✅ | ✅ | ✅ | ❌ |
+| Registrar petición/oferta/reunión/acuerdo | ✅ | ❌ | ✅ | ❌ |
+| Cerrar/reabrir negociación (genera Documento) | ✅ | ❌ | ❌ | ❌ |
 
 Esta matriz es el candado de negocio detrás del "publicación no negociable" del Art. IV.8: **solo Admin Tenant y Revisor pueden aprobar**, ningún otro rol tiene ese permiso ni siquiera vía API directa.
+
+La negociación (Fase 3) es un proceso pre-firma interno del tenant, no un reporte publicado
+(Art. IV.9) — por eso Visualizador no tiene acceso, a diferencia del comparador. Cerrar o
+reabrir queda reservado a Admin Tenant porque genera (o regenera) un Documento oficial que
+entra al pipeline del Art. IV.
 
 Los catálogos globales de segmentación (sector, tipo de empresa, categoría, actividad,
 geografía — Art. II.5) **no son editables por ningún rol de tenant**, ni siquiera Admin

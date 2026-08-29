@@ -91,50 +91,89 @@ Cuatro bloques, en este orden — cada uno depende del anterior (B necesita las 
 C necesita poder registrar acuerdos antes de cerrar, D es la superficie visible de todo lo
 anterior).
 
-### A. Modelo de datos
+### A. Modelo de datos ✅ terminado
 
-- [ ] Diseñar y agregar a `schema.sql`: `negociaciones`, `peticiones`, `ofertas`,
+- [x] Diseñar y agregar a `schema.sql`: `negociaciones`, `peticiones`, `ofertas`,
   `reuniones`, `acuerdos`, `bitacora_negociacion`
-- [ ] `documentos.negociacion_id` + `documentos.version_negociacion` (nullable), extender
+- [x] `documentos.negociacion_id` + `documentos.version_negociacion` (nullable), extender
   el CHECK de `origen` para admitir `'negociacion'`
-- [ ] Migración incremental para la base ya desplegada:
+- [x] Migración incremental para la base ya desplegada:
   `service/db/migrations/007_negociacion.sql`
-- [ ] Bloque conditional correspondiente en `.github/workflows/deploy-apps.yml`
+- [x] Bloque conditional correspondiente en `.github/workflows/deploy-apps.yml`
 
-### B. CRUD de negociación (sin cierre todavía)
+Verificado contra Postgres 16 real en Docker: `schema.sql` fresco y, por separado,
+`schema.sql` previo a esta fase + migración `007` (simulando la base ya desplegada en
+Azure) — ambos caminos llegan a la misma estructura (`documentos` con
+`negociacion_id`/`version_negociacion`, `origen` admite `'negociacion'`, y las 6 tablas
+nuevas presentes).
 
-- [ ] Backend: `POST/GET /negociaciones` (por empresa), `GET /negociaciones/{id}` (detalle
+### B. CRUD de negociación (sin cierre todavía) ✅ terminado
+
+- [x] Backend: `POST/GET /negociaciones` (por empresa), `GET /negociaciones/{id}` (detalle
   con peticiones/ofertas/reuniones/acuerdos anidados)
-- [ ] Backend: `POST /negociaciones/{id}/peticiones`, `POST /peticiones/{id}/ofertas`,
+- [x] Backend: `POST /negociaciones/{id}/peticiones`, `POST /peticiones/{id}/ofertas`,
   `POST /negociaciones/{id}/reuniones`, `POST /negociaciones/{id}/acuerdos`
-- [ ] Cada escritura agrega su evento a `bitacora_negociacion`
-- [ ] Matriz de permisos de §4 aplicada (`require_role`)
+- [x] Cada escritura agrega su evento a `bitacora_negociacion`
+- [x] Matriz de permisos de §4 aplicada (`require_role`)
+- [x] Validación de propiedad: `peticion_id`/`oferta_id` opcionales de un acuerdo deben
+  pertenecer a la misma negociación (si no, 422) — evita colgar referencias ajenas
+  (incluso de otro tenant) de un acuerdo, Art VI.2
 
-### C. Cierre y reapertura → Documento
+### C. Cierre y reapertura → Documento ✅ terminado
 
-- [ ] Función que arma el `.docx` sintético a partir del acuerdo más reciente por título
-- [ ] `POST /negociaciones/{id}/cerrar`: valida ≥1 acuerdo, genera Documento
+- [x] Función que arma el `.docx` sintético a partir del acuerdo más reciente por título
+- [x] `POST /negociaciones/{id}/cerrar`: valida ≥1 acuerdo, genera Documento
   (`origen='negociacion'`, `version_negociacion` incremental), dispara
   `_procesar_pipeline()`, marca `negociaciones.estado='cerrada'`
-- [ ] `POST /negociaciones/{id}/reabrir` (solo si `estado='cerrada'`)
-- [ ] Verificar con Postgres real: cerrar → Documento aparece en `/documentos` con su
-  `empresa_id` → pipeline corre → reabrir → agregar/corregir un acuerdo → volver a cerrar →
-  aparece un **segundo** Documento (`version_negociacion=2`), el primero intacto
+- [x] `POST /negociaciones/{id}/reabrir` (solo si `estado='cerrada'`)
+- [x] Verificado con Postgres real: cerrar → Documento aparece en `/documentos` con su
+  `empresa_id` → pipeline corre → reabrir → agregar un acuerdo de otro título → volver a
+  cerrar → aparece un **segundo** Documento (`version_negociacion=2`) con ambos títulos
+  vigentes, el primero intacto (`version_negociacion=1`, sigue en `clasificado`)
 
-### D. Frontend
+**Bug encontrado y corregido durante la verificación:** `_armar_docx_acuerdos` usaba
+`doc.add_heading()` para cada título. `app/segmentation.py` no reconoce encabezados de
+Word como límite de cláusula — busca el patrón `CLAUSULA`/`ARTICULO`, y como
+`extraction.py` une los párrafos del `.docx` con un solo salto de línea (sin línea en
+blanco), el fallback por párrafos tampoco los separaba. Resultado: con 2+ acuerdos, todos
+los títulos terminaban fusionados en una sola cláusula (probado cerrando una negociación
+con 2 títulos contra el stack real — "1 de 1 clausulas", cuando debían ser 2). Corregido
+prefijando cada acuerdo con `"CLAUSULA -- <título>"` antes del texto, reusando el mismo
+patrón de detección que ya usan las convenciones cargadas directo. Agregado
+`test_armar_docx_acuerdos_segmenta_un_titulo_por_clausula` (`tests/test_negociacion.py`)
+como regresión.
 
-- [ ] Pantalla de negociación por Empresa: listar negociaciones, crear una nueva
-- [ ] Detalle de negociación: registrar petición → oferta, reunión, acuerdo; botón
+### D. Frontend ✅ terminado
+
+- [x] Pantalla de negociación por Empresa: listar negociaciones, crear una nueva
+  (`web/src/negociacion/NegociacionesPage.jsx`)
+- [x] Detalle de negociación: registrar petición → oferta, reunión, acuerdo; botón
   cerrar/reabrir; ver Documentos generados por versión
-- [ ] Enlace desde `EmpresasPage.jsx` (o `DocumentList.jsx`) hacia la negociación de una
-  empresa
-- [ ] Actualizar `auth-spec.md` §5 con la matriz de §4
+  (`web/src/negociacion/NegociacionDetailPage.jsx`)
+- [x] Enlace desde `EmpresasPage.jsx` y desde la columna "Empresa" de `DocumentList.jsx`
+  hacia la negociación de una empresa (visible solo para los roles con permiso de ver,
+  §4 — Visualizador no ve el link)
+- [x] Actualizar `auth-spec.md` §5 con la matriz de §4
+
+**Verificación de punta a punta**, en el navegador contra el stack completo (Postgres real
++ API .NET + servicio Python + Vite, todo vía `docker compose` + uvicorn manual): creé una
+empresa → creé una negociación → registré una petición, su oferta, una reunión y un
+acuerdo (con el título vinculado a la petición de origen, validado como perteneciente a la
+misma negociación) → cerré → se generó el Documento v1, corrió el pipeline completo
+(extracción → segmentación → clasificación fallida por API key de prueba → estado
+`clasificado`) → reabrí → agregué un acuerdo de un título distinto (addendum) → volví a
+cerrar → apareció el Documento v2 con **ambos** títulos como cláusulas separadas (tras el
+fix de segmentación) → aprobé ambas cláusulas en la cola de revisión → el Comparador las
+mostró correctamente agrupadas por empresa. Confirmado también por red: cada
+petición/oferta/reunión/acuerdo/cierre/reabrir devolvió `201`/`200` según corresponda.
 
 ## 8. Checklist resumido
 
-- [ ] A. Modelo de datos
-- [ ] B. CRUD de negociación
-- [ ] C. Cierre y reapertura → Documento
-- [ ] D. Frontend
+- [x] A. Modelo de datos
+- [x] B. CRUD de negociación
+- [x] C. Cierre y reapertura → Documento
+- [x] D. Frontend
+
+**Fase 3 completa.**
 
 *(Se actualiza a medida que avanzamos, mismo criterio que `spec-empresas-comparacion.md`.)*

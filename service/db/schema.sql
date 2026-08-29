@@ -187,6 +187,84 @@ CREATE TABLE empresas (
 
 CREATE INDEX idx_empresas_tenant_id ON empresas(tenant_id);
 
+-- Negociacion colectiva pre-firma (Art IV bis, Fase 3 / spec-negociacion.md): peticion del
+-- sindicato, oferta de la empresa, reuniones y acuerdo por titulo. Al cerrar, genera un
+-- Documento (definido mas abajo, de ahi que este bloque vaya antes). Definido antes de
+-- documentos porque documentos.negociacion_id referencia esta tabla.
+CREATE TABLE negociaciones (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id     UUID NOT NULL REFERENCES tenants(id),
+    empresa_id    UUID NOT NULL REFERENCES empresas(id),
+    estado        TEXT NOT NULL DEFAULT 'abierta' CHECK (estado IN ('abierta', 'cerrada')),
+    fecha_inicio  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_cierre  TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_negociaciones_tenant_id ON negociaciones(tenant_id);
+CREATE INDEX idx_negociaciones_empresa_id ON negociaciones(empresa_id);
+
+CREATE TABLE peticiones (
+    id              SERIAL PRIMARY KEY,
+    negociacion_id  UUID NOT NULL REFERENCES negociaciones(id),
+    titulo_id       INTEGER REFERENCES taxonomia_titulos(id),
+    nro_peticion    INTEGER NOT NULL,
+    texto           TEXT NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_peticiones_negociacion_id ON peticiones(negociacion_id);
+
+CREATE TABLE ofertas (
+    id           SERIAL PRIMARY KEY,
+    peticion_id  INTEGER NOT NULL REFERENCES peticiones(id),
+    texto        TEXT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_ofertas_peticion_id ON ofertas(peticion_id);
+
+CREATE TABLE reuniones (
+    id              SERIAL PRIMARY KEY,
+    negociacion_id  UUID NOT NULL REFERENCES negociaciones(id),
+    fecha           DATE NOT NULL,
+    asistentes      TEXT,
+    resumen         TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_reuniones_negociacion_id ON reuniones(negociacion_id);
+
+-- El acuerdo mas reciente por titulo_id dentro de una negociacion es el que se toma al
+-- cerrar (spec-negociacion.md §5) -- no hay un flag "vigente", se resuelve por created_at
+-- para no tener que mantener ese estado en sync en cada insercion.
+CREATE TABLE acuerdos (
+    id              SERIAL PRIMARY KEY,
+    negociacion_id  UUID NOT NULL REFERENCES negociaciones(id),
+    titulo_id       INTEGER NOT NULL REFERENCES taxonomia_titulos(id),
+    texto_acordado  TEXT NOT NULL,
+    peticion_id     INTEGER REFERENCES peticiones(id),
+    oferta_id       INTEGER REFERENCES ofertas(id),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_acuerdos_negociacion_id ON acuerdos(negociacion_id, titulo_id, created_at);
+
+-- Distinta de bitacora_accesos (login/logout/aprobaciones) -- esta es la bitacora propia
+-- del proceso de negociacion (Art III de la constitucion).
+CREATE TABLE bitacora_negociacion (
+    id              SERIAL PRIMARY KEY,
+    negociacion_id  UUID NOT NULL REFERENCES negociaciones(id),
+    evento          TEXT NOT NULL CHECK (
+                        evento IN ('creacion', 'peticion', 'oferta', 'reunion', 'acuerdo', 'cierre', 'reapertura')
+                    ),
+    usuario_id      UUID REFERENCES usuarios(id),
+    detalle         TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_bitacora_negociacion_negociacion_id ON bitacora_negociacion(negociacion_id);
+
 CREATE TABLE documentos (
     id            SERIAL PRIMARY KEY,
     tenant_id     UUID NOT NULL REFERENCES tenants(id),
@@ -195,16 +273,21 @@ CREATE TABLE documentos (
     -- (no hay documentos previos); en una base existente lo resuelve
     -- db/migrations/005_documentos_empresa.sql.
     empresa_id    UUID NOT NULL REFERENCES empresas(id),
-    origen        TEXT NOT NULL CHECK (origen IN ('archivo', 'url')),
+    origen        TEXT NOT NULL CHECK (origen IN ('archivo', 'url', 'negociacion')),
     url_origen    TEXT,
     ruta_archivo  TEXT,
     es_publico    BOOLEAN NOT NULL DEFAULT false,
     estado        TEXT NOT NULL DEFAULT 'pendiente',
     estado_detalle TEXT,
+    -- Fase 3 (spec-negociacion.md, Art IV bis.5): solo se llenan cuando el documento se
+    -- genero al cerrar una negociacion. version_negociacion permite reapertura + addendum
+    -- sin tabla de versiones separada (cada cierre agrega un Documento, no reemplaza el anterior).
+    negociacion_id       UUID REFERENCES negociaciones(id),
+    version_negociacion  INTEGER,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT chk_documentos_origen_datos CHECK (
         (origen = 'url' AND url_origen IS NOT NULL)
-        OR (origen = 'archivo' AND ruta_archivo IS NOT NULL)
+        OR (origen IN ('archivo', 'negociacion') AND ruta_archivo IS NOT NULL)
     ),
     -- Solo un documento ingresado por URL puede declararse publico (Art VI.1 / IV.2):
     -- un archivo cargado no tiene una URL de origen que validar como accesible sin autenticacion.
@@ -215,6 +298,7 @@ CREATE TABLE documentos (
 
 CREATE INDEX idx_documentos_tenant_id ON documentos(tenant_id);
 CREATE INDEX idx_documentos_empresa_id ON documentos(empresa_id);
+CREATE INDEX idx_documentos_negociacion_id ON documentos(negociacion_id);
 
 CREATE TABLE clausulas (
     id             SERIAL PRIMARY KEY,
