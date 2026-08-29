@@ -107,50 +107,79 @@ Cuatro bloques. A toca el modelo de auth compartido (riesgoso, se verifica con e
 cuidado antes de seguir); B es la superficie pública; C es el panel de Plataforma; D es el
 rol en sí en el login existente.
 
-### A. Modelo de datos + auth nullable
+### A. Modelo de datos + auth nullable ✅ terminado
 
-- [ ] Migración: `usuarios.tenant_id` nullable, índice único parcial de email,
+- [x] Migración: `usuarios.tenant_id` nullable, índice único parcial de email,
   `tenant_paises_habilitados`, `tenants.suspendido`, valores nuevos de `rol_usuario`
-- [ ] `api/Models/Usuario.cs`: `TenantId` → `Guid?`; enum `RolUsuario` con los 3 roles nuevos
-- [ ] `api/Services/TokenService.cs`: emitir el claim `tenant_id` de forma null-safe (omitirlo
+  (`service/db/migrations/009_plataforma.sql`, con backfill de tenants existentes)
+- [x] `api/Models/Usuario.cs`: `TenantId` → `Guid?`; enum `RolUsuario` con los 3 roles nuevos
+- [x] `api/Services/TokenService.cs`: emitir el claim `tenant_id` de forma null-safe (omitirlo
   si es null, no emitir un string vacío)
-- [ ] `api/Controllers/AuthController.cs`: la resolución de país por tenant no debe explotar
+- [x] `api/Controllers/AuthController.cs`: la resolución de país por tenant no debe explotar
   cuando el usuario no tiene tenant (usuario de Plataforma) — el claim `pais` queda vacío/omitido
-- [ ] `api/Authorization/AuthorizationPolicies.cs` (o donde vivan): política nueva para los
-  3 roles de Plataforma
-- [ ] Verificar con Postgres real: un usuario con `tenant_id=NULL` puede loguearse, recibe un
-  JWT sin claim de tenant/país, y un usuario de tenant normal sigue funcionando exactamente
-  igual que antes (sin regresión)
+- [x] `api/Services/AuthorizationPolicies.cs`: 4 políticas nuevas para los 3 roles de Plataforma
+- [x] Verificado con Postgres real y el stack completo (`docker compose`): schema fresco y
+  migración incremental (con un tenant preexistente, confirmando el backfill) llegan a la
+  misma estructura. Contra la API .NET real: un usuario con `tenant_id=NULL` se loguea y
+  recibe un JWT con `PlataformaAdmin` y **sin** `tenant_id` ni `pais`; el flujo completo de
+  un usuario normal (login → reset de contraseña obligatorio → login → refresh) sigue
+  funcionando exactamente igual que antes, confirmado decodificando ambos JWT. `dotnet test`
+  7/7 (agregado `GenerarAccessToken_UsuarioDePlataformaSinTenantNiPais_OmiteAmbosClaims`).
 
-### B. Registro público self-service
+### B. Registro público self-service ✅ terminado
 
-- [ ] Endpoint público (sin auth) que crea Tenant + primer Usuario Admin Tenant en una sola
-  transacción — mismo patrón de "requiere reset de contraseña" que `seed_admin_user.py`
-- [ ] Puebla `tenant_paises_habilitados` automáticamente con el `pais_id` del tenant nuevo
-- [ ] Frontend: pantalla de registro pública (fuera de `ProtectedRoute`)
-- [ ] `seed_admin_user.py` queda como fallback de emergencia/dev, no como el camino principal
+- [x] Endpoint público (sin auth) que crea Tenant + primer Usuario Admin Tenant en una sola
+  transacción (`POST /tenants` extendido) — a diferencia de `seed_admin_user.py`, acá el
+  usuario elige su propia contraseña en el momento, así que `requiere_reset_password=false`
+  (no aplica el flujo de reset obligatorio, que es para contraseñas que generó otra
+  persona)
+- [x] Puebla `tenant_paises_habilitados` automáticamente con el `pais_id` del tenant nuevo
+- [x] Frontend: `web/src/auth/RegisterPage.jsx`, ruta pública `/registro` (fuera de
+  `ProtectedRoute`), enlazada desde `LoginPage.jsx`
+- [x] `seed_admin_user.py` y `docs/bootstrap-demo.md` documentan el registro self-service
+  como el camino real; el script queda como atajo de desarrollo
 
-### C. Panel de Plataforma
+Verificado de punta a punta contra el stack completo (Postgres real + API .NET + servicio
+Python + Vite): registré "Consultora Laboral del Este" desde `/registro` → quedé logueado
+de una (sin pasar por reset) → confirmé en Postgres el tenant, el usuario
+(`requiere_reset_password=false`) y `tenant_paises_habilitados` con Venezuela. Probé
+también las validaciones del lado del servidor: contraseña corta (422) y email sin "@"
+(422).
 
-- [ ] Backend: listar tenants (con licencia, países habilitados, suspendido), editar
-  licencia/fecha de vencimiento, habilitar/deshabilitar país por tenant, suspender/reactivar,
-  flip global de `paises.activo`, crear otro usuario de Plataforma — matriz de permisos de §5
-- [ ] Frontend: pantalla de Plataforma (login propio, fuera del layout de tenant)
-- [ ] Verificar de punta a punta: PlataformaSoporte no puede tocar el flip global;
-  PlataformaAuditor no puede editar nada; un tenant suspendido no puede operar aunque su
-  JWT siga siendo válido
+### C. Panel de Plataforma ✅ terminado
 
-### D. Housekeeping
+- [x] Backend (`api/Controllers/PlataformaController.cs`, nuevo): listar tenants (con
+  licencia, países habilitados, suspendido), editar licencia/fecha de vencimiento,
+  habilitar/deshabilitar país por tenant, suspender/reactivar, flip global de
+  `paises.activo`, crear otro usuario de Plataforma — matriz de permisos de §5 via
+  `[Authorize(Policy = ...)]` por endpoint
+- [x] `AuthController.cs`: login y refresh rechazan con 401 si el tenant está suspendido
+- [x] Frontend: `web/src/plataforma/PlataformaPage.jsx`, ruta `/plataforma` — el login es
+  el mismo formulario compartido (`LoginPage.jsx`), que redirige según el rol del JWT
+- [x] Verificado de punta a punta contra el stack completo (primera vez que un
+  `[Authorize(Policy=...)]` real se ejercita en este API — hasta ahora solo existían las
+  políticas, sin controller que las usara): PlataformaAdmin ve/edita todo e incluso crea
+  otro usuario de Plataforma (201); PlataformaSoporte ve y edita pero el flip global de
+  país le da 403; PlataformaAuditor solo ve (403 en cualquier escritura); un AdminTenant
+  normal recibe 403 en cualquier endpoint de Plataforma; suspender un tenant bloquea el
+  login de su AdminTenant con 401 y el mensaje correcto; reactivar lo desbloquea.
+  `dotnet test` 7/7, `npm run build` limpio.
 
-- [ ] Actualizar `auth-spec.md` con el modelo de Plataforma (no encaja del todo en la
-  matriz de roles de tenant existente — sección aparte)
-- [ ] `docs/bootstrap-demo.md`: documentar el registro self-service como el camino real
+### D. Housekeeping ✅ terminado
+
+- [x] `auth-spec.md` §5 bis: modelo de Plataforma documentado aparte (no encajaba en la
+  matriz de roles de tenant existente)
+- [x] `docs/bootstrap-demo.md` y `seed_admin_user.py`: documentan el registro self-service
+  como el camino real; el script queda como atajo de desarrollo (y ahora también puebla
+  `tenant_paises_habilitados`, consistente con el registro self-service)
 
 ## 7. Checklist resumido
 
-- [ ] A. Modelo de datos + auth nullable
-- [ ] B. Registro público self-service
-- [ ] C. Panel de Plataforma
-- [ ] D. Housekeeping
+- [x] A. Modelo de datos + auth nullable
+- [x] B. Registro público self-service
+- [x] C. Panel de Plataforma
+- [x] D. Housekeeping
+
+**Fase 5 completa.**
 
 *(Se actualiza a medida que avanzamos, mismo criterio que las specs de Fases 2-4.)*

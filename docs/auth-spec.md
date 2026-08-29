@@ -77,6 +77,32 @@ La negociación (Fase 3) es un proceso pre-firma interno del tenant, no un repor
 reabrir queda reservado a Admin Tenant porque genera (o regenera) un Documento oficial que
 entra al pipeline del Art. IV.
 
+## 5 bis. Rol de Plataforma (Fase 5, spec-plataforma.md)
+
+No encaja en la matriz de §5: un usuario de Plataforma no pertenece a ningún tenant
+(`usuarios.tenant_id IS NULL`, Art. VII.4/XI.5) y su JWT no lleva claims `tenant_id` ni
+`pais` — ver `TokenService.GenerarAccessToken`. Vive en el mismo `usuarios`/login que los
+roles de tenant (mismo bcrypt, mismo JWT, misma `bitacora_accesos`), pero es un modelo de
+permisos aparte, gateado por su propia familia de políticas
+(`AuthorizationPolicies.PuedeVerPlataforma` etc., no las de tenant):
+
+| Acción | PlataformaAdmin | PlataformaSoporte | PlataformaAuditor |
+|---|---|---|---|
+| Ver tenants / licencias / países habilitados | ✅ | ✅ | ✅ |
+| Editar licencia / fecha de vencimiento | ✅ | ✅ | ❌ |
+| Habilitar/deshabilitar país por tenant | ✅ | ✅ | ❌ |
+| Suspender/reactivar un tenant | ✅ | ✅ | ❌ |
+| Flip global de `paises.activo` (gate legal, Art II.4) | ✅ | ❌ | ❌ |
+| Crear otro usuario de Plataforma | ✅ | ❌ | ❌ |
+
+El alta de un tenant nuevo (`POST /tenants`, servicio Python) es self-service — no requiere
+ningún rol de Plataforma, es un endpoint público. Plataforma administra tenants **después**
+de creados, nunca los crea.
+
+Un tenant `suspendido=true` no puede iniciar sesión nueva (`AuthController.Login`/`Refresh`
+devuelven 401) — no revoca sesiones ya emitidas, mismo criterio de granularidad que el
+check existente de `usuario.Activo` (el access token de 15 min expira solo).
+
 Los catálogos globales de segmentación (sector, tipo de empresa, categoría, actividad,
 geografía — Art. II.5) **no son editables por ningún rol de tenant**, ni siquiera Admin
 Tenant: "Gestionar empresas del catálogo" cubre solo la entidad Empresa propia del tenant,

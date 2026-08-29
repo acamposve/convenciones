@@ -24,7 +24,12 @@
 --     usuarios, refresh_tokens, bitacora_accesos) — el scaffold de auth traia singular
 --     (tenant, usuario, refresh_token); se renombraron acá para no tener dos convenciones.
 
-CREATE TYPE rol_usuario AS ENUM ('AdminTenant', 'Revisor', 'Editor', 'Visualizador');
+-- PlataformaAdmin/Soporte/Auditor (Fase 5, spec-plataforma.md): usuarios sin tenant
+-- (usuarios.tenant_id NULL) que administran operadores despues de creados.
+CREATE TYPE rol_usuario AS ENUM (
+    'AdminTenant', 'Revisor', 'Editor', 'Visualizador',
+    'PlataformaAdmin', 'PlataformaSoporte', 'PlataformaAuditor'
+);
 
 CREATE TABLE paises (
     id      SERIAL PRIMARY KEY,
@@ -42,12 +47,28 @@ CREATE TABLE tenants (
     -- no lee ni hace cumplir estos valores todavia.
     plan_licencia       TEXT NOT NULL DEFAULT 'trial',
     fecha_vencimiento   DATE,
+    -- Fase 5 (spec-plataforma.md): Plataforma puede suspender un operador (licencia vencida,
+    -- incumplimiento) sin borrar sus datos -- el login sigue funcionando, pero el JWT no
+    -- habilita ninguna accion. No reemplaza el aislamiento del Art VI.2, es un check aparte.
+    suspendido          BOOLEAN NOT NULL DEFAULT false,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Fase 5: que paises tiene habilitados cada tenant segun su licencia (independiente del
+-- flip global paises.activo, que es el gate legal de Art II.4). Hoy cada tenant nuevo
+-- arranca con exactamente una fila (su propio pais_id) via el registro self-service --
+-- modelado M:N pensando en Fase 6 (expansion), no porque un tenant ya opere multi-pais.
+CREATE TABLE tenant_paises_habilitados (
+    tenant_id  UUID NOT NULL REFERENCES tenants(id),
+    pais_id    INTEGER NOT NULL REFERENCES paises(id),
+    PRIMARY KEY (tenant_id, pais_id)
 );
 
 CREATE TABLE usuarios (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id                   UUID NOT NULL REFERENCES tenants(id),
+    -- Fase 5: nullable -- NULL identifica a un usuario de Plataforma (PlataformaAdmin/
+    -- Soporte/Auditor), que por definicion no pertenece a ningun tenant (Art VII.4).
+    tenant_id                   UUID REFERENCES tenants(id),
     email                       VARCHAR(320) NOT NULL,
     password_hash               TEXT NOT NULL,
     rol                         rol_usuario NOT NULL,
@@ -59,6 +80,11 @@ CREATE TABLE usuarios (
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (tenant_id, email)
 );
+
+-- Postgres trata cada NULL como distinto en un UNIQUE compuesto, asi que
+-- UNIQUE(tenant_id, email) de arriba NO evita emails duplicados entre usuarios de
+-- Plataforma (tenant_id NULL) -- este indice parcial cubre exactamente ese caso.
+CREATE UNIQUE INDEX idx_usuarios_email_plataforma ON usuarios(email) WHERE tenant_id IS NULL;
 
 CREATE TABLE refresh_tokens (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

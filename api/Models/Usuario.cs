@@ -5,7 +5,12 @@ public enum RolUsuario
     AdminTenant,
     Revisor,
     Editor,
-    Visualizador
+    Visualizador,
+    // Fase 5 (spec-plataforma.md): usuarios sin tenant (TenantId null) que administran
+    // operadores despues de creados -- ver AuthorizationPolicies para la matriz de permisos.
+    PlataformaAdmin,
+    PlataformaSoporte,
+    PlataformaAuditor
 }
 
 public class Pais
@@ -27,13 +32,20 @@ public class Tenant
     public string PlanLicencia { get; set; } = "trial";
     public DateOnly? FechaVencimiento { get; set; }
 
+    // Fase 5: Plataforma suspende un operador (licencia vencida, incumplimiento) sin
+    // borrar sus datos -- se hace cumplir donde corresponda (Bloque C), no en el login en si.
+    public bool Suspendido { get; set; }
+
     public Pais? Pais { get; set; }
 }
 
 public class Usuario
 {
     public Guid Id { get; set; }
-    public Guid TenantId { get; set; }
+
+    // Fase 5: nullable -- NULL identifica a un usuario de Plataforma (PlataformaAdmin/
+    // Soporte/Auditor), que por definicion no pertenece a ningun tenant (Art VII.4).
+    public Guid? TenantId { get; set; }
     public string Email { get; set; } = default!;
     public string PasswordHash { get; set; } = default!;
     public RolUsuario Rol { get; set; }
@@ -46,6 +58,18 @@ public class Usuario
     public DateTimeOffset? UltimoLoginAt { get; set; }
 
     public Tenant? Tenant { get; set; }
+}
+
+// Fase 5 (spec-plataforma.md §4): que paises tiene habilitados cada tenant segun su
+// licencia -- independiente del flip global Pais.Activo (el gate legal de Art II.4).
+// Clave compuesta (TenantId, PaisId), configurada en ComparadorDbContext.
+public class TenantPaisHabilitado
+{
+    public Guid TenantId { get; set; }
+    public int PaisId { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public Pais? Pais { get; set; }
 }
 
 public class RefreshToken

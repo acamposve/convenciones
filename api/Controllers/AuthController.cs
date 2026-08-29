@@ -42,6 +42,15 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Credenciales inválidas." });
         }
 
+        // Fase 5 (spec-plataforma.md): un tenant suspendido no puede iniciar sesion nueva
+        // -- no revoca sesiones ya emitidas (el access token expira solo, Art VII), mismo
+        // criterio de granularidad que ya usa el check de usuario.Activo mas abajo.
+        if (usuario.Tenant?.Suspendido == true)
+        {
+            await Bitacora(usuario.Id, usuario.TenantId, "login_fail", ip, userAgent);
+            return Unauthorized(new { message = "Este operador está suspendido. Contactá a soporte." });
+        }
+
         // Art. VI.4: usuarios migrados del legado nunca tienen password_hash reutilizable;
         // arrancan con requiere_reset_password = true y no reciben sesión completa, solo un
         // token de un solo uso para /api/auth/reset-password.
@@ -60,8 +69,7 @@ public class AuthController : ControllerBase
             return Ok(new LoginResponse(null, null, true, resetRaw));
         }
 
-        var paisCodigo = usuario.Tenant?.Pais?.Codigo
-            ?? throw new InvalidOperationException($"Tenant {usuario.TenantId} sin pais resuelto.");
+        var paisCodigo = ResolverPaisCodigo(usuario);
         var access = _tokens.GenerarAccessToken(usuario, paisCodigo);
         var (refreshRaw, refreshHash) = _tokens.GenerarRefreshToken();
 
@@ -123,6 +131,10 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new { message = "Usuario inactivo." });
         }
+        if (usuario.Tenant?.Suspendido == true)
+        {
+            return Unauthorized(new { message = "Este operador está suspendido. Contactá a soporte." });
+        }
 
         // Rotacion: el refresh token usado se revoca y se emite uno nuevo, para que un
         // token robado y ya usado por el legitimo deje de servir.
@@ -136,13 +148,25 @@ public class AuthController : ControllerBase
             ExpiraAt = DateTimeOffset.UtcNow.AddDays(7),
         });
 
-        var paisCodigo = usuario.Tenant?.Pais?.Codigo
-            ?? throw new InvalidOperationException($"Tenant {usuario.TenantId} sin pais resuelto.");
+        var paisCodigo = ResolverPaisCodigo(usuario);
         var access = _tokens.GenerarAccessToken(usuario, paisCodigo);
 
         await _db.SaveChangesAsync();
 
         return Ok(new LoginResponse(access, newRefreshRaw, false, null));
+    }
+
+    // Fase 5 (spec-plataforma.md): un usuario de Plataforma (TenantId null) no tiene pais
+    // propio -- antes esto explotaba con InvalidOperationException para cualquier usuario
+    // sin tenant resuelto, que ahora es un caso valido en vez de un bug de datos.
+    private static string? ResolverPaisCodigo(Usuario usuario)
+    {
+        if (usuario.TenantId is null)
+        {
+            return null;
+        }
+        return usuario.Tenant?.Pais?.Codigo
+            ?? throw new InvalidOperationException($"Tenant {usuario.TenantId} sin pais resuelto.");
     }
 
     private async Task Bitacora(Guid? usuarioId, Guid? tenantId, string evento, string? ip, string? userAgent)

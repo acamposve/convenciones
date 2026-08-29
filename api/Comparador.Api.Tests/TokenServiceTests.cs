@@ -56,6 +56,28 @@ public class TokenServiceTests
         Assert.Contains("comparador-web", token.Audiences);
     }
 
+    // Fase 5 (spec-plataforma.md): un usuario de Plataforma no tiene tenant ni pais propio.
+    // Antes de este cambio, TenantId era un Guid no-nullable y esto ni siquiera compilaba;
+    // ahora Nullable<Guid>.ToString() daria "" si se emitiera igual que antes -- hay que
+    // omitir el claim entero, no emitir un string vacio que un consumidor confunda con un
+    // tenant_id real.
+    [Fact]
+    public void GenerarAccessToken_UsuarioDePlataformaSinTenantNiPais_OmiteAmbosClaims()
+    {
+        var tokens = BuildService();
+        var usuario = BuildUsuario();
+        usuario.TenantId = null;
+        usuario.Rol = RolUsuario.PlataformaAdmin;
+
+        var jwt = tokens.GenerarAccessToken(usuario, paisCodigo: null);
+
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(jwt);
+        Assert.Equal(usuario.Id.ToString(), token.Claims.Single(c => c.Type == "user_id").Value);
+        Assert.Equal("PlataformaAdmin", token.Claims.Single(c => c.Type == ClaimTypes.Role).Value);
+        Assert.Empty(token.Claims.Where(c => c.Type == "tenant_id"));
+        Assert.Empty(token.Claims.Where(c => c.Type == "pais"));
+    }
+
     [Fact]
     public void GenerarAccessToken_ExpiraSegunJwtAccessTokenMinutes()
     {

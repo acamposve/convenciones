@@ -47,6 +47,14 @@ de documentos — sin ningún curl manual a `POST /tenants` ni correr el script 
 La UI ahora es enteramente React: la vieja UI server-rendered en Jinja2
 (`service/app/ui.py` + `templates/`) se eliminó — React (`web/`) es el único frontend.
 
+**Fase 5 (spec-plataforma.md):** el camino real para un operador nuevo ya no es
+`seed_admin_user.py` — es el registro self-service en `http://localhost:${WEB_PORT}/registro`
+(`POST /tenants` con `nombre_empresa`/`email`/`password`), que crea el Tenant y su primer
+Usuario AdminTenant en un solo paso y loguea de una (sin reset obligatorio, porque el
+usuario elige su propia contraseña ahí mismo). `seed_admin_user.py` queda como atajo de
+desarrollo/demo — sigue siendo útil para tener un tenant con credenciales fijas y
+predecibles sin pasar por el formulario cada vez que se levanta el compose desde cero.
+
 ## Servicio Python
 
 El microservicio Python (`service/app/main.py` — ingesta, extracción, segmentación,
