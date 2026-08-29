@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 const PUEDE_REVISAR = ["AdminTenant", "Revisor"]; // spec-empresas-comparacion.md §3
 
 const CONFIANZA_LABEL = { alto: "Alta", medio: "Media", bajo: "Baja" };
+const CUMPLIMIENTO_LABEL = { por_debajo: "Por debajo", iguala: "Iguala", supera: "Supera", no_aplica: "No aplica" };
 
 // Cola de revision humana (Art. IV.7-8, no negociable): nada llega al comparador
 // (Bloque E) sin pasar por aca. "Corregir" no es una accion separada -- el Revisor puede
@@ -79,6 +80,11 @@ export function RevisionPage() {
       <div className="banner banner-warning">
         Ninguna cláusula queda disponible para comparar (Art. IV.9) hasta que un Revisor la apruebe acá.
       </div>
+      <div className="banner banner-warning">
+        La columna "Cumplimiento legal" es una asistencia de IA que cruza la cláusula contra
+        el marco legal vigente (Art. IV.5 bis) — <strong>no es asesoría legal</strong> ni una
+        determinación vinculante. La decisión final es siempre del Revisor.
+      </div>
 
       {error && <div className="banner banner-error">{error}</div>}
 
@@ -94,6 +100,7 @@ export function RevisionPage() {
               <th>Cláusula</th>
               <th>Título sugerido</th>
               <th>Confianza</th>
+              <th>Cumplimiento legal</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -120,6 +127,18 @@ export function RevisionPage() {
                     </span>
                   ) : (
                     <span className="badge badge-error">Sin clasificar</span>
+                  )}
+                </td>
+                <td>
+                  {cl.cumplimiento_legal ? (
+                    <span
+                      className={`badge badge-${cl.cumplimiento_legal}`}
+                      title={cl.cumplimiento_justificacion ?? ""}
+                    >
+                      {CUMPLIMIENTO_LABEL[cl.cumplimiento_legal]}
+                    </span>
+                  ) : (
+                    <span className="banner-muted">—</span>
                   )}
                 </td>
                 <td>

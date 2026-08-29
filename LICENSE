@@ -1,0 +1,35 @@
+# Licencia — Comparador de Convenciones Colectivas de Trabajo
+
+**NOTA:** Este proyecto contiene código propietario y datos sensibles. La licencia de cada componente y dataset se especifica abajo.
+
+## Código fuente
+
+Pendiente definición: ¿MIT, Apache 2.0, Propietaria, o multi-licencia por módulo?
+
+**Contacta al equipo legal/producto antes de usarlo o distribuirlo.**
+
+## Datasets y datos de referencia
+
+### Taxonomía de países
+- **Origen:** Adaptadas de sistemas legales de Venezuela, Uruguay, Argentina, Chile (marcos públicos de ley)
+- **Licencia:** Dominio público (derivadas de texto legal)
+- **Ubicación:** `docs/taxonomia_venezuela.json`, `docs/catalogos_empresa_venezuela.json`, y equivalentes por país
+
+### Corpus de convenciones legadas (403 PDFs venezolanos)
+- **Origen:** Sistema PHP legado (Art. IX de constitution.md)
+- **Derechos:** Pendiente confirmación Art. XI.2 de constitution.md
+- **Uso:** Dataset de entrenamiento y validación — **no se distribuye públicamente**
+- **Ubicación:** `db/fixtures/` (privado)
+
+### Marcos legales
+- **Origen:** Leyes públicas de cada país (Ley Orgánica del Trabajo de Venezuela, Ley 14.250 de Argentina, etc.)
+- **Licencia:** Dominio público (texto legal oficial)
+- **Ubicación:** `docs/spec-marco-legal.md` y referencias en `docs/`
+
+## Terceros y dependencias
+
+Ver `api/Comparador.Api.csproj`, `service/requirements.txt`, `web/package.json` para licencias de librerías (típicamente Apache 2.0, MIT, BSD).
+
+---
+
+**Para consultas sobre licenciamiento, contacta al equipo legal.**

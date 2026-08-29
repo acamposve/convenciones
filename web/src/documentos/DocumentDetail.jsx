@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+const CUMPLIMIENTO_LABEL = { por_debajo: "Por debajo", iguala: "Iguala", supera: "Supera", no_aplica: "No aplica" };
+
 export function DocumentDetail() {
   const { id } = useParams();
   const { docFetch } = useAuth();
@@ -50,6 +52,10 @@ export function DocumentDetail() {
       <div className="banner banner-warning">
         ⚠️ Clasificación automática por IA — sin revisión humana. Este resultado no ha sido validado por una persona ni está publicado.
       </div>
+      <div className="banner banner-warning">
+        La columna "Cumplimiento legal" es una asistencia de IA (Art. IV.5 bis) —
+        <strong> no es asesoría legal</strong> ni una determinación vinculante.
+      </div>
 
       {(documento.estado === "error" || documento.estado_detalle) && (
         <div className="banner banner-error">
@@ -70,13 +76,14 @@ export function DocumentDetail() {
             <th style={{ width: "3rem" }}>#</th>
             <th style={{ width: "14rem" }}>Título asignado</th>
             <th>Texto de la cláusula</th>
+            <th style={{ width: "8rem" }}>Cumplimiento legal</th>
             <th style={{ width: "8rem" }}>Revisión</th>
           </tr>
         </thead>
         <tbody>
           {documento.clausulas.length === 0 && (
             <tr>
-              <td className="table-empty" colSpan={4}>Todavía no hay cláusulas para este documento.</td>
+              <td className="table-empty" colSpan={5}>Todavía no hay cláusulas para este documento.</td>
             </tr>
           )}
           {documento.clausulas.map((c) => (
@@ -93,6 +100,18 @@ export function DocumentDetail() {
                 )}
               </td>
               <td className="clause-texto">{c.texto}</td>
+              <td>
+                {c.cumplimiento_legal ? (
+                  <span
+                    className={`badge badge-${c.cumplimiento_legal}`}
+                    title={c.cumplimiento_justificacion ?? ""}
+                  >
+                    {CUMPLIMIENTO_LABEL[c.cumplimiento_legal]}
+                  </span>
+                ) : (
+                  <span className="banner-muted">—</span>
+                )}
+              </td>
               <td>
                 <span className={`badge badge-${c.estado_revision}`}>{c.estado_revision}</span>
               </td>

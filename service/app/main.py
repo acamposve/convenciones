@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import storage
 from app.auth import require_role
-from app.classification import build_system_prompt, classify_clause
+from app.classification import build_system_prompt, check_legal_compliance, classify_clause
 from app.config import WEB_ORIGIN
 from app.db import get_conn
 from app.extraction import ExtractionError, extract_text
@@ -389,6 +389,25 @@ def _marcar_error(documento_id: int, mensaje: str) -> None:
         conn.commit()
 
 
+def _articulos_relacionados_a_titulo(cur, titulo_id: int, tenant_id: uuid.UUID) -> list[dict]:
+    """Articulos de ley vinculados a un titulo (Fase 4, spec-marco-legal.md), filtrados por
+    el pais del tenant (Art VI.2 -- ninguna razon para cruzar cumplimiento contra la ley de
+    un pais distinto al del tenant, aunque hoy solo exista corpus de Venezuela)."""
+    cur.execute(
+        """
+        SELECT al.nro_articulo, al.titulo_articulo, al.texto_completo
+        FROM titulo_articulo_ley tal
+        JOIN articulos_ley al ON al.id = tal.articulo_ley_id
+        JOIN leyes l ON l.id = al.ley_id
+        JOIN tenants t ON t.pais_id = l.pais_id
+        WHERE tal.titulo_id = %s AND t.id = %s
+        ORDER BY al.nro_articulo
+        """,
+        (titulo_id, tenant_id),
+    )
+    return cur.fetchall()
+
+
 def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes, extension: str) -> None:
     try:
         texto = extract_text(contenido, extension)
@@ -436,12 +455,35 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
                 print(f"[clasificacion] documento {documento_id} orden {orden}: {exc}")
                 fallos += 1
 
+            # Art IV.5 bis (spec-marco-legal.md): solo se llama al modelo si el titulo ya
+            # asignado tiene articulos de ley vinculados -- si no, 'no_aplica' sin gastar
+            # una llamada extra. Nunca bloquea el pipeline: un fallo acá deja la señal en
+            # NULL, igual que un fallo de clasificacion deja titulo_id en NULL.
+            cumplimiento_legal = None
+            cumplimiento_justificacion = None
+            if titulo_id is not None:
+                articulos_relacionados = _articulos_relacionados_a_titulo(cur, titulo_id, tenant_id)
+                if not articulos_relacionados:
+                    cumplimiento_legal = "no_aplica"
+                else:
+                    try:
+                        resultado_legal = check_legal_compliance(texto_clausula, articulos_relacionados)
+                        cumplimiento_legal = resultado_legal["cumplimiento"]
+                        cumplimiento_justificacion = resultado_legal["justificacion"]
+                    except Exception as exc:
+                        print(f"[cumplimiento] documento {documento_id} orden {orden}: {exc}")
+
             cur.execute(
                 """
-                INSERT INTO clausulas (documento_id, tenant_id, texto, titulo_id, categoria_id, orden, confianza)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO clausulas
+                    (documento_id, tenant_id, texto, titulo_id, categoria_id, orden, confianza,
+                     cumplimiento_legal, cumplimiento_justificacion)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (documento_id, tenant_id, texto_clausula, titulo_id, categoria_id, orden, confianza),
+                (
+                    documento_id, tenant_id, texto_clausula, titulo_id, categoria_id, orden, confianza,
+                    cumplimiento_legal, cumplimiento_justificacion,
+                ),
             )
         conn.commit()
 
@@ -470,7 +512,7 @@ def _obtener_documento(documento_id: int, tenant_id: uuid.UUID) -> dict:
         cur.execute(
             """
             SELECT cl.id, cl.texto, cl.orden, t.nombre AS titulo_nombre, c.nombre AS categoria_nombre,
-                   cl.confianza, cl.estado_revision
+                   cl.confianza, cl.estado_revision, cl.cumplimiento_legal, cl.cumplimiento_justificacion
             FROM clausulas cl
             LEFT JOIN taxonomia_titulos t ON t.id = cl.titulo_id
             LEFT JOIN taxonomia_categorias c ON c.id = cl.categoria_id
@@ -528,7 +570,8 @@ def listar_cola_revision(request: Request):
             """
             SELECT cl.id, cl.texto, cl.orden, cl.confianza,
                    cl.documento_id, d.empresa_id, e.nombre AS empresa_nombre,
-                   cl.titulo_id, t.nombre AS titulo_nombre, cl.categoria_id, c.nombre AS categoria_nombre
+                   cl.titulo_id, t.nombre AS titulo_nombre, cl.categoria_id, c.nombre AS categoria_nombre,
+                   cl.cumplimiento_legal, cl.cumplimiento_justificacion
             FROM clausulas cl
             JOIN documentos d ON d.id = cl.documento_id
             JOIN empresas e ON e.id = d.empresa_id

@@ -279,9 +279,15 @@ button:disabled {
 }
 
 .badge-error,
-.badge-rechazado {
+.badge-rechazado,
+.badge-por_debajo {
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
+}
+
+.badge-supera {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
 }
 
 /* --- Detalle de documento --- */
