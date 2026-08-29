@@ -29,5 +29,7 @@ JWT_AUDIENCE = "comparador-web"
 
 # CORS: la app de React (web/) llama a este servicio directo desde el navegador para
 # /tenants y /documentos, en un origen distinto (5173 vs 8000) — mismo motivo que
-# api/Program.cs necesita su propio Cors:WebOrigin.
-WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:5173")
+# api/Program.cs necesita su propio Cors:WebOrigin. Lista separada por coma, no un origen
+# único: en Azure el frontend quedó accesible tanto por el FQDN largo de Container Apps
+# como por un dominio propio (presenciavirtual.com.uy).
+WEB_ORIGINS = [o.strip() for o in os.environ.get("WEB_ORIGIN", "http://localhost:5173").split(",") if o.strip()]

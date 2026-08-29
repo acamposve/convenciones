@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import storage
 from app.auth import require_role
 from app.classification import build_system_prompt, check_legal_compliance, classify_clause
-from app.config import WEB_ORIGIN
+from app.config import WEB_ORIGINS
 from app.db import get_conn
 from app.extraction import ExtractionError, extract_text
 from app.segmentation import segment_clauses
@@ -35,7 +35,7 @@ app = FastAPI(title="Comparador de Documentos Legales — demo Venezuela")
 # navegador bloquea la carga/lista de documentos con "No 'Access-Control-Allow-Origin'".
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[WEB_ORIGIN],
+    allow_origins=WEB_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
