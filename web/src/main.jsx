@@ -12,6 +12,8 @@ import { DocumentDetail } from "./documentos/DocumentDetail";
 import { EmpresasPage } from "./empresas/EmpresasPage";
 import { RevisionPage } from "./revision/RevisionPage";
 import { ComparadorPage } from "./comparador/ComparadorPage";
+import { NegociacionesPage } from "./negociacion/NegociacionesPage";
+import { NegociacionDetailPage } from "./negociacion/NegociacionDetailPage";
 
 // Fase 2 (constitution.md v2.0.0): Empresa + cola de revisión (Art IV.8) + comparador
 // intra-tenant (Art IV.9) ya conviven con el pipeline de ingesta/clasificación de la
@@ -98,6 +100,22 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             element={
               <ProtectedRoute>
                 <ComparadorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/empresas/:empresaId/negociaciones"
+            element={
+              <ProtectedRoute>
+                <NegociacionesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/negociaciones/:id"
+            element={
+              <ProtectedRoute>
+                <NegociacionDetailPage />
               </ProtectedRoute>
             }
           />

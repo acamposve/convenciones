@@ -233,12 +233,13 @@ export function EmpresasPage() {
               <th>Estado</th>
               <th>Localidad</th>
               <th>Contacto</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {empresas.length === 0 && (
               <tr>
-                <td className="table-empty" colSpan={6}>Todavía no hay empresas en el catálogo.</td>
+                <td className="table-empty" colSpan={7}>Todavía no hay empresas en el catálogo.</td>
               </tr>
             )}
             {empresas.map((e) => (
@@ -249,6 +250,11 @@ export function EmpresasPage() {
                 <td>{e.estado_nombre ?? "—"}</td>
                 <td>{e.localidad_nombre ?? "—"}</td>
                 <td>{e.contacto_nombre ?? "—"}</td>
+                <td>
+                  <Link className="table-link-secondary" to={`/empresas/${e.id}/negociaciones`}>
+                    negociaciones
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

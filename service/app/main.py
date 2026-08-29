@@ -674,3 +674,357 @@ def comparar(
         )
         emp["clausulas"].append({"id": fila["clausula_id"], "texto": fila["texto"], "documento_id": fila["documento_id"]})
     return list(por_empresa.values())
+
+
+# ---------------------------------------------------------------------------
+# Negociacion colectiva pre-firma (Art IV bis, Fase 3 / spec-negociacion.md) -- peticion
+# (sindicato), oferta (empresa), reunion y acuerdo por titulo. Antecede al Art IV: una
+# Empresa puede tener documentos que nunca pasaron por aca (convenciones cargadas directo).
+# Ver la negociacion es AdminTenant/Revisor/Editor -- no es un reporte publicado (Art IV.9),
+# asi que Visualizador no entra (spec-negociacion.md §4).
+# ---------------------------------------------------------------------------
+
+_VER_NEGOCIACION = ("AdminTenant", "Revisor", "Editor")
+_EDITAR_NEGOCIACION = ("AdminTenant", "Editor")
+
+
+def _registrar_evento_negociacion(cur, negociacion_id, evento: str, usuario_id, detalle: str = None) -> None:
+    cur.execute(
+        "INSERT INTO bitacora_negociacion (negociacion_id, evento, usuario_id, detalle) VALUES (%s, %s, %s, %s)",
+        (negociacion_id, evento, usuario_id, detalle),
+    )
+
+
+def _obtener_negociacion(negociacion_id, tenant_id) -> dict:
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT n.id, n.estado, n.fecha_inicio, n.fecha_cierre, n.empresa_id, e.nombre AS empresa_nombre
+            FROM negociaciones n
+            JOIN empresas e ON e.id = n.empresa_id
+            WHERE n.id = %s AND n.tenant_id = %s
+            """,
+            (negociacion_id, tenant_id),
+        )
+        negociacion = cur.fetchone()
+        if negociacion is None:
+            raise HTTPException(404, "negociación no encontrada")
+
+        cur.execute(
+            """
+            SELECT p.id, p.nro_peticion, p.texto, p.titulo_id, t.nombre AS titulo_nombre, p.created_at
+            FROM peticiones p
+            LEFT JOIN taxonomia_titulos t ON t.id = p.titulo_id
+            WHERE p.negociacion_id = %s
+            ORDER BY p.nro_peticion
+            """,
+            (negociacion_id,),
+        )
+        peticiones = cur.fetchall()
+        if peticiones:
+            cur.execute(
+                "SELECT id, peticion_id, texto, created_at FROM ofertas WHERE peticion_id = ANY(%s) ORDER BY created_at",
+                ([p["id"] for p in peticiones],),
+            )
+            ofertas_por_peticion: dict = {}
+            for oferta in cur.fetchall():
+                ofertas_por_peticion.setdefault(oferta["peticion_id"], []).append(oferta)
+            for peticion in peticiones:
+                peticion["ofertas"] = ofertas_por_peticion.get(peticion["id"], [])
+        negociacion["peticiones"] = peticiones
+
+        cur.execute(
+            "SELECT id, fecha, asistentes, resumen, created_at FROM reuniones WHERE negociacion_id = %s ORDER BY fecha",
+            (negociacion_id,),
+        )
+        negociacion["reuniones"] = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT a.id, a.titulo_id, t.nombre AS titulo_nombre, a.texto_acordado,
+                   a.peticion_id, a.oferta_id, a.created_at
+            FROM acuerdos a
+            JOIN taxonomia_titulos t ON t.id = a.titulo_id
+            WHERE a.negociacion_id = %s
+            ORDER BY a.created_at DESC
+            """,
+            (negociacion_id,),
+        )
+        negociacion["acuerdos"] = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT id, estado, estado_detalle, version_negociacion, created_at
+            FROM documentos WHERE negociacion_id = %s ORDER BY version_negociacion
+            """,
+            (negociacion_id,),
+        )
+        negociacion["documentos"] = cur.fetchall()
+
+    return negociacion
+
+
+@app.post("/negociaciones", status_code=201)
+def crear_negociacion(request: Request, empresa_id: uuid.UUID = Form(...)):
+    claims = require_role(request, *_EDITAR_NEGOCIACION)
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM empresas WHERE id = %s AND tenant_id = %s", (empresa_id, claims.tenant_id))
+        if cur.fetchone() is None:
+            raise HTTPException(404, f"empresa_id {empresa_id} no existe en tu catálogo")
+
+        cur.execute(
+            "INSERT INTO negociaciones (tenant_id, empresa_id) VALUES (%s, %s) RETURNING id",
+            (claims.tenant_id, empresa_id),
+        )
+        negociacion_id = cur.fetchone()["id"]
+        _registrar_evento_negociacion(cur, negociacion_id, "creacion", claims.user_id)
+        conn.commit()
+    return _obtener_negociacion(negociacion_id, claims.tenant_id)
+
+
+@app.get("/negociaciones")
+def listar_negociaciones(request: Request, empresa_id: uuid.UUID):
+    claims = require_role(request, *_VER_NEGOCIACION)
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT n.id, n.estado, n.fecha_inicio, n.fecha_cierre, n.empresa_id, e.nombre AS empresa_nombre
+            FROM negociaciones n
+            JOIN empresas e ON e.id = n.empresa_id
+            WHERE n.tenant_id = %s AND n.empresa_id = %s
+            ORDER BY n.fecha_inicio DESC
+            """,
+            (claims.tenant_id, empresa_id),
+        )
+        return cur.fetchall()
+
+
+@app.get("/negociaciones/{negociacion_id}")
+def obtener_negociacion(request: Request, negociacion_id: uuid.UUID):
+    claims = require_role(request, *_VER_NEGOCIACION)
+    return _obtener_negociacion(negociacion_id, claims.tenant_id)
+
+
+def _cargar_negociacion_abierta(cur, negociacion_id, tenant_id) -> dict:
+    cur.execute(
+        "SELECT id, estado FROM negociaciones WHERE id = %s AND tenant_id = %s",
+        (negociacion_id, tenant_id),
+    )
+    negociacion = cur.fetchone()
+    if negociacion is None:
+        raise HTTPException(404, "negociación no encontrada")
+    if negociacion["estado"] != "abierta":
+        raise HTTPException(422, "la negociación está cerrada -- reabrila antes de agregar algo nuevo")
+    return negociacion
+
+
+@app.post("/negociaciones/{negociacion_id}/peticiones", status_code=201)
+def crear_peticion(
+    request: Request,
+    negociacion_id: uuid.UUID,
+    nro_peticion: int = Form(...),
+    texto: str = Form(...),
+    titulo_id: Optional[int] = Form(None),
+):
+    claims = require_role(request, *_EDITAR_NEGOCIACION)
+    with get_conn() as conn, conn.cursor() as cur:
+        _cargar_negociacion_abierta(cur, negociacion_id, claims.tenant_id)
+        cur.execute(
+            "INSERT INTO peticiones (negociacion_id, titulo_id, nro_peticion, texto) VALUES (%s, %s, %s, %s) RETURNING id",
+            (negociacion_id, titulo_id, nro_peticion, texto),
+        )
+        peticion_id = cur.fetchone()["id"]
+        _registrar_evento_negociacion(cur, negociacion_id, "peticion", claims.user_id, f"petición #{nro_peticion}")
+        conn.commit()
+    return {"id": peticion_id}
+
+
+@app.post("/peticiones/{peticion_id}/ofertas", status_code=201)
+def crear_oferta(request: Request, peticion_id: int, texto: str = Form(...)):
+    claims = require_role(request, *_EDITAR_NEGOCIACION)
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.negociacion_id FROM peticiones p
+            JOIN negociaciones n ON n.id = p.negociacion_id
+            WHERE p.id = %s AND n.tenant_id = %s
+            """,
+            (peticion_id, claims.tenant_id),
+        )
+        fila = cur.fetchone()
+        if fila is None:
+            raise HTTPException(404, "petición no encontrada")
+        negociacion_id = fila["negociacion_id"]
+        _cargar_negociacion_abierta(cur, negociacion_id, claims.tenant_id)
+
+        cur.execute("INSERT INTO ofertas (peticion_id, texto) VALUES (%s, %s) RETURNING id", (peticion_id, texto))
+        oferta_id = cur.fetchone()["id"]
+        _registrar_evento_negociacion(cur, negociacion_id, "oferta", claims.user_id)
+        conn.commit()
+    return {"id": oferta_id}
+
+
+@app.post("/negociaciones/{negociacion_id}/reuniones", status_code=201)
+def crear_reunion(
+    request: Request,
+    negociacion_id: uuid.UUID,
+    fecha: str = Form(...),
+    asistentes: Optional[str] = Form(None),
+    resumen: Optional[str] = Form(None),
+):
+    claims = require_role(request, *_EDITAR_NEGOCIACION)
+    with get_conn() as conn, conn.cursor() as cur:
+        _cargar_negociacion_abierta(cur, negociacion_id, claims.tenant_id)
+        cur.execute(
+            "INSERT INTO reuniones (negociacion_id, fecha, asistentes, resumen) VALUES (%s, %s, %s, %s) RETURNING id",
+            (negociacion_id, fecha, asistentes, resumen),
+        )
+        reunion_id = cur.fetchone()["id"]
+        _registrar_evento_negociacion(cur, negociacion_id, "reunion", claims.user_id)
+        conn.commit()
+    return {"id": reunion_id}
+
+
+@app.post("/negociaciones/{negociacion_id}/acuerdos", status_code=201)
+def crear_acuerdo(
+    request: Request,
+    negociacion_id: uuid.UUID,
+    titulo_id: int = Form(...),
+    texto_acordado: str = Form(...),
+    peticion_id: Optional[int] = Form(None),
+    oferta_id: Optional[int] = Form(None),
+):
+    claims = require_role(request, *_EDITAR_NEGOCIACION)
+    with get_conn() as conn, conn.cursor() as cur:
+        _cargar_negociacion_abierta(cur, negociacion_id, claims.tenant_id)
+        cur.execute("SELECT id FROM taxonomia_titulos WHERE id = %s", (titulo_id,))
+        if cur.fetchone() is None:
+            raise HTTPException(422, f"titulo_id {titulo_id} no existe en la taxonomía")
+
+        # peticion_id/oferta_id son opcionales, pero si se mandan deben pertenecer a ESTA
+        # negociacion -- si no, cualquier id ajeno (incluso de otro tenant) quedaria
+        # colgado de un acuerdo como referencia decorativa (Art VI.2).
+        if peticion_id is not None:
+            cur.execute(
+                "SELECT id FROM peticiones WHERE id = %s AND negociacion_id = %s",
+                (peticion_id, negociacion_id),
+            )
+            if cur.fetchone() is None:
+                raise HTTPException(422, f"peticion_id {peticion_id} no pertenece a esta negociación")
+        if oferta_id is not None:
+            cur.execute(
+                "SELECT o.id FROM ofertas o JOIN peticiones p ON p.id = o.peticion_id WHERE o.id = %s AND p.negociacion_id = %s",
+                (oferta_id, negociacion_id),
+            )
+            if cur.fetchone() is None:
+                raise HTTPException(422, f"oferta_id {oferta_id} no pertenece a esta negociación")
+
+        cur.execute(
+            """
+            INSERT INTO acuerdos (negociacion_id, titulo_id, texto_acordado, peticion_id, oferta_id)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+            """,
+            (negociacion_id, titulo_id, texto_acordado, peticion_id, oferta_id),
+        )
+        acuerdo_id = cur.fetchone()["id"]
+        _registrar_evento_negociacion(cur, negociacion_id, "acuerdo", claims.user_id)
+        conn.commit()
+    return {"id": acuerdo_id}
+
+
+def _armar_docx_acuerdos(acuerdos: list[dict]) -> bytes:
+    """Un documento sintetico, un titulo por clausula, a partir del acuerdo mas reciente de
+    cada titulo (spec-negociacion.md §5) -- se persiste y procesa igual que un archivo
+    cargado, sin rama especial en el pipeline (extraction.py ya sabe leer .docx).
+
+    El prefijo "CLAUSULA -- <titulo>" no es cosmetico: app/segmentation.py detecta limites
+    de clausula buscando el patron "CLAUSULA"/"ARTICULO" (no encabezados de Word, que
+    extract_text descarta -- doc.paragraphs los aplana igual que cualquier parrafo). Sin
+    ese prefijo, dos o mas acuerdos terminaban fusionados en una sola clausula porque
+    extract_docx los une con un solo salto de linea (sin linea en blanco de por medio, el
+    fallback de parrafos tampoco los separaba)."""
+    import io
+
+    from docx import Document as DocxDocument
+
+    doc = DocxDocument()
+    for acuerdo in acuerdos:
+        doc.add_paragraph(f"CLAUSULA -- {acuerdo['titulo_nombre']}")
+        doc.add_paragraph(acuerdo["texto_acordado"])
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
+
+
+@app.post("/negociaciones/{negociacion_id}/cerrar", status_code=201)
+def cerrar_negociacion(request: Request, negociacion_id: uuid.UUID, background: BackgroundTasks):
+    claims = require_role(request, "AdminTenant")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, estado, empresa_id FROM negociaciones WHERE id = %s AND tenant_id = %s",
+            (negociacion_id, claims.tenant_id),
+        )
+        negociacion = cur.fetchone()
+        if negociacion is None:
+            raise HTTPException(404, "negociación no encontrada")
+        if negociacion["estado"] != "abierta":
+            raise HTTPException(422, "la negociación ya está cerrada")
+
+        # El acuerdo mas reciente por titulo dentro de esta negociacion (DISTINCT ON,
+        # ordenado por created_at DESC) -- asi un addendum que renegocia un solo titulo no
+        # duplica los demas al re-cerrar (spec-negociacion.md §5).
+        cur.execute(
+            """
+            SELECT DISTINCT ON (a.titulo_id) a.titulo_id, t.nombre AS titulo_nombre, a.texto_acordado
+            FROM acuerdos a
+            JOIN taxonomia_titulos t ON t.id = a.titulo_id
+            WHERE a.negociacion_id = %s
+            ORDER BY a.titulo_id, a.created_at DESC
+            """,
+            (negociacion_id,),
+        )
+        acuerdos_vigentes = cur.fetchall()
+        if not acuerdos_vigentes:
+            raise HTTPException(422, "no hay acuerdos registrados -- no se puede cerrar sin al menos uno")
+
+        cur.execute("SELECT COUNT(*) AS n FROM documentos WHERE negociacion_id = %s", (negociacion_id,))
+        version = cur.fetchone()["n"] + 1
+
+        contenido = _armar_docx_acuerdos(acuerdos_vigentes)
+        nombre_archivo = f"negociacion_{negociacion_id}_v{version}.docx"
+        ruta_archivo = storage.guardar(claims.tenant_id, nombre_archivo, contenido)
+
+        cur.execute(
+            """
+            INSERT INTO documentos (tenant_id, empresa_id, origen, ruta_archivo, estado, negociacion_id, version_negociacion)
+            VALUES (%s, %s, 'negociacion', %s, 'pendiente', %s, %s)
+            RETURNING id
+            """,
+            (claims.tenant_id, negociacion["empresa_id"], ruta_archivo, negociacion_id, version),
+        )
+        documento_id = cur.fetchone()["id"]
+
+        cur.execute(
+            "UPDATE negociaciones SET estado = 'cerrada', fecha_cierre = now() WHERE id = %s",
+            (negociacion_id,),
+        )
+        _registrar_evento_negociacion(cur, negociacion_id, "cierre", claims.user_id, f"documento v{version}")
+        conn.commit()
+
+    background.add_task(_procesar_pipeline, documento_id, claims.tenant_id, contenido, ".docx")
+    return _obtener_negociacion(negociacion_id, claims.tenant_id)
+
+
+@app.post("/negociaciones/{negociacion_id}/reabrir")
+def reabrir_negociacion(request: Request, negociacion_id: uuid.UUID):
+    claims = require_role(request, "AdminTenant")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE negociaciones SET estado = 'abierta', fecha_cierre = NULL WHERE id = %s AND tenant_id = %s AND estado = 'cerrada' RETURNING id",
+            (negociacion_id, claims.tenant_id),
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(404, "negociación no encontrada, o ya está abierta")
+        _registrar_evento_negociacion(cur, negociacion_id, "reapertura", claims.user_id)
+        conn.commit()
+    return _obtener_negociacion(negociacion_id, claims.tenant_id)

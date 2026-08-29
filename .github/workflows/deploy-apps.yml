@@ -148,6 +148,10 @@ jobs:
             echo "Falta la cola de revisión — aplicando db/migrations/006_cola_revision.sql"
             psql "$DATABASE_URL" -f db/migrations/006_cola_revision.sql
           fi
+          if [ -z "$(psql "$DATABASE_URL" -tAc "SELECT to_regclass('public.negociaciones')")" ]; then
+            echo "Falta la negociación colectiva — aplicando db/migrations/007_negociacion.sql"
+            psql "$DATABASE_URL" -f db/migrations/007_negociacion.sql
+          fi
           python db/seed_taxonomia.py
           python db/seed_catalogos_empresa.py
           python db/seed_admin_user.py
