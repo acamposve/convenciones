@@ -71,43 +71,70 @@ para "ETL sin validar".
 Tres bloques — A necesita estar cerrado para tener datos que consultar en B, B expone la
 señal que C muestra.
 
-### A. Modelo de datos + ETL de la LOTTT
+### A. Modelo de datos + ETL de la LOTTT ✅ terminado
 
-- [ ] Agregar a `schema.sql`: `leyes`, `articulos_ley`, `titulo_articulo_ley`,
+- [x] Agregar a `schema.sql`: `leyes`, `articulos_ley`, `titulo_articulo_ley`,
   `clausulas.cumplimiento_legal`, `clausulas.cumplimiento_justificacion`
-- [ ] Migración incremental `service/db/migrations/008_marco_legal.sql`
-- [ ] `docs/ley_lottt_venezuela.json` — corpus curado (parser propio de tuplas SQL, mismo
+- [x] Migración incremental `service/db/migrations/008_marco_legal.sql`
+- [x] `docs/ley_lottt_venezuela.json` — corpus curado (parser propio de tuplas SQL, mismo
   enfoque que Fase 2 para el HTML del legado), con el vínculo artículo→título ya incluido
-- [ ] `service/db/seed_marco_legal.py` — idempotente, mismo estilo que `seed_taxonomia.py`
-- [ ] Bloque condicional en `.github/workflows/deploy-apps.yml`
+- [x] `service/db/seed_marco_legal.py` — idempotente, mismo estilo que `seed_taxonomia.py`
+- [x] Bloque condicional en `.github/workflows/deploy-apps.yml`
 
-### B. Verificación de cumplimiento en el pipeline (Art IV.5 bis)
+Verificado contra Postgres 16 real en Docker: `schema.sql` fresco y, por separado,
+`schema.sql` previo a esta fase + migración `008` (simulando la base ya desplegada en
+Azure) llegan a la misma estructura. Seed corrido contra ambos caminos: 1 ley, 555
+artículos, 357 vínculos en 28 títulos distintos — coincide exactamente con lo esperado del
+ETL. Idempotencia del `ON CONFLICT` confirmada manualmente vía SQL directo (el propio
+script de Python sufrió una lentitud intermitente del port-forwarding de Docker en Windows
+al re-ejecutarlo, sin relación con la lógica del script).
 
-- [ ] `classification.py`: `check_legal_compliance()` — cruza el texto de la cláusula
+### B. Verificación de cumplimiento en el pipeline (Art IV.5 bis) ✅ terminado
+
+- [x] `classification.py`: `check_legal_compliance()` — cruza el texto de la cláusula
   contra los artículos vinculados al título ya asignado, devuelve
   `por_debajo`/`iguala`/`supera` + justificación breve (salida estructurada, mismo patrón
   que `classify_clause()`)
-- [ ] `_procesar_pipeline()`: después de clasificar, si el título tiene artículos
+- [x] `_procesar_pipeline()`: después de clasificar, si el título tiene artículos
   vinculados (para el país del tenant) llama a `check_legal_compliance()`; si no,
   `cumplimiento_legal='no_aplica'` sin llamar al modelo (ahorra costo cuando no hay base
   legal para comparar)
-- [ ] Nunca bloquea ni reemplaza la aprobación humana (Art IV.8) — es una columna más que
+- [x] Nunca bloquea ni reemplaza la aprobación humana (Art IV.8) — es una columna más que
   ve el Revisor, no una puerta
 
-### C. Mostrar la señal (con el aviso legal no negociable)
+**Nota de verificación:** la key de Anthropic disponible en este entorno de prueba resultó
+inválida (401 "API key is invalid" incluso llamando directo al SDK, no un bug de esta
+fase), así que no se pudo probar en vivo el juicio real del modelo. Sí se verificó contra
+Postgres real la parte determinística: la consulta `_articulos_relacionados_a_titulo()`
+devuelve los 18 artículos correctos de la LOTTT para el título "Vacaciones" (121, 190-203,
+236, 254, 341 — todos genuinamente sobre vacaciones) y 0 artículos para un título sin
+vínculo ("Juguetes") — la rama `no_aplica` sin gastar una llamada al modelo. La rama de
+fallo gradual del modelo (clasificación falla → `titulo_id` queda NULL → cumplimiento
+queda NULL sin romper el pipeline) se probó en vivo cerrando una negociación real con 2
+acuerdos.
 
-- [ ] `RevisionPage.jsx` y `DocumentDetail.jsx`: columna/badge de cumplimiento con la
-  justificación breve
-- [ ] Aviso explícito en la UI (Art. XI.6): "asistencia de IA, no asesoría legal" en cada
+### C. Mostrar la señal (con el aviso legal no negociable) ✅ terminado
+
+- [x] `RevisionPage.jsx` y `DocumentDetail.jsx`: columna/badge de cumplimiento con la
+  justificación breve (`title` del badge)
+- [x] Aviso explícito en la UI (Art. XI.6): "asistencia de IA, no asesoría legal" en cada
   lugar donde se muestre la señal
-- [ ] Verificar de punta a punta contra Postgres real: cláusula clasificada con un título
-  vinculado → señal de cumplimiento calculada y visible; cláusula con un título sin
-  vínculo → `no_aplica` sin llamada extra al modelo
+- [x] Verificado de punta a punta contra Postgres real: simulando manualmente (vía SQL,
+  dado que no había key real) el resultado que `check_legal_compliance()` habría escrito —
+  el badge "Por debajo" (rojo) y "No aplica" (gris) se ven correctos tanto en
+  `DocumentDetail.jsx` como en `RevisionPage.jsx`, con el aviso legal visible en ambas
+  pantallas (capturas de pantalla revisadas).
 
 ## 6. Checklist resumido
 
-- [ ] A. Modelo de datos + ETL de la LOTTT
-- [ ] B. Verificación de cumplimiento en el pipeline
-- [ ] C. Mostrar la señal
+- [x] A. Modelo de datos + ETL de la LOTTT
+- [x] B. Verificación de cumplimiento en el pipeline
+- [x] C. Mostrar la señal
+
+**Fase 4 completa**, con la salvedad honesta señalada en el Bloque B: el juicio real del
+modelo (`check_legal_compliance`) no se probó en vivo por falta de una API key válida en
+este entorno — se verificó todo lo que no depende de eso (SQL, pipeline, UI, fallo
+gradual). Recomendado probarlo con una key real antes de considerar esta fase lista para
+producción.
 
 *(Se actualiza a medida que avanzamos, mismo criterio que las specs de Fase 2 y 3.)*

@@ -112,6 +112,48 @@ CREATE TABLE taxonomia_titulos (
 
 CREATE INDEX idx_taxonomia_titulos_categoria_id ON taxonomia_titulos(categoria_id);
 
+-- Marco legal (Art. II.6 / IV.5 bis de la constitucion, Fase 4 / spec-marco-legal.md):
+-- catalogo de leyes por pais, igual criterio que la taxonomia -- global, sin tenant_id.
+-- No es solo referencia de consulta: titulo_articulo_ley alimenta la verificacion de
+-- cumplimiento legal del pipeline (paso 5 bis), una señal de asistencia para el Revisor,
+-- nunca una determinacion legal vinculante (Art XI.6 -- disclaimer obligatorio en la UI).
+CREATE TABLE leyes (
+    id                 SERIAL PRIMARY KEY,
+    pais_id            INTEGER NOT NULL REFERENCES paises(id),
+    nombre             TEXT NOT NULL,
+    gaceta             TEXT,
+    fecha_publicacion  DATE,
+    UNIQUE (pais_id, nombre)
+);
+
+CREATE INDEX idx_leyes_pais_id ON leyes(pais_id);
+
+-- IDs no autoincrementales a proposito de "nro_articulo" en si (ese es de la ley, no de la
+-- tabla): la PK es un id propio porque un mismo nro_articulo puede repetirse entre leyes
+-- distintas (por eso el UNIQUE es compuesto, no nro_articulo solo).
+CREATE TABLE articulos_ley (
+    id               SERIAL PRIMARY KEY,
+    ley_id           INTEGER NOT NULL REFERENCES leyes(id),
+    nro_articulo     INTEGER NOT NULL,
+    titulo_articulo  TEXT,
+    texto_completo   TEXT NOT NULL,
+    UNIQUE (ley_id, nro_articulo)
+);
+
+CREATE INDEX idx_articulos_ley_ley_id ON articulos_ley(ley_id);
+
+-- Tabla puente M:N (spec-marco-legal.md §4): la curaduria inicial se adopta del vinculo
+-- que ya traia el dump legado (articulos_ley_trabajo.codigo_titulo_comparativo == este
+-- mismo taxonomia_titulos.id, confirmado por trazabilidad de IDs), revisada a mano antes
+-- de confiar en ella -- no es una sugerencia de IA sin validar.
+CREATE TABLE titulo_articulo_ley (
+    titulo_id       INTEGER NOT NULL REFERENCES taxonomia_titulos(id),
+    articulo_ley_id INTEGER NOT NULL REFERENCES articulos_ley(id),
+    PRIMARY KEY (titulo_id, articulo_ley_id)
+);
+
+CREATE INDEX idx_titulo_articulo_ley_articulo_ley_id ON titulo_articulo_ley(articulo_ley_id);
+
 -- Catalogos globales de segmentacion de empresas (Art. II.5 de la constitucion, Fase 2 /
 -- spec-empresas-comparacion.md Bloque A): compartidos por TODOS los tenants, sin tenant_id
 -- -- son datos de referencia objetivos (ej. "Sector: Manufactura" es el mismo dato para
@@ -316,6 +358,11 @@ CREATE TABLE clausulas (
                        CHECK (estado_revision IN ('pendiente', 'aprobado', 'rechazado')),
     revisado_por       UUID REFERENCES usuarios(id),
     revisado_at        TIMESTAMPTZ,
+    -- Fase 4 (spec-marco-legal.md, Art IV.5 bis): señal de asistencia, nunca una
+    -- determinacion legal vinculante -- 'no_aplica' cuando el titulo asignado no tiene
+    -- articulos de ley vinculados (titulo_articulo_ley), sin necesidad de llamar al modelo.
+    cumplimiento_legal          TEXT CHECK (cumplimiento_legal IN ('por_debajo', 'iguala', 'supera', 'no_aplica')),
+    cumplimiento_justificacion  TEXT,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
