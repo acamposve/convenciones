@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const PUEDE_CARGAR = ["AdminTenant", "Editor"]; // auth-spec.md §5
@@ -8,11 +8,20 @@ const PUEDE_CARGAR = ["AdminTenant", "Editor"]; // auth-spec.md §5
 // service/app/templates/index.html.
 export function DocumentUploadForm({ onUploaded }) {
   const { rol, docFetch } = useAuth();
+  const [empresas, setEmpresas] = useState(null);
+  const [empresaId, setEmpresaId] = useState("");
   const [archivo, setArchivo] = useState(null);
   const [urlOrigen, setUrlOrigen] = useState("");
   const [esPublico, setEsPublico] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    docFetch("/empresas")
+      .then((res) => res.json())
+      .then(setEmpresas)
+      .catch(() => setEmpresas([]));
+  }, [docFetch]);
 
   if (!PUEDE_CARGAR.includes(rol)) {
     return (
@@ -22,7 +31,20 @@ export function DocumentUploadForm({ onUploaded }) {
     );
   }
 
+  if (empresas !== null && empresas.length === 0) {
+    return (
+      <div className="banner banner-warning">
+        Todavía no hay ninguna empresa en tu catálogo — hay que <a href="/empresas">crear una</a> antes de poder cargar documentos (Bloque C: un documento siempre pertenece a una empresa).
+      </div>
+    );
+  }
+
   async function subir(formData) {
+    if (!empresaId) {
+      setError("Elegí una empresa antes de subir el documento.");
+      return;
+    }
+    formData.append("empresa_id", empresaId);
     setEnviando(true);
     setError(null);
     try {
@@ -61,6 +83,16 @@ export function DocumentUploadForm({ onUploaded }) {
   return (
     <div>
       {error && <div className="banner banner-error">{error}</div>}
+
+      <label className="field">
+        <span className="field-label">Empresa (Bloque C: todo documento pertenece a una)</span>
+        <select value={empresaId} onChange={(e) => setEmpresaId(e.target.value)} required>
+          <option value="">— elegí una empresa —</option>
+          {empresas?.map((e) => (
+            <option key={e.id} value={e.id}>{e.nombre}</option>
+          ))}
+        </select>
+      </label>
 
       <fieldset className="card">
         <legend>Subir documento (archivo PDF o Word)</legend>

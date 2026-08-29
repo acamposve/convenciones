@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import "./index.css";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
@@ -9,10 +9,13 @@ import { ResetPasswordPage } from "./auth/ResetPasswordPage";
 import { DocumentUploadForm } from "./documentos/DocumentUploadForm";
 import { DocumentList } from "./documentos/DocumentList";
 import { DocumentDetail } from "./documentos/DocumentDetail";
+import { EmpresasPage } from "./empresas/EmpresasPage";
+import { RevisionPage } from "./revision/RevisionPage";
+import { ComparadorPage } from "./comparador/ComparadorPage";
 
-// Alcance actual (spec-mvp-demo.md): solo carga y lectura de documentos clasificados.
-// Sin cola de revision, sin reportes, sin selector — eso es fase posterior (Art X).
-// (cambio trivial: smoke test del pipeline de deploy-apps.yml, primera prueba en Azure)
+// Fase 2 (constitution.md v2.0.0): Empresa + cola de revisión (Art IV.8) + comparador
+// intra-tenant (Art IV.9) ya conviven con el pipeline de ingesta/clasificación de la
+// Fase 1 (spec-mvp-demo.md).
 function DocumentosPage() {
   const { rol, logout } = useAuth();
   const [reloadToken, setReloadToken] = useState(0);
@@ -23,10 +26,15 @@ function DocumentosPage() {
         <h1>
           Comparador de Documentos Legales <span className="role-tag">({rol})</span>
         </h1>
-        <button className="btn-secondary" onClick={logout}>Cerrar sesión</button>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+          <Link to="/empresas">Empresas</Link>
+          <Link to="/revision">Revisión</Link>
+          <Link to="/comparador">Comparador</Link>
+          <button className="btn-secondary" onClick={logout}>Cerrar sesión</button>
+        </div>
       </div>
       <div className="banner banner-warning">
-        Clasificación automática por IA — sin revisión humana. Demo interna, no publicada.
+        Clasificación automática por IA — pasa por revisión humana antes de poder compararse (Art. IV.8/IV.9).
       </div>
 
       <DocumentUploadForm onUploaded={() => setReloadToken((t) => t + 1)} />
@@ -66,6 +74,30 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             element={
               <ProtectedRoute>
                 <DocumentDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/empresas"
+            element={
+              <ProtectedRoute>
+                <EmpresasPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/revision"
+            element={
+              <ProtectedRoute>
+                <RevisionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comparador"
+            element={
+              <ProtectedRoute>
+                <ComparadorPage />
               </ProtectedRoute>
             }
           />

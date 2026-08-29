@@ -272,12 +272,14 @@ button:disabled {
   color: var(--color-text-muted);
 }
 
-.badge-clasificado {
+.badge-clasificado,
+.badge-aprobado {
   background: var(--color-success-bg);
   color: var(--color-success-text);
 }
 
-.badge-error {
+.badge-error,
+.badge-rechazado {
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
 }

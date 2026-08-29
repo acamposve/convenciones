@@ -34,7 +34,13 @@ def build_system_prompt(titulos: list[dict]) -> str:
 
 
 def classify_clause(texto_clausula: str, titulos: list[dict], system_prompt: str) -> dict:
-    """Devuelve {'titulo_id': int, 'categoria_id': int}."""
+    """Devuelve {'titulo_id': int, 'categoria_id': int, 'confianza': 'alto'|'medio'|'bajo'}.
+
+    confianza (Art IV.7, spec-empresas-comparacion.md §5 -- decision cerrada): auto-reporte
+    del modelo, en el mismo llamado, sin costo ni latencia adicional. Es una señal blanda
+    (los LLM tienden a sobreestimar su propia confianza) que solo sirve para ordenar la cola
+    de revision (Bloque D) -- nunca para certificar nada.
+    """
     valid_ids = [t["id"] for t in titulos]
     titulo_by_id = {t["id"]: t for t in titulos}
 
@@ -56,8 +62,9 @@ def classify_clause(texto_clausula: str, titulos: list[dict], system_prompt: str
                     "type": "object",
                     "properties": {
                         "titulo_id": {"type": "integer", "enum": valid_ids},
+                        "confianza": {"type": "string", "enum": ["alto", "medio", "bajo"]},
                     },
-                    "required": ["titulo_id"],
+                    "required": ["titulo_id", "confianza"],
                     "additionalProperties": False,
                 },
             }
@@ -74,4 +81,4 @@ def classify_clause(texto_clausula: str, titulos: list[dict], system_prompt: str
     data = json.loads(texto_respuesta)
     titulo_id = data["titulo_id"]
     titulo = titulo_by_id[titulo_id]
-    return {"titulo_id": titulo_id, "categoria_id": titulo["categoria_id"]}
+    return {"titulo_id": titulo_id, "categoria_id": titulo["categoria_id"], "confianza": data["confianza"]}

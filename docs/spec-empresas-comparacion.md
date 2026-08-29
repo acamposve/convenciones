@@ -68,48 +68,78 @@ Cinco bloques, en este orden — cada uno depende de que el anterior esté cerra
 A para tener qué referenciar, C necesita B para tener a qué empresa vincular el documento,
 etc.). No tiene sentido adelantar un bloque sin el previo.
 
-### A. Catálogos globales de segmentación
+### A. Catálogos globales de segmentación ✅ terminado
 
-- [ ] Diseñar el schema: `sectores`, `tipos_empresa`, `categorias_sector`, `actividades_empresa`, `estados`, `localidades` (migración nueva en `service/db/migrations/`)
-- [ ] Conseguir/curar el dataset real venezolano para estas tablas (revisar si `legacy/` tiene datos ya cargados en estas tablas, no solo el CRUD — si están, es ETL; si no, hay que armarlos a mano)
-- [ ] Script de seed (`service/db/seed_catalogos_empresa.py`, mismo patrón que `seed_taxonomia.py`)
-- [ ] Endpoint de solo lectura para listarlos (en el servicio Python, junto a `/tenants` y `/documentos`)
+- [x] Diseñar el schema: `sectores`, `tipos_empresa`, `categorias_sector`, `actividades_empresa`, `estados`, `localidades` — agregado a `schema.sql` (instalación nueva) y a `service/db/migrations/003_catalogos_empresa.sql` (base ya desplegada)
+- [x] Conseguir/curar el dataset real venezolano — extraído de `presenci_cccol.sql` (dump legado) con un parser de tuplas SQL propio; HTML limpiado, doble-encoding reparado con `ftfy`, y 23 nombres de localidades con la tilde perdida corregidos a mano (confirmados con Alex) + 1 duplicado del legado excluido (`Morón` bajo Lara). Datos curados en `docs/catalogos_empresa_venezuela.json`
+- [x] Script de seed (`service/db/seed_catalogos_empresa.py`) — idempotente, verificado corriéndolo dos veces seguidas contra Postgres real (mismos conteos)
+- [x] Endpoint de solo lectura (`GET /catalogos`, `GET /catalogos/localidades?estado_id=`) — verificado con requests HTTP reales, no solo tests
 
-### B. Entidad Empresa
+Verificado de punta a punta contra un Postgres 16 real en Docker: `schema.sql` fresco, la migración `003` sola (simulando la base ya desplegada en Azure), los dos seeds corridos dos veces (idempotencia), y los dos endpoints respondiendo 200 con acentos correctos.
 
-- [ ] Migración: tabla `empresas` (FK a tenant + a los catálogos de A)
-- [ ] Backend: `POST/GET/PUT /empresas` (mismo patrón que `/tenants` en `service/app/main.py`)
-- [ ] Frontend: pantalla de alta/listado/edición de empresas
-- [ ] Aplicar la matriz de permisos de la sección 3 (`require_role` en cada endpoint)
+### B. Entidad Empresa ✅ terminado
 
-### C. Vincular Documento a Empresa
+- [x] Migración: tabla `empresas` — agregada a `schema.sql` y a `service/db/migrations/004_empresas.sql`
+- [x] Backend: `POST/GET/PUT /empresas` (+ `GET /empresas/{id}`), mismo patrón que `/tenants`
+- [x] Frontend: `web/src/empresas/EmpresasPage.jsx` — alta con selects encadenados (sector/tipo/categoría/actividad/estado→localidad) + listado
+- [x] Matriz de permisos de la sección 3 aplicada (`require_role(request, "AdminTenant", "Editor")` en los 4 endpoints)
 
-- [ ] Migración: `documentos.empresa_id` (nullable primero)
-- [ ] Migración de datos: crear "Empresa Demo" por tenant existente y asignarla a sus documentos (decisión ya cerrada, sección 5)
-- [ ] Una vez poblado en todos los tenants, `empresa_id` pasa a `NOT NULL`
-- [ ] Backend: `POST /documentos` exige `empresa_id`
-- [ ] Frontend: selector de empresa en `DocumentUploadForm.jsx`
+Verificado en el navegador contra el stack completo (Postgres real + API .NET vía
+`docker compose` + servicio Python + Vite dev server): login → cambio de contraseña
+obligatorio → creación de una empresa (Bolívar → Puerto Ordaz, cascada estado→localidad en
+vivo) → confirmado `POST /empresas → 201` por red y la fila apareciendo en la tabla del
+catálogo. No solo tests — la interacción real.
 
-### D. Cola de revisión (Art. IV.8)
+### C. Vincular Documento a Empresa ✅ terminado
 
-- [ ] Migración: `clausulas.estado_revision`, `revisado_por`, `revisado_at`
-- [ ] `classification.py`: agregar el campo de confianza (alto/medio/bajo) al schema de salida de `classify_clause()` (decisión cerrada, sección 5)
-- [ ] Backend: `GET /revision` (lista priorizada por confianza), `POST /revision/{clausula_id}/aprobar|corregir|rechazar`
-- [ ] Frontend: pantalla de cola de revisión
-- [ ] Actualizar `auth-spec.md` §5 con las filas nuevas de la sección 3 de este spec — hoy solo están redactadas acá, falta llevarlas al doc de auth real
+- [x] Migración: `documentos.empresa_id` (nullable primero, luego `NOT NULL`) — `db/migrations/005_documentos_empresa.sql`
+- [x] Migración de datos: cada tenant sin empresas recibe una por defecto (su propio `nombre_empresa`, no "Empresa Demo" a secas para no duplicar el nombre del tenant) y se le asignan sus documentos existentes
+- [x] Backend: `POST /documentos` exige `empresa_id`, valida que pertenezca al tenant del JWT
+- [x] Frontend: selector de empresa en `DocumentUploadForm.jsx`, con aviso si el catálogo está vacío
 
-### E. Comparador
+### D. Cola de revisión (Art. IV.8) ✅ terminado
 
-- [ ] Backend: endpoint de comparación (filtro por título + sector/tipo/actividad/geografía + empresas seleccionadas del catálogo del tenant; **solo** cláusulas aprobadas, Art. IV.9)
-- [ ] Frontend: pantalla de comparación (equivalente moderno de `comparador.php`)
-- [ ] Validar el criterio de éxito de la sección 4 de punta a punta
+- [x] Migración: `clausulas.confianza`, `estado_revision`, `revisado_por`, `revisado_at` — `db/migrations/006_cola_revision.sql`
+- [x] `classification.py`: campo de confianza agregado al schema de salida de `classify_clause()`, sin costo/latencia extra
+- [x] Backend: `GET /revision` (priorizada: confianza baja o sin clasificar primero), `POST /revision/{id}/aprobar` (admite corrección de título en el mismo gesto), `POST /revision/{id}/rechazar`
+- [x] Frontend: `web/src/revision/RevisionPage.jsx`
+- [ ] Actualizar `auth-spec.md` §5 con las filas nuevas de la sección 3 — pendiente, no bloquea nada
+
+### E. Comparador ✅ terminado
+
+- [x] Backend: `GET /comparador/titulos` (solo títulos con al menos una cláusula aprobada) y `GET /comparador` (filtro por título + sector/tipo/categoría/actividad/estado; **solo** cláusulas aprobadas, Art. IV.9), agrupado por empresa
+- [x] Frontend: `web/src/comparador/ComparadorPage.jsx`
+- [x] Criterio de éxito de la sección 4 validado de punta a punta (ver abajo)
+
+**Verificación de punta a punta de C+D+E**, en el navegador contra el stack completo
+(Postgres real + API .NET + servicio Python + Vite, todo vía `docker compose` + uvicorn
+manual): creé una empresa → subí un documento real (PDF con texto nativo generado para la
+prueba, no el dummy escaneado de W3C que probé primero y confirmó el manejo de errores) →
+la cláusula quedó `pendiente` sin clasificar (API key de prueba, sin llamar a Claude de
+verdad) → en la cola de revisión elegí el título correcto y aprobé en un solo gesto → la
+cláusula salió de la cola → en el Comparador, el selector de títulos mostró **solo**
+"Ambito de Aplicación" (el único aprobado) → al comparar, apareció "Textiles del Sur C.A."
+con su cláusula. Confirmado también por red: `POST /empresas → 201`, `POST /documentos →
+201`, `POST /revision/1/aprobar → 200`, `GET /comparador?titulo_id=80 → 200`.
+
+De paso se encontraron y corrigieron dos cosas durante la prueba:
+- Ninguna de las pantallas nuevas (Empresas/Revisión/Comparador) tenía un link de vuelta a
+  "Documentos" — se agregó a las tres.
+- El contenedor `web` de `docker compose` no detectaba cambios de archivo hechos desde el
+  host (problema de file-watching en volúmenes bind-mounted en Windows) — hace falta
+  `docker compose restart web` después de editar código si el navegador sigue sirviendo la
+  versión vieja pese al refresh.
 
 ## 8. Checklist resumido — para ver de un vistazo dónde estamos
 
-- [ ] A. Catálogos globales de segmentación
-- [ ] B. Entidad Empresa
-- [ ] C. Documento ↔ Empresa
-- [ ] D. Cola de revisión (Art. IV.8)
-- [ ] E. Comparador
+- [x] A. Catálogos globales de segmentación
+- [x] B. Entidad Empresa
+- [x] C. Documento ↔ Empresa
+- [x] D. Cola de revisión (Art. IV.8)
+- [x] E. Comparador
+
+**Fase 2 completa.** Queda pendiente, sin bloquear nada: actualizar `auth-spec.md` §5 con
+la matriz de permisos nueva (hoy vive redactada en la sección 3 de este spec, no en el doc
+de auth real).
 
 *(Se actualiza a medida que avanzamos — marcar acá, no en otro lado, para que este spec sea la única fuente de verdad de "cuánto falta" de la Fase 2.)*

@@ -127,7 +127,29 @@ jobs:
               echo "Schema actual detectado — no se reaplican migraciones históricas."
             fi
           fi
+          # Independiente de la rama de arriba: una base nueva ya sale con `sectores` desde
+          # schema.sql, así que este chequeo no hace nada ahí. La que sí lo necesita es la
+          # base ya desplegada (schema.sql + 002_auth ya aplicados antes de que existiera
+          # esta migración) — mismo criterio que 002_auth.sql: chequear la tabla marcadora
+          # antes de aplicar, no re-aplicar a ciegas.
+          if [ -z "$(psql "$DATABASE_URL" -tAc "SELECT to_regclass('public.sectores')")" ]; then
+            echo "Faltan los catálogos de empresa — aplicando db/migrations/003_catalogos_empresa.sql"
+            psql "$DATABASE_URL" -f db/migrations/003_catalogos_empresa.sql
+          fi
+          if [ -z "$(psql "$DATABASE_URL" -tAc "SELECT to_regclass('public.empresas')")" ]; then
+            echo "Falta la entidad Empresa — aplicando db/migrations/004_empresas.sql"
+            psql "$DATABASE_URL" -f db/migrations/004_empresas.sql
+          fi
+          if [ -z "$(psql "$DATABASE_URL" -tAc "SELECT column_name FROM information_schema.columns WHERE table_name='documentos' AND column_name='empresa_id'")" ]; then
+            echo "Falta documentos.empresa_id — aplicando db/migrations/005_documentos_empresa.sql"
+            psql "$DATABASE_URL" -f db/migrations/005_documentos_empresa.sql
+          fi
+          if [ -z "$(psql "$DATABASE_URL" -tAc "SELECT column_name FROM information_schema.columns WHERE table_name='clausulas' AND column_name='estado_revision'")" ]; then
+            echo "Falta la cola de revisión — aplicando db/migrations/006_cola_revision.sql"
+            psql "$DATABASE_URL" -f db/migrations/006_cola_revision.sql
+          fi
           python db/seed_taxonomia.py
+          python db/seed_catalogos_empresa.py
           python db/seed_admin_user.py
         env:
           # 🔴 MANUAL: confirmar que el usuario ("comparador_admin" abajo)

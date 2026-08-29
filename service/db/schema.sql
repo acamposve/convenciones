@@ -112,9 +112,89 @@ CREATE TABLE taxonomia_titulos (
 
 CREATE INDEX idx_taxonomia_titulos_categoria_id ON taxonomia_titulos(categoria_id);
 
+-- Catalogos globales de segmentacion de empresas (Art. II.5 de la constitucion, Fase 2 /
+-- spec-empresas-comparacion.md Bloque A): compartidos por TODOS los tenants, sin tenant_id
+-- -- son datos de referencia objetivos (ej. "Sector: Manufactura" es el mismo dato para
+-- cualquier operador). Mismo criterio que taxonomia_categorias/titulos: IDs son los del
+-- dump legado (docs/catalogos_empresa_venezuela.json, extraido de presenci_cccol.sql), no
+-- autoincrementales, para trazabilidad con el dataset historico.
+-- Van ANTES de documentos/empresas a proposito: empresas.sector_id (etc.) y
+-- documentos.empresa_id necesitan que estas tablas ya existan.
+
+CREATE TABLE sectores (
+    id           INTEGER PRIMARY KEY,
+    nombre       TEXT NOT NULL,
+    descripcion  TEXT
+);
+
+CREATE TABLE tipos_empresa (
+    id           INTEGER PRIMARY KEY,
+    nombre       TEXT NOT NULL,
+    descripcion  TEXT
+);
+
+CREATE TABLE categorias_sector (
+    id           INTEGER PRIMARY KEY,
+    nombre       TEXT NOT NULL,
+    descripcion  TEXT
+);
+
+CREATE TABLE actividades_empresa (
+    id           INTEGER PRIMARY KEY,
+    nombre       TEXT NOT NULL,
+    descripcion  TEXT
+);
+
+-- Geografia: estados y localidades de Venezuela (unico pais activo, Art I.2/II.4). pais_id
+-- referencia la tabla paises ya existente arriba -- se resuelve por codigo='VE' al sembrar,
+-- nunca se hardcodea el id.
+CREATE TABLE estados (
+    id       INTEGER PRIMARY KEY,
+    pais_id  INTEGER NOT NULL REFERENCES paises(id),
+    nombre   TEXT NOT NULL
+);
+
+CREATE INDEX idx_estados_pais_id ON estados(pais_id);
+
+CREATE TABLE localidades (
+    id         INTEGER PRIMARY KEY,
+    estado_id  INTEGER NOT NULL REFERENCES estados(id),
+    nombre     TEXT NOT NULL
+);
+
+CREATE INDEX idx_localidades_estado_id ON localidades(estado_id);
+
+-- Empresa (Art. III de la constitucion, Fase 2 / spec-empresas-comparacion.md Bloque B):
+-- la empresa-cliente cuya(s) convencion(es) el tenant (operador) analiza/compara. Pertenece
+-- a un tenant (Art. VI.2 -- aislamiento obligatorio); los catalogos de segmentacion son
+-- opcionales (nullable) porque cargar una empresa no deberia bloquearse si todavia no se
+-- sabe su sector/tipo/categoria/actividad exactos.
+CREATE TABLE empresas (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id     UUID NOT NULL REFERENCES tenants(id),
+    nombre        TEXT NOT NULL,
+    rif           TEXT,
+    sector_id     INTEGER REFERENCES sectores(id),
+    tipo_id       INTEGER REFERENCES tipos_empresa(id),
+    categoria_id  INTEGER REFERENCES categorias_sector(id),
+    actividad_id  INTEGER REFERENCES actividades_empresa(id),
+    estado_id     INTEGER REFERENCES estados(id),
+    localidad_id  INTEGER REFERENCES localidades(id),
+    contacto_nombre  TEXT,
+    contacto_email   TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_empresas_tenant_id ON empresas(tenant_id);
+
 CREATE TABLE documentos (
     id            SERIAL PRIMARY KEY,
     tenant_id     UUID NOT NULL REFERENCES tenants(id),
+    -- Bloque C (spec-empresas-comparacion.md): un documento pertenece a una Empresa del
+    -- catalogo del tenant, no solo al tenant. En instalacion nueva no hace falta backfill
+    -- (no hay documentos previos); en una base existente lo resuelve
+    -- db/migrations/005_documentos_empresa.sql.
+    empresa_id    UUID NOT NULL REFERENCES empresas(id),
     origen        TEXT NOT NULL CHECK (origen IN ('archivo', 'url')),
     url_origen    TEXT,
     ruta_archivo  TEXT,
@@ -134,6 +214,7 @@ CREATE TABLE documentos (
 );
 
 CREATE INDEX idx_documentos_tenant_id ON documentos(tenant_id);
+CREATE INDEX idx_documentos_empresa_id ON documentos(empresa_id);
 
 CREATE TABLE clausulas (
     id             SERIAL PRIMARY KEY,
@@ -143,11 +224,20 @@ CREATE TABLE clausulas (
     titulo_id      INTEGER REFERENCES taxonomia_titulos(id),
     categoria_id   INTEGER REFERENCES taxonomia_categorias(id),
     orden          INTEGER NOT NULL,
+    -- Bloque D (spec-empresas-comparacion.md, Art. IV.7-8): cola de revision humana.
+    -- confianza: auto-reporte del modelo (decision cerrada, spec §5) -- señal blanda para
+    -- ordenar la cola, no una certificacion.
+    confianza          TEXT CHECK (confianza IN ('alto', 'medio', 'bajo')),
+    estado_revision    TEXT NOT NULL DEFAULT 'pendiente'
+                       CHECK (estado_revision IN ('pendiente', 'aprobado', 'rechazado')),
+    revisado_por       UUID REFERENCES usuarios(id),
+    revisado_at        TIMESTAMPTZ,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_clausulas_documento_id ON clausulas(documento_id);
 CREATE INDEX idx_clausulas_tenant_id ON clausulas(tenant_id);
+CREATE INDEX idx_clausulas_estado_revision ON clausulas(tenant_id, estado_revision);
 
 -- Seed minimo de paises (activo=false hasta validacion legal, ver Art. II.4 y XI.1)
 INSERT INTO paises (codigo, nombre, activo) VALUES

@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-// Espejo de service/app/templates/documento.html: tabla de clausulas con el titulo de
-// taxonomia que le asigno la clasificacion (Art IV.5) — sin score, sin revision (spec-mvp-demo.md).
 export function DocumentDetail() {
   const { id } = useParams();
   const { docFetch } = useAuth();
@@ -72,12 +70,13 @@ export function DocumentDetail() {
             <th style={{ width: "3rem" }}>#</th>
             <th style={{ width: "14rem" }}>Título asignado</th>
             <th>Texto de la cláusula</th>
+            <th style={{ width: "8rem" }}>Revisión</th>
           </tr>
         </thead>
         <tbody>
           {documento.clausulas.length === 0 && (
             <tr>
-              <td className="table-empty" colSpan={3}>Todavía no hay cláusulas para este documento.</td>
+              <td className="table-empty" colSpan={4}>Todavía no hay cláusulas para este documento.</td>
             </tr>
           )}
           {documento.clausulas.map((c) => (
@@ -94,6 +93,9 @@ export function DocumentDetail() {
                 )}
               </td>
               <td className="clause-texto">{c.texto}</td>
+              <td>
+                <span className={`badge badge-${c.estado_revision}`}>{c.estado_revision}</span>
+              </td>
             </tr>
           ))}
         </tbody>

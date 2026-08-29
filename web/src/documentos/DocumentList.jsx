@@ -56,6 +56,7 @@ export function DocumentList({ reloadToken }) {
       <thead>
         <tr>
           <th>ID</th>
+          <th>Empresa</th>
           <th>Origen</th>
           <th>Estado</th>
           <th>Público</th>
@@ -65,7 +66,7 @@ export function DocumentList({ reloadToken }) {
       <tbody>
         {documentos.length === 0 && (
           <tr>
-            <td className="table-empty" colSpan={5}>Todavía no hay documentos para esta empresa.</td>
+            <td className="table-empty" colSpan={6}>Todavía no hay documentos cargados.</td>
           </tr>
         )}
         {documentos.map((d) => (
@@ -73,6 +74,7 @@ export function DocumentList({ reloadToken }) {
             <td>
               <Link to={`/documentos/${d.id}`}>{d.id}</Link>
             </td>
+            <td>{d.empresa_nombre}</td>
             <td>{d.origen}</td>
             <td>
               <span className={`badge badge-${d.estado}`}>{d.estado}</span>
