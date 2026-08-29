@@ -55,18 +55,26 @@ Nota: `Usuario` ya existía como entidad conceptual en Art. III ("Usuario / Rol"
    - verifica que el rol tenga permiso para la acción (ver matriz §5).
 5. Todo intento (éxito o fallo) se escribe en `BitacoraAcceso`.
 
-## 5. Matriz de permisos (mínima, Fase 1)
+## 5. Matriz de permisos (Fase 1 + Fase 2, `spec-empresas-comparacion.md` §3)
 
 | Acción | Admin Tenant | Revisor | Editor | Visualizador |
 |---|---|---|---|---|
 | Gestionar usuarios del tenant | ✅ | ❌ | ❌ | ❌ |
+| Gestionar empresas del catálogo (Fase 2) | ✅ | ❌ | ✅ | ❌ |
 | Cargar documento (ingesta) | ✅ | ❌ | ✅ | ❌ |
 | Ver cola de revisión | ✅ | ✅ | ❌ | ❌ |
 | Aprobar/corregir cláusula (Art. IV.8) | ✅ | ✅ | ❌ | ❌ |
-| Ver reporte/comparación publicada | ✅ | ✅ | ✅ | ✅ |
+| Ver comparador / reporte publicado | ✅ | ✅ | ✅ | ✅ |
 | Exportar PDF | ✅ | ✅ | ✅ | ❌ |
 
 Esta matriz es el candado de negocio detrás del "publicación no negociable" del Art. IV.8: **solo Admin Tenant y Revisor pueden aprobar**, ningún otro rol tiene ese permiso ni siquiera vía API directa.
+
+Los catálogos globales de segmentación (sector, tipo de empresa, categoría, actividad,
+geografía — Art. II.5) **no son editables por ningún rol de tenant**, ni siquiera Admin
+Tenant: "Gestionar empresas del catálogo" cubre solo la entidad Empresa propia del tenant,
+no los catálogos globales de los que esa empresa toma sus atributos. La administración de
+esos catálogos queda reservada al rol de Plataforma (Art. VII.4, Fase 5 — sin UI propia
+todavía, ver `spec-plataforma.md`).
 
 ## 6. Abierto / pendiente (para Art. XI)
 

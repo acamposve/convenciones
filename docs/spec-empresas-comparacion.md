@@ -103,7 +103,7 @@ catálogo. No solo tests — la interacción real.
 - [x] `classification.py`: campo de confianza agregado al schema de salida de `classify_clause()`, sin costo/latencia extra
 - [x] Backend: `GET /revision` (priorizada: confianza baja o sin clasificar primero), `POST /revision/{id}/aprobar` (admite corrección de título en el mismo gesto), `POST /revision/{id}/rechazar`
 - [x] Frontend: `web/src/revision/RevisionPage.jsx`
-- [ ] Actualizar `auth-spec.md` §5 con las filas nuevas de la sección 3 — pendiente, no bloquea nada
+- [x] Actualizar `auth-spec.md` §5 con las filas nuevas de la sección 3
 
 ### E. Comparador ✅ terminado
 
@@ -138,8 +138,6 @@ De paso se encontraron y corrigieron dos cosas durante la prueba:
 - [x] D. Cola de revisión (Art. IV.8)
 - [x] E. Comparador
 
-**Fase 2 completa.** Queda pendiente, sin bloquear nada: actualizar `auth-spec.md` §5 con
-la matriz de permisos nueva (hoy vive redactada en la sección 3 de este spec, no en el doc
-de auth real).
+**Fase 2 completa**, incluyendo la actualización de `auth-spec.md` §5.
 
 *(Se actualiza a medida que avanzamos — marcar acá, no en otro lado, para que este spec sea la única fuente de verdad de "cuánto falta" de la Fase 2.)*
