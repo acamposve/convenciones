@@ -1,6 +1,6 @@
 # Constitución del Proyecto — Comparador de Documentos Legales
 
-> **Versión:** 2.0.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-08-23
+> **Versión:** 2.1.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-08-29
 > **Origen:** `documento_arquitectura_comparador_convenciones.docx` (preparado para Alex Campos, 8 de agosto de 2026)
 > **Enmienda 2.0.0:** redefine el modelo de tenant (Art. I.3) tras revisar el código legado
 > completo (`legacy/`). El valor original del producto era la comparación cross-empresa
@@ -8,6 +8,14 @@
 > el autoservicio de una sola empresa. Se incorporan las entidades Empresa, Negociación y
 > Marco Legal, y se replantea el roadmap (Art. X). Registrado según la regla de enmienda
 > del Art. XI (cambio a Art. I).
+> **Enmienda 2.1.0:** a partir de la reunión con el cliente de dominio (Luis Villegas,
+> 2026-08-29): agrega el resumen ejecutivo por cláusula con revisión propia, independiente
+> de la clasificación (Art. IV.6 bis/8/9); habilita finalmente el campo comparativo del
+> Art. IV.6 (diseñado desde el MVP original, nunca implementado); agrega la biblioteca
+> pública global de convenciones, segunda excepción explícita al aislamiento por tenant
+> (Art. VI.7); aclara que la taxonomía versionada por país (Art. II.3) sigue sin
+> implementarse a nivel de esquema y define el mecanismo de clonado. Replantea el
+> roadmap (Art. X) intercalando estas fases delante de la expansión de países.
 
 Este documento fija los principios y decisiones de arquitectura que gobiernan el diseño e implementación del nuevo Comparador de Documentos Legales. Cualquier decisión técnica o de producto que lo contradiga debe justificarse explícitamente y, si se acepta, disparar una enmienda a esta constitución.
 
@@ -28,7 +36,7 @@ El sistema reemplaza un SaaS PHP de ~20 años ("convenciones") que comparaba con
 
 1. El sistema legado organiza cláusulas en dos niveles: **5 categorías** (GENERALES, ECONÓMICO, SOCIOECONÓMICAS, SINDICALES, SEGURIDAD OCUPACIONAL) y **~60 títulos comparativos** dentro de ellas, cada uno con un indicador de si requiere campo de comparación económica.
 2. Esta estructura conceptual es transversal a los cuatro países (remuneración, beneficios/condiciones de trabajo, aportes sindicales), confirmado contra los marcos legales de Argentina (Ley 14.250), Uruguay (Ley 18.566) y Chile (Código del Trabajo, Libro IV).
-3. Diseño obligatorio: **núcleo de categorías común a los cuatro países**, con una **capa de títulos versionada por país** que permite agregar, renombrar o desactivar títulos sin tocar el núcleo.
+3. Diseño obligatorio: **núcleo de categorías común a los cuatro países**, con una **capa de títulos versionada por país** que permite agregar, renombrar o desactivar títulos sin tocar el núcleo. **Este diseño sigue sin implementarse a nivel de esquema hasta Fase 7 (Art. X): hoy `taxonomia_categorias`/`taxonomia_titulos` son un catálogo global único (el de Venezuela), no versionado por país. Fase 8 lo implementa vía clonado — un país nuevo arranca copiando el set de un país ya activo (hoy, Venezuela) y a partir de ahí es independiente y editable por Plataforma (Art. VII.4), sin afectar al país de origen; no es una referencia compartida en vivo. [Enmienda 2.1.0 — nuevo]**
 4. Ningún país nuevo se activa comercialmente sin que su taxonomía haya sido **validada por un abogado laboral local**. La investigación web no sustituye esta validación.
 5. **Los catálogos de segmentación de empresas (sector, tipo de empresa, categoría de sector, actividad económica) y de geografía (país, estado, localidad) son globales, compartidos por todos los tenants — no se duplican por operador.** Son datos de referencia objetivos (ej. "Sector: Manufactura" es el mismo dato para cualquier consultora). **[Enmienda 2.0.0 — nuevo]**
 6. **El marco legal (leyes y artículos de ley) es un catálogo por país, igual que la taxonomía. No es solo referencia de consulta: alimenta la verificación de cumplimiento legal (Art. IV.5 bis) — cruza cada cláusula clasificada contra los artículos de ley relacionados a su título, y señala si está por debajo, iguala, o supera el mínimo legal. Esta señal es asistencia para la revisión humana, nunca una determinación legal vinculante ni asesoría legal automatizada — el Revisor (Art. VII) es quien decide, igual que ningún resultado se publica sin su aprobación (Art. IV.8, no negociable). [Enmienda 2.0.0 — nuevo]**
@@ -48,7 +56,7 @@ Entidades fundamentales (nombres conceptuales, no nombres de tabla definitivos):
 | **Ley / Artículo de ley** *(nuevo)* | Corpus legal por país (ej. Ley Orgánica del Trabajo, otras leyes), vinculado a títulos de taxonomía; alimenta la verificación de cumplimiento (Art. IV.5 bis) | Adaptado de `ley_trabajo`, `otras_leyes`, `articulos_ley_trabajo` |
 | **Negociación** *(nuevo)* | Proceso de negociación colectiva de una Empresa antes de firmar: peticiones (sindicato), ofertas (empresa), reuniones, acuerdos. Al cerrar con acuerdo, genera el Documento (Art. IV). Bitácora propia (`bitacora_negociacion`), **distinta** de la bitácora de accesos | Adaptado del módulo `discusion` |
 | Documento / Contrato | Convención capturada por URL, carga, **o generada al cerrar una Negociación**; guarda tenant, **empresa**, país, vigencia, estado público/privado | Adaptado de `contratos`, ahora vinculado a Empresa además de Tenant |
-| Cláusula / Artículo | Unidad extraída: número, texto, resumen, título asignado, campo comparativo, estado de revisión, confianza del modelo, **señal de cumplimiento legal** *(nuevo)* | Adaptado de `articulos_contratos` |
+| Cláusula / Artículo | Unidad extraída: número, texto, título asignado, campo comparativo (Art. IV.6), **resumen ejecutivo con revisión propia e independiente de la del título** (Art. IV.6 bis/8, `[Enmienda 2.1.0]`), confianza del modelo, señal de cumplimiento legal | Adaptado de `articulos_contratos` |
 | Bitácora de accesos | Registro de login/logout/fallos y aprobaciones de cláusulas — **distinta de la bitácora de negociación** (arriba) | Adaptado de `bitacoras` |
 | Licencia | Plan del tenant: fechas, límites de usuarios/documentos, países habilitados | Nuevo |
 | Reporte de comparación | Selección de empresas/documentos/cláusulas del catálogo del tenant, filtros por sector/tipo/actividad/geografía; alimenta vista web y export | Adaptado del módulo `comparador.php` |
@@ -76,9 +84,10 @@ Flujo obligatorio, en este orden, con revisión humana como puerta de publicaci�
 5. **Clasificación** — un LLM (vía API, salida estructurada) asigna cada cláusula a un título de la taxonomía del país del tenant, usando las descripciones de cada título como contexto.
 5 bis. **Verificación de cumplimiento legal** *(nuevo)* — cruza cada cláusula clasificada contra los artículos de ley (Art. II.6) relacionados a su título, y marca una señal: por debajo / iguala / supera el mínimo legal. Es asistencia para el paso 8, nunca una determinación automática vinculante.
 6. **Extracción del campo comparativo** — normaliza el valor comparable (ej. "15 días", "30% del salario") cuando el título lo requiere.
+6 bis. **Resumen ejecutivo** *(nuevo)* — un LLM redacta una síntesis breve y fiel al texto original de la cláusula, sin interpretar ni agregar contenido que no esté en el original (pensada para lectura ejecutiva rápida: "15 días hábiles de vacaciones + 1 bono anual", no un análisis). Recibe su **propia** revisión humana, independiente de la de clasificación (paso 8) — puede estar aprobado uno y pendiente el otro, en cualquier combinación. **[Enmienda 2.1.0]**
 7. **Score de confianza** — cada cláusula clasificada recibe un nivel de confianza que prioriza la cola de revisión.
-8. **Revisión humana** — el rol Revisor valida o corrige clasificación, resumen, campo comparativo **y la señal de cumplimiento legal** antes de publicar. **No negociable.**
-9. **Publicación** — la cláusula aprobada queda visible en el reporte web y disponible para comparación.
+8. **Revisión humana** — el rol Revisor valida o corrige, en **dos gestos independientes**: (a) clasificación/título y campo comparativo, y (b) resumen ejecutivo — uno no bloquea al otro. También valida la señal de cumplimiento legal. **No negociable. [Enmienda 2.1.0 — aclara que son dos estados de revisión separados, no uno solo]**
+9. **Publicación** — la cláusula con clasificación aprobada queda visible en el reporte web y disponible para comparación; la aprobación del resumen **no** es condición de publicación (Art. IV.6 bis). Si el resumen también está aprobado, la vista de comparación lo muestra colapsado con el texto completo desplegable; si no, muestra directamente el texto completo. **[Enmienda 2.1.0]**
 
 **Dataset de partida:** ~6.400 artículos ya clasificados (dump legado) y 403 PDFs reales de convenciones venezolanas vinculados a su clasificación. Uso condicionado a confirmar el derecho de reutilización de esos documentos como dataset de prueba (ver Artículo XI).
 
@@ -104,6 +113,7 @@ Flujo obligatorio, en este orden, con revisión humana como puerta de publicaci�
 4. Contraseñas con hashing moderno (bcrypt/argon2). **No se migran** la tabla de usuarios ni las contraseñas del sistema legado — sus valores no corresponden a un hash seguro. Se fuerza restablecimiento para todo usuario heredado.
 5. Bitácora de auditoría sobre cambios y aprobaciones de cláusulas, continuando el concepto de `bitacoras` del legado.
 6. **El rol de Plataforma (Art. VII.4) es la única excepción al aislamiento estricto por tenant de este artículo: opera fuera del modelo de tenant para poder dar de alta operadores nuevos. Sus acciones quedan en una bitácora separada, con el mismo nivel de auditoría que el punto 5. [Enmienda 2.0.0 — nuevo]**
+7. **Biblioteca pública de convenciones** *(nuevo)*: un directorio de solo lectura, sin autenticación, que lista documentos con `es_publico=true` de **todos los tenants juntos** — la segunda y única otra excepción deliberada al aislamiento del punto 2 (junto con el rol de Plataforma del punto 6). A diferencia del resto del sistema, acá el cruce entre tenants es el objetivo explícito del producto (un directorio único del sector, no el catálogo de un operador) — el filtro sigue siendo estricto en el otro sentido: únicamente documentos marcados públicos por una persona (punto 1), nunca cláusulas ni metadata de un documento privado, y nunca datos de Empresa/tenant más allá del nombre necesario para identificar el documento. **[Enmienda 2.1.0 — nuevo]**
 
 ## Artículo VII — Roles, autenticación empresarial y licenciamiento
 
@@ -124,17 +134,19 @@ Flujo obligatorio, en este orden, con revisión humana como puerta de publicaci�
 3. **No se reutiliza:** código PHP4/5 (incompatible con PHP moderno, sin framework); credenciales en texto plano; consultas sin sanitizar (`$_GET` directo en SQL); tabla de usuarios y contraseñas; flujo de captura 100% manual.
 4. Se construyen **scripts ETL puntuales** para migrar tablas de referencia (países, categorías, títulos, empresas, contratos, artículos) del dump MySQL hacia el nuevo modelo, como datos semilla e históricos.
 
-## Artículo X — Roadmap *(replanteado, Enmienda 2.0.0)*
+## Artículo X — Roadmap *(replanteado, Enmiendas 2.0.0 y 2.1.0)*
 
 | Fase | Contenido |
 |---|---|
 | Fase 0 — Validación | Validación legal de la taxonomía por país con abogados locales; confirmación de derechos de uso del dataset histórico |
 | Fase 1 — Fundaciones técnicas *(ya desplegado, demo interno)* | Carga de un documento por tenant, clasificación asistida por IA, auth básica con roles fijos. **Sin** catálogo de empresas, sin comparación, sin negociación, sin cola de revisión — es la base técnica, no el producto completo (`spec-mvp-demo.md`) |
-| Fase 2 — Empresa + Revisión + Comparación | Entidad Empresa y catálogos globales de segmentación (Art. II.5); cola de revisión humana (Art. IV.8 — ya era no negociable, nunca se construyó); comparador intra-tenant filtrado por sector/tipo/actividad/geografía — el núcleo del producto original |
-| Fase 3 — Negociación colectiva | Módulo de discusión completo (Art. IV bis): peticiones, ofertas, reuniones, acuerdos |
-| Fase 4 — Marco legal y cumplimiento | Corpus de leyes por país (Art. II.6); verificación de cumplimiento activa en clasificación (Art. IV.5 bis) |
-| Fase 5 — Plataforma SaaS real | Rol de Plataforma (Art. VII.4) con UI propia; alta de operadores sin script manual; licenciamiento/facturación real |
-| Fase 6 — Expansión y escala | Activación de Uruguay, Argentina y Chile (cada uno con validación legal propia); SSO/SAML; aislamiento de datos dedicado para clientes grandes; mejora continua del extractor |
+| Fase 2 — Empresa + Revisión + Comparación *(ya desplegado)* | Entidad Empresa y catálogos globales de segmentación (Art. II.5); cola de revisión humana (Art. IV.8 — ya era no negociable, nunca se construyó); comparador intra-tenant filtrado por sector/tipo/actividad/geografía — el núcleo del producto original |
+| Fase 3 — Negociación colectiva *(ya desplegado)* | Módulo de discusión completo (Art. IV bis): peticiones, ofertas, reuniones, acuerdos |
+| Fase 4 — Marco legal y cumplimiento *(ya desplegado)* | Corpus de leyes por país (Art. II.6); verificación de cumplimiento activa en clasificación (Art. IV.5 bis) |
+| Fase 5 — Plataforma SaaS real *(ya desplegado)* | Rol de Plataforma (Art. VII.4) con UI propia; registro self-service de operadores; licenciamiento/países habilitados por tenant |
+| **Fase 6 — Resumen ejecutivo y campo comparativo** *(nuevo, Enmienda 2.1.0)* | Resumen ejecutivo por cláusula (Art. IV.6 bis) con revisión humana propia e independiente de la clasificación; campo comparativo (Art. IV.6, diseñado desde el MVP original, nunca implementado); comparador muestra el resumen colapsado con el texto completo desplegable cuando está aprobado |
+| **Fase 7 — Biblioteca pública** *(nuevo, Enmienda 2.1.0)* | Directorio global de solo lectura, sin autenticación, de documentos públicos de todos los tenants (Art. VI.7); buscador por nombre de empresa |
+| **Fase 8 — Taxonomía por país y expansión** *(renumerada, antes Fase 6)* | Implementación real de la taxonomía versionada por país (Art. II.3: clonado + edición independiente por Plataforma); activación de Uruguay como primer caso concreto; Argentina y Chile a continuación (cada uno con validación legal propia); SSO/SAML; aislamiento de datos dedicado para clientes grandes; mejora continua del extractor |
 
 ## Artículo XI — Riesgos abiertos y gobernanza de cambios
 
