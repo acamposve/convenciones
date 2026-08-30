@@ -848,6 +848,39 @@ def comparar(
 
 
 # ---------------------------------------------------------------------------
+# Biblioteca publica (Art VI.7, spec-biblioteca-publica.md) -- unico endpoint del sistema
+# SIN autenticacion y que cruza TODOS los tenants a proposito: un directorio de solo
+# lectura de documentos marcados publicos, para que alguien sin cuenta encuentre que
+# empresas tienen convenciones publicas y las lea en su URL de origen. No expone
+# clausulas, resumenes ni tenant_id -- eso queda privado aunque el documento sea publico.
+# No depende de que el pipeline haya clasificado ni de revision humana (spec-biblioteca-
+# publica.md Bloque unico): alcanza con es_publico=true, que ya se valida en la ingesta.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/biblioteca")
+def listar_biblioteca_publica(empresa: Optional[str] = None):
+    filtros = ["d.es_publico = true"]
+    params: list = []
+    if empresa:
+        filtros.append("e.nombre ILIKE %s")
+        params.append(f"%{empresa}%")
+
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT e.nombre AS empresa_nombre, d.url_origen, d.created_at
+            FROM documentos d
+            JOIN empresas e ON e.id = d.empresa_id
+            WHERE {' AND '.join(filtros)}
+            ORDER BY e.nombre, d.created_at DESC
+            """,
+            params,
+        )
+        return cur.fetchall()
+
+
+# ---------------------------------------------------------------------------
 # Negociacion colectiva pre-firma (Art IV bis, Fase 3 / spec-negociacion.md) -- peticion
 # (sindicato), oferta (empresa), reunion y acuerdo por titulo. Antecede al Art IV: una
 # Empresa puede tener documentos que nunca pasaron por aca (convenciones cargadas directo).
