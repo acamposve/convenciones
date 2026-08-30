@@ -16,6 +16,7 @@ import { ComparadorPage } from "./comparador/ComparadorPage";
 import { NegociacionesPage } from "./negociacion/NegociacionesPage";
 import { NegociacionDetailPage } from "./negociacion/NegociacionDetailPage";
 import { PlataformaPage } from "./plataforma/PlataformaPage";
+import { BibliotecaPage } from "./biblioteca/BibliotecaPage";
 
 // Fase 2 (constitution.md v2.0.0): Empresa + cola de revisión (Art IV.8) + comparador
 // intra-tenant (Art IV.9) ya conviven con el pipeline de ingesta/clasificación de la
@@ -66,6 +67,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="/registro" element={<RegisterPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/no-autorizado" element={<NoAutorizado />} />
+          <Route path="/biblioteca" element={<BibliotecaPage />} />
           <Route
             path="/"
             element={

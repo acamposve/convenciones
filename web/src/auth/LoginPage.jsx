@@ -46,6 +46,9 @@ export function LoginPage() {
           <p className="banner-muted">
             <Link to="/registro">¿Todavía no tenés cuenta? Crear una</Link>
           </p>
+          <p className="banner-muted">
+            <Link to="/biblioteca">Ver biblioteca pública (sin cuenta)</Link>
+          </p>
         </div>
       </form>
     </div>
