@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import storage
 from app.auth import require_role
-from app.classification import build_system_prompt, check_legal_compliance, classify_clause
+from app.classification import build_system_prompt, check_legal_compliance, classify_clause, summarize_clause
 from app.config import WEB_ORIGINS
 from app.db import get_conn
 from app.extraction import ExtractionError, extract_text
@@ -462,7 +462,8 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
 
         cur.execute(
             """
-            SELECT t.id, t.nombre, t.descripcion, c.id AS categoria_id, c.nombre AS categoria_nombre
+            SELECT t.id, t.nombre, t.descripcion, c.id AS categoria_id, c.nombre AS categoria_nombre,
+                   c.requiere_campo_comparacion_economica
             FROM taxonomia_titulos t
             JOIN taxonomia_categorias c ON c.id = t.categoria_id
             ORDER BY c.id, t.id
@@ -470,6 +471,7 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
         )
         titulos = cur.fetchall()
 
+    titulo_by_id = {t["id"]: t for t in titulos}
     system_prompt = build_system_prompt(titulos)
     fallos = 0
 
@@ -505,16 +507,33 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
                     except Exception as exc:
                         print(f"[cumplimiento] documento {documento_id} orden {orden}: {exc}")
 
+            # Art IV.6/6 bis (spec-resumen-ejecutivo.md): campo_comparativo solo se pide si
+            # la categoria del titulo lo requiere; resumen_ejecutivo siempre se intenta si
+            # ya hay titulo. Un fallo acá no bloquea el pipeline, igual que clasificacion y
+            # cumplimiento legal -- ambos quedan NULL y con estado_revision_resumen='pendiente'.
+            campo_comparativo = None
+            resumen_ejecutivo = None
+            if titulo_id is not None:
+                titulo = titulo_by_id[titulo_id]
+                try:
+                    resultado_resumen = summarize_clause(
+                        texto_clausula, titulo["nombre"], titulo["requiere_campo_comparacion_economica"]
+                    )
+                    resumen_ejecutivo = resultado_resumen["resumen_ejecutivo"]
+                    campo_comparativo = resultado_resumen["campo_comparativo"]
+                except Exception as exc:
+                    print(f"[resumen] documento {documento_id} orden {orden}: {exc}")
+
             cur.execute(
                 """
                 INSERT INTO clausulas
                     (documento_id, tenant_id, texto, titulo_id, categoria_id, orden, confianza,
-                     cumplimiento_legal, cumplimiento_justificacion)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     cumplimiento_legal, cumplimiento_justificacion, campo_comparativo, resumen_ejecutivo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     documento_id, tenant_id, texto_clausula, titulo_id, categoria_id, orden, confianza,
-                    cumplimiento_legal, cumplimiento_justificacion,
+                    cumplimiento_legal, cumplimiento_justificacion, campo_comparativo, resumen_ejecutivo,
                 ),
             )
         conn.commit()
@@ -603,13 +622,19 @@ def listar_cola_revision(request: Request):
             SELECT cl.id, cl.texto, cl.orden, cl.confianza,
                    cl.documento_id, d.empresa_id, e.nombre AS empresa_nombre,
                    cl.titulo_id, t.nombre AS titulo_nombre, cl.categoria_id, c.nombre AS categoria_nombre,
-                   cl.cumplimiento_legal, cl.cumplimiento_justificacion
+                   cl.cumplimiento_legal, cl.cumplimiento_justificacion,
+                   cl.estado_revision, cl.campo_comparativo,
+                   cl.resumen_ejecutivo, cl.estado_revision_resumen
             FROM clausulas cl
             JOIN documentos d ON d.id = cl.documento_id
             JOIN empresas e ON e.id = d.empresa_id
             LEFT JOIN taxonomia_titulos t ON t.id = cl.titulo_id
             LEFT JOIN taxonomia_categorias c ON c.id = cl.categoria_id
-            WHERE cl.tenant_id = %s AND cl.estado_revision = 'pendiente'
+            -- Fase 6 (spec-resumen-ejecutivo.md): la clausula sigue en la cola mientras
+            -- CUALQUIERA de los dos estados siga pendiente -- son independientes, aprobar
+            -- uno no saca a la clausula de la cola si el otro todavia no se resolvio.
+            WHERE cl.tenant_id = %s
+              AND (cl.estado_revision = 'pendiente' OR cl.estado_revision_resumen = 'pendiente')
             ORDER BY
                 -- confianza baja (o sin confianza, ej. fallo de clasificacion) primero:
                 -- Art IV.7, prioriza la cola por lo que mas necesita ojo humano.
@@ -626,10 +651,12 @@ def aprobar_clausula(
     request: Request,
     clausula_id: int,
     titulo_id: Optional[int] = Form(None),
+    campo_comparativo: Optional[str] = Form(None),
 ):
     # "Corregir" (auth-spec.md §5) se resuelve aca mismo: si el Revisor manda un titulo_id
     # distinto al sugerido, se actualiza como parte de la aprobacion -- no es una accion
-    # separada, es el mismo gesto de "reviso y confirmo (con o sin ajuste)".
+    # separada, es el mismo gesto de "reviso y confirmo (con o sin ajuste)". Igual con
+    # campo_comparativo (Fase 6): comparte este estado de revision, no el del resumen.
     claims = require_role(request, "AdminTenant", "Revisor")
     with get_conn() as conn, conn.cursor() as cur:
         if titulo_id is not None:
@@ -640,6 +667,11 @@ def aprobar_clausula(
             cur.execute(
                 "UPDATE clausulas SET titulo_id = %s, categoria_id = %s WHERE id = %s AND tenant_id = %s",
                 (titulo_id, fila["categoria_id"], clausula_id, claims.tenant_id),
+            )
+        if campo_comparativo is not None:
+            cur.execute(
+                "UPDATE clausulas SET campo_comparativo = %s WHERE id = %s AND tenant_id = %s",
+                (campo_comparativo, clausula_id, claims.tenant_id),
             )
 
         cur.execute(
@@ -674,6 +706,57 @@ def rechazar_clausula(request: Request, clausula_id: int):
             raise HTTPException(404, "clausula no encontrada")
         conn.commit()
     return {"id": clausula_id, "estado_revision": "rechazado"}
+
+
+# Fase 6 (spec-resumen-ejecutivo.md, Art IV.6 bis/8): el resumen ejecutivo tiene su propia
+# aprobacion, independiente de la de arriba -- puede aprobarse el titulo sin el resumen (o
+# viceversa), en cualquier orden, sin que uno bloquee al otro.
+@app.post("/revision/{clausula_id}/aprobar-resumen")
+def aprobar_resumen(
+    request: Request,
+    clausula_id: int,
+    resumen_ejecutivo: Optional[str] = Form(None),
+):
+    claims = require_role(request, "AdminTenant", "Revisor")
+    with get_conn() as conn, conn.cursor() as cur:
+        if resumen_ejecutivo is not None:
+            cur.execute(
+                "UPDATE clausulas SET resumen_ejecutivo = %s WHERE id = %s AND tenant_id = %s",
+                (resumen_ejecutivo, clausula_id, claims.tenant_id),
+            )
+
+        cur.execute(
+            """
+            UPDATE clausulas
+            SET estado_revision_resumen = 'aprobado', revisado_por_resumen = %s, revisado_at_resumen = now()
+            WHERE id = %s AND tenant_id = %s
+            RETURNING id
+            """,
+            (claims.user_id, clausula_id, claims.tenant_id),
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(404, "clausula no encontrada")
+        conn.commit()
+    return {"id": clausula_id, "estado_revision_resumen": "aprobado"}
+
+
+@app.post("/revision/{clausula_id}/rechazar-resumen")
+def rechazar_resumen(request: Request, clausula_id: int):
+    claims = require_role(request, "AdminTenant", "Revisor")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE clausulas
+            SET estado_revision_resumen = 'rechazado', revisado_por_resumen = %s, revisado_at_resumen = now()
+            WHERE id = %s AND tenant_id = %s
+            RETURNING id
+            """,
+            (claims.user_id, clausula_id, claims.tenant_id),
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(404, "clausula no encontrada")
+        conn.commit()
+    return {"id": clausula_id, "estado_revision_resumen": "rechazado"}
 
 
 # ---------------------------------------------------------------------------
@@ -729,7 +812,8 @@ def comparar(
         cur.execute(
             f"""
             SELECT e.id AS empresa_id, e.nombre AS empresa_nombre,
-                   cl.id AS clausula_id, cl.texto, cl.orden, d.id AS documento_id
+                   cl.id AS clausula_id, cl.texto, cl.orden, d.id AS documento_id,
+                   cl.campo_comparativo, cl.resumen_ejecutivo, cl.estado_revision_resumen
             FROM clausulas cl
             JOIN documentos d ON d.id = cl.documento_id
             JOIN empresas e ON e.id = d.empresa_id
@@ -742,12 +826,24 @@ def comparar(
 
     # Agrupado por empresa: una sola fila de comparador.php por empresa, con sus clausulas
     # aprobadas para este titulo (normalmente una, pero no se asume).
+    #
+    # Fase 6 (spec-resumen-ejecutivo.md, Art IV.9): el resumen solo viaja si tambien esta
+    # aprobado -- si no, el frontend no tiene de donde mostrarlo y cae al texto completo.
+    # La aprobacion de la clasificacion (el filtro de arriba) sigue siendo la unica
+    # condicion para que la clausula aparezca en el comparador.
     por_empresa: dict = {}
     for fila in filas:
         emp = por_empresa.setdefault(
             fila["empresa_id"], {"empresa_id": fila["empresa_id"], "empresa_nombre": fila["empresa_nombre"], "clausulas": []}
         )
-        emp["clausulas"].append({"id": fila["clausula_id"], "texto": fila["texto"], "documento_id": fila["documento_id"]})
+        resumen_aprobado = fila["estado_revision_resumen"] == "aprobado"
+        emp["clausulas"].append({
+            "id": fila["clausula_id"],
+            "texto": fila["texto"],
+            "documento_id": fila["documento_id"],
+            "campo_comparativo": fila["campo_comparativo"],
+            "resumen_ejecutivo": fila["resumen_ejecutivo"] if resumen_aprobado else None,
+        })
     return list(por_empresa.values())
 
 

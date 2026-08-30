@@ -60,30 +60,34 @@ Ninguna pendiente — las de la reunión (§6 de la respuesta original) quedaron
 
 Tres bloques — A es el pipeline (necesita estar antes de B y C), B es la cola de revisión extendida, C es el comparador.
 
-### A. Pipeline: campo comparativo + resumen ejecutivo
+### A. Pipeline: campo comparativo + resumen ejecutivo ✅ terminado
 
-- [ ] Migración: `clausulas.campo_comparativo`, `resumen_ejecutivo`, `estado_revision_resumen`, `revisado_por_resumen`, `revisado_at_resumen`
-- [ ] `classification.py`: función(es) para campo comparativo y resumen ejecutivo — decidir en implementación si van en la misma llamada estructurada que la clasificación (menos costo/latencia, mismo patrón que `confianza`) o en llamadas separadas (más control, más costo)
-- [ ] `_procesar_pipeline()`: integrar el/los paso(s) nuevo(s), guardando ambos campos con `estado_revision_resumen='pendiente'` por defecto
-- [ ] Verificar con Postgres real + casos de cláusulas reales: el resumen no debe desviarse del texto original (revisión manual de una muestra antes de dar por buena la fase, mismo criterio que se usó para el marco legal)
+- [x] Migración: `clausulas.campo_comparativo`, `resumen_ejecutivo`, `estado_revision_resumen`, `revisado_por_resumen`, `revisado_at_resumen` (`service/db/migrations/010_resumen_ejecutivo.sql`)
+- [x] `classification.py`: `summarize_clause()` — llamada separada de `classify_clause()` (se necesita saber el título ya asignado antes de pedir el resumen/campo comparativo). `campo_comparativo` se omite del schema de salida cuando la categoría del título no lo requiere (`taxonomia_categorias.requiere_campo_comparacion_economica`), en vez de forzar al modelo a inventarlo
+- [x] `_procesar_pipeline()`: integrado después de cumplimiento legal (5 bis); un fallo no bloquea el pipeline, igual que clasificación/cumplimiento legal
+- [x] Verificado: schema fresco + migración incremental llegan a la misma estructura contra Postgres real; pipeline en vivo no rompe cuando la clasificación falla (gracia igual que en fases anteriores); `summarize_clause()` verificado con el cliente de Anthropic mockeado (3 tests nuevos en `test_classification.py`: pide campo comparativo cuando la categoría lo requiere, lo omite cuando no, maneja `refusal`) — no se pudo probar el juicio real del modelo en este entorno por no contar con una API key válida (mismo límite que en Fase 4), pendiente antes de producción real
+- [ ] Revisión manual de fidelidad con casos reales — sigue pendiente hasta tener una key real
 
-### B. Cola de revisión: aprobar resumen como gesto independiente
+### B. Cola de revisión: aprobar resumen como gesto independiente ✅ terminado
 
-- [ ] Backend: `POST /revision/{clausula_id}/aprobar-resumen` y `.../rechazar-resumen` (o extender los existentes con un parámetro — a decidir en implementación), gateados igual que hoy (`AdminTenant`/`Revisor`)
-- [ ] `GET /revision`: incluir `campo_comparativo`, `resumen_ejecutivo`, `estado_revision_resumen` en la respuesta
-- [ ] Frontend (`RevisionPage.jsx`): mostrar resumen propuesto + campo comparativo, con su propio botón de aprobar/rechazar separado del de clasificación
-- [ ] Verificar: aprobar clasificación sin aprobar resumen queda visible en la cláusula sin bloquear nada; aprobar resumen sin clasificación aprobada no publica igual (Art IV.9 sigue dependiendo solo de clasificación)
+- [x] Backend: `POST /revision/{clausula_id}/aprobar-resumen` y `.../rechazar-resumen` (endpoints separados, no un parámetro en los existentes), gateados igual que hoy (`AdminTenant`/`Revisor`). `aprobar` (clasificación) también gana un `campo_comparativo` opcional para corregirlo en el mismo gesto, igual que ya hacía con `titulo_id`
+- [x] `GET /revision`: incluye `estado_revision`, `campo_comparativo`, `resumen_ejecutivo`, `estado_revision_resumen` — y el `WHERE` cambia a mostrar la cláusula mientras **cualquiera** de los dos estados siga `pendiente` (antes solo miraba `estado_revision`, lo que hacía desaparecer la cláusula de la cola en cuanto se aprobaba el título, sin dejar forma de revisar el resumen por separado)
+- [x] Frontend (`RevisionPage.jsx`): dos columnas independientes ("Clasificación" y "Resumen ejecutivo"), cada una con sus propios controles editables + Aprobar/Rechazar mientras esté `pendiente`, y un badge de solo lectura una vez resuelta
+- [x] Verificado en vivo contra el stack completo: aprobé la clasificación primero → la cláusula siguió en la cola (resumen todavía pendiente), con la columna de clasificación mostrando el badge "Aprobado" y el resumen todavía editable → aprobé el resumen → la cláusula recién ahí desapareció de la cola. Confirmado en Postgres: ambos estados quedaron `aprobado`, cada uno con su propia auditoría (`revisado_at`/`revisado_at_resumen`)
 
-### C. Comparador: resumen colapsado + texto completo desplegable
+### C. Comparador: resumen colapsado + texto completo desplegable ✅ terminado
 
-- [ ] Backend (`GET /comparador`): incluir `resumen_ejecutivo`/`estado_revision_resumen`/`campo_comparativo` en la respuesta
-- [ ] Frontend (`ComparadorPage.jsx`): si `estado_revision_resumen='aprobado'`, mostrar resumen colapsado con control para desplegar texto completo; si no, mostrar texto completo directo
-- [ ] Verificar de punta a punta: una cláusula con clasificación aprobada y resumen aprobado se ve colapsada; una con clasificación aprobada pero resumen pendiente se ve con el texto completo, sin romper nada
+- [x] Backend (`GET /comparador`): la consulta incluye `campo_comparativo`, `resumen_ejecutivo`, `estado_revision_resumen`; el `resumen_ejecutivo` se nulifica en el servidor si `estado_revision_resumen != 'aprobado'` (nunca viaja un resumen sin validar) — el gate de publicación sigue siendo solo `estado_revision = 'aprobado'` (Art IV.9, decisión cerrada en §6)
+- [x] Frontend (`ComparadorPage.jsx`): si el resumen viene presente (i.e. aprobado), se muestra colapsado junto al `campo_comparativo` como badge, con botón "Ver texto completo"/"Ver resumen" para alternar; si no hay resumen (pendiente o rechazado), se muestra el texto completo directo, sin controles de resumen
+- [x] Verificado de punta a punta contra el stack completo (docker compose + uvicorn local en :8010 por el conflicto de puerto con Laragon, ver memoria): se insertaron dos cláusulas de prueba vía SQL directo (título "Vacaciones" aprobado en ambas) — una con `estado_revision_resumen='aprobado'` (se vio colapsada con badge de campo comparativo y botón "Ver texto completo", que al hacer clic despliega el texto original y cambia a "Ver resumen") y otra con `estado_revision_resumen='pendiente'` (se vio con el texto completo directo, sin botón, resumen ausente en la respuesta JSON tal como lo nulifica el backend). Datos de prueba eliminados al terminar
+- [x] `npm run build` limpio y `pytest` 25/25 verdes, sin regresiones
 
 ## 9. Checklist resumido
 
-- [ ] A. Pipeline: campo comparativo + resumen ejecutivo
-- [ ] B. Cola de revisión: aprobar resumen como gesto independiente
-- [ ] C. Comparador: resumen colapsado + texto completo desplegable
+- [x] A. Pipeline: campo comparativo + resumen ejecutivo
+- [x] B. Cola de revisión: aprobar resumen como gesto independiente
+- [x] C. Comparador: resumen colapsado + texto completo desplegable
+
+**Fase 6 completa.** Sigue pendiente, transversal a los tres bloques: la revisión manual de fidelidad del resumen/campo comparativo con casos reales, bloqueada por no contar con una API key de Anthropic válida en este entorno (mismo límite ya señalado en Fase 4) — verificar antes de producción real.
 
 *(Se actualiza a medida que avanzamos, mismo criterio que las specs de Fases 2-5.)*

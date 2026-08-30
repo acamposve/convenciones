@@ -389,12 +389,23 @@ CREATE TABLE clausulas (
     -- articulos de ley vinculados (titulo_articulo_ley), sin necesidad de llamar al modelo.
     cumplimiento_legal          TEXT CHECK (cumplimiento_legal IN ('por_debajo', 'iguala', 'supera', 'no_aplica')),
     cumplimiento_justificacion  TEXT,
+    -- Fase 6 (spec-resumen-ejecutivo.md, Art IV.6/6 bis): campo_comparativo comparte el
+    -- estado_revision de arriba (decision cerrada, spec §6) -- resumen_ejecutivo tiene su
+    -- PROPIO estado, independiente, porque puede aprobarse en un momento distinto al de la
+    -- clasificacion (uno no bloquea al otro).
+    campo_comparativo   TEXT,
+    resumen_ejecutivo   TEXT,
+    estado_revision_resumen  TEXT NOT NULL DEFAULT 'pendiente'
+                             CHECK (estado_revision_resumen IN ('pendiente', 'aprobado', 'rechazado')),
+    revisado_por_resumen     UUID REFERENCES usuarios(id),
+    revisado_at_resumen      TIMESTAMPTZ,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_clausulas_documento_id ON clausulas(documento_id);
 CREATE INDEX idx_clausulas_tenant_id ON clausulas(tenant_id);
 CREATE INDEX idx_clausulas_estado_revision ON clausulas(tenant_id, estado_revision);
+CREATE INDEX idx_clausulas_estado_revision_resumen ON clausulas(tenant_id, estado_revision_resumen);
 
 -- Seed minimo de paises (activo=false hasta validacion legal, ver Art. II.4 y XI.1)
 INSERT INTO paises (codigo, nombre, activo) VALUES

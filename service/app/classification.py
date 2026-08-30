@@ -150,3 +150,76 @@ def check_legal_compliance(texto_clausula: str, articulos: list[dict]) -> dict:
         raise ClassificationError("El modelo no devolvio una respuesta de texto evaluable para cumplimiento legal.")
 
     return json.loads(texto_respuesta)
+
+
+def summarize_clause(texto_clausula: str, titulo_nombre: str, requiere_campo_comparativo: bool) -> dict:
+    """Devuelve {'resumen_ejecutivo': str, 'campo_comparativo': str|None}.
+
+    Art IV.6/6 bis (spec-resumen-ejecutivo.md): campo_comparativo solo se pide si la
+    categoria del titulo lo requiere (taxonomia_categorias.requiere_campo_comparacion_economica,
+    hoy el unico flag real que existe para esto -- no hay uno por titulo) -- si no, se omite
+    del schema de salida en vez de forzar al modelo a inventar un valor donde no aplica.
+
+    Restriccion dura de producto (decision cerrada, spec §6, la puso el cliente de dominio
+    en la reunion de origen -- no es un detalle de estilo del prompt): el resumen ejecutivo
+    nunca interpreta, opina, ni agrega contenido ausente del texto original. Es una sintesis
+    practica para lectura ejecutiva rapida ("15 dias habiles de vacaciones + 1 bono anual"),
+    no un analisis.
+    """
+    schema_properties = {"resumen_ejecutivo": {"type": "string"}}
+    required = ["resumen_ejecutivo"]
+    if requiere_campo_comparativo:
+        schema_properties["campo_comparativo"] = {"type": "string"}
+        required.append("campo_comparativo")
+
+    system_prompt = (
+        f"Eres un asistente que redacta un resumen ejecutivo breve y fiel de una clausula de "
+        f"convencion colectiva de trabajo, clasificada bajo el titulo '{titulo_nombre}'. "
+        "Reglas estrictas: no interpretes, no agregues contenido que no este literalmente en "
+        "el texto original, no opines ni evalues si es buena o mala condicion. El resumen debe "
+        "ser una sintesis practica para que un ejecutivo entienda el punto clave sin leer la "
+        "clausula completa (ej. 'Aumento salarial del 15%', '15 dias habiles de vacaciones + "
+        "1 bono anual')."
+    )
+    if requiere_campo_comparativo:
+        system_prompt += (
+            " Ademas extrae el campo comparativo: el valor normalizado y comparable de la "
+            "clausula tal como aparece en el texto (ej. '15 dias habiles', '30% del salario')."
+        )
+
+    response = _client.messages.create(
+        model=CLASSIFICATION_MODEL,
+        max_tokens=400,
+        system=[
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+        messages=[{"role": "user", "content": texto_clausula}],
+        output_config={
+            "format": {
+                "type": "json_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": schema_properties,
+                    "required": required,
+                    "additionalProperties": False,
+                },
+            }
+        },
+    )
+
+    if response.stop_reason == "refusal":
+        raise ClassificationError("El modelo rehuso resumir esta clausula (stop_reason=refusal).")
+
+    texto_respuesta = next((b.text for b in response.content if b.type == "text"), None)
+    if texto_respuesta is None:
+        raise ClassificationError("El modelo no devolvio una respuesta de texto resumible.")
+
+    data = json.loads(texto_respuesta)
+    return {
+        "resumen_ejecutivo": data["resumen_ejecutivo"],
+        "campo_comparativo": data.get("campo_comparativo"),
+    }
