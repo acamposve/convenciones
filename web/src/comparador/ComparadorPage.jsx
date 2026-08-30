@@ -5,6 +5,10 @@ import { useAuth } from "../context/AuthContext";
 // El nucleo del producto original (comparador.php del legado): comparar el mismo titulo
 // de taxonomia entre varias empresas del catalogo, filtrando por sector/tipo/actividad/
 // geografia. Intra-tenant (Art VI.2) y solo clausulas aprobadas (Art IV.9).
+//
+// Fase 6 (spec-resumen-ejecutivo.md Art IV.9 §5): si el resumen ejecutivo esta aprobado
+// (estado_revision_resumen), se muestra colapsado con un control para desplegar el texto
+// completo -- si no, se muestra el texto completo directo, nunca un resumen sin validar.
 export function ComparadorPage() {
   const { docFetch } = useAuth();
   const [titulos, setTitulos] = useState(null);
@@ -13,6 +17,7 @@ export function ComparadorPage() {
   const [filtros, setFiltros] = useState({ sector_id: "", tipo_id: "", categoria_id: "", actividad_id: "", estado_id: "" });
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState(null);
+  const [expandidas, setExpandidas] = useState({}); // { [clausulaId]: true }
 
   useEffect(() => {
     docFetch("/comparador/titulos").then((res) => res.json()).then(setTitulos).catch(() => setTitulos([]));
@@ -99,9 +104,42 @@ export function ComparadorPage() {
               <div key={emp.empresa_id} className="card" style={{ minWidth: 260, flex: "1 0 260px" }}>
                 <div className="card-body">
                   <h2 style={{ fontSize: "1rem" }}>{emp.empresa_nombre}</h2>
-                  {emp.clausulas.map((cl) => (
-                    <p key={cl.id} className="clause-texto">{cl.texto}</p>
-                  ))}
+                  {emp.clausulas.map((cl) => {
+                    const tieneResumen = Boolean(cl.resumen_ejecutivo);
+                    const desplegada = expandidas[cl.id];
+                    return (
+                      <div key={cl.id} style={{ marginBottom: "0.75rem" }}>
+                        {cl.campo_comparativo && (
+                          <div className="badge" style={{ marginBottom: "0.25rem" }}>{cl.campo_comparativo}</div>
+                        )}
+                        {tieneResumen && !desplegada ? (
+                          <>
+                            <p className="clause-texto">{cl.resumen_ejecutivo}</p>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => setExpandidas((e) => ({ ...e, [cl.id]: true }))}
+                            >
+                              Ver texto completo
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="clause-texto">{cl.texto}</p>
+                            {tieneResumen && (
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => setExpandidas((e) => ({ ...e, [cl.id]: false }))}
+                              >
+                                Ver resumen
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
