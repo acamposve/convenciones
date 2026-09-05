@@ -131,7 +131,7 @@ Option A — Async (email/Slack):
 > **Start here:**
 > 1. [REORGANIZATION_SUMMARY.md](REORGANIZATION_SUMMARY.md) — 5 min overview
 > 2. [BEFORE_AFTER_COMPARISON.md](BEFORE_AFTER_COMPARISON.md) — visual comparison
-> 3. New dev? Read [README.md](README.md) → [CONTRIBUTING.md](CONTRIBUTING.md) → [docs/constitution.md](docs/constitution.md)
+> 3. New dev? Read [README.md](../README.md) → [CONTRIBUTING.md](CONTRIBUTING.md) → [constitution.md](constitution.md)
 > 
 > **Key documents created:**
 > - ARCHITECTURE.md — Tech stack and design patterns
@@ -154,10 +154,10 @@ Option B — Sync (standup):
 
 ## Phase 6: Ongoing (every sprint)
 
-- [ ] When onboarding new dev: point to [README.md](README.md) first, then [CONTRIBUTING.md](CONTRIBUTING.md)
+- [ ] When onboarding new dev: point to [README.md](../README.md) first, then [CONTRIBUTING.md](CONTRIBUTING.md)
 - [ ] Before committing: run `cd web && npm run lint` to catch issues early
-- [ ] When proposing new feature: check [docs/PHASES.md](docs/PHASES.md) to see if it fits current phase
-- [ ] When changing architecture: justify against [ARCHITECTURE.md](ARCHITECTURE.md) or propose amendment to [docs/constitution.md](docs/constitution.md)
+- [ ] When proposing new feature: check [PHASES.md](PHASES.md) to see if it fits current phase
+- [ ] When changing architecture: justify against [ARCHITECTURE.md](ARCHITECTURE.md) or propose amendment to [constitution.md](constitution.md)
 - [ ] Update [CHANGELOG.md](CHANGELOG.md) with significant changes (features, bugs, governance)
 
 ---
@@ -220,7 +220,7 @@ If any of these is missing after reading this list, run `bash VALIDATE_REORGANIZ
 ## Questions?
 
 1. **How do I onboard a new developer?**  
-   → Share [README.md](README.md) + [CONTRIBUTING.md](CONTRIBUTING.md)
+   → Share [README.md](../README.md) + [CONTRIBUTING.md](CONTRIBUTING.md)
 
 2. **Why so much documentation?**  
    → See [BEFORE_AFTER_COMPARISON.md](BEFORE_AFTER_COMPARISON.md) — it's not over-engineered, it's appropriate for a legal compliance project

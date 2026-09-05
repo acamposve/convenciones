@@ -24,4 +24,4 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## Fases futuras
 
-Ver [`docs/spec-mvp-demo.md`](docs/spec-mvp-demo.md) y roadmap en `constitution.md` Art. X.
+Ver [`spec-mvp-demo.md`](spec-mvp-demo.md) y roadmap en `constitution.md` Art. X.

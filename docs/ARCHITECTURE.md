@@ -1,6 +1,6 @@
 # Visión de arquitectura
 
-**Referencia:** Esta es una síntesis ejecutiva. Para detalles, ver [`docs/constitution.md`](docs/constitution.md) Art. III–V.
+**Referencia:** Esta es una síntesis ejecutiva. Para detalles, ver [`constitution.md`](constitution.md) Art. III–V.
 
 ## Principios
 
@@ -129,4 +129,4 @@ Futuro: Migracion a AKS (Kubernetes) cuando:
 
 **Stack completo: .NET 8 · Python/FastAPI · React/Vite · PostgreSQL · Terraform · Azure**
 
-Justificación detallada de cada decisión en [`docs/constitution.md`](docs/constitution.md) Art. V.
+Justificación detallada de cada decisión en [`constitution.md`](constitution.md) Art. V.

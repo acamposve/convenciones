@@ -22,7 +22,7 @@ El proyecto maneja convenciones colectivas de trabajo y marcos legales de Venezu
 - Documentos legales → Régimen de acceso y privacidad de cada país
 - Información de empresas → Según Art. VI de constitution.md (privado por defecto)
 
-Ver [`docs/constitution.md`](docs/constitution.md) Art. VI (Seguridad y privacidad) para los principios irrevocables.
+Ver [`constitution.md`](constitution.md) Art. VI (Seguridad y privacidad) para los principios irrevocables.
 
 ## Dependencias
 

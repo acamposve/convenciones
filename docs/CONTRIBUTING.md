@@ -2,7 +2,7 @@
 
 ## Antes de contribuir
 
-**Lee primero:** [`docs/constitution.md`](docs/constitution.md) — es la fuente única de verdad del proyecto.
+**Lee primero:** [`constitution.md`](constitution.md) — es la fuente única de verdad del proyecto.
 
 Cualquier cambio técnico o de producto que contradiga la constitución requiere:
 1. Comentar explícitamente la contradicción
@@ -30,7 +30,7 @@ Cualquier cambio técnico o de producto que contradiga la constitución requiere
 | **Fase 1** | Revisión humana, cola de revisión, score de confianza, campo comparativo | Planeada |
 | **Fase 2+** | Multi-país, licenciamiento, SSO, publicación, reportes web | Planeada |
 
-Ver [`docs/spec-mvp-demo.md`](docs/spec-mvp-demo.md) para el alcance exacto de hoy.
+Ver [`spec-mvp-demo.md`](spec-mvp-demo.md) para el alcance exacto de hoy.
 
 ## Desarrollo local
 
