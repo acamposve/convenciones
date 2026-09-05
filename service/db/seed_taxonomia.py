@@ -24,7 +24,13 @@ def main() -> None:
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM paises WHERE codigo = 'VE'")
-            pais_id_venezuela = cur.fetchone()[0]
+            fila_venezuela = cur.fetchone()
+            if fila_venezuela is None:
+                raise RuntimeError(
+                    "No existe el pais Venezuela (codigo 'VE') en la tabla paises -- "
+                    "aplica schema.sql (o la migracion 002_auth.sql) antes de correr este seed."
+                )
+            pais_id_venezuela = fila_venezuela[0]
 
             for categoria in data["categorias"]:
                 cur.execute(

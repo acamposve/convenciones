@@ -41,7 +41,10 @@ export function EmpresasPage() {
   // tenant tiene licenciados -- si es uno solo, se preselecciona (caso de hoy: Venezuela).
   useEffect(() => {
     docFetch("/tenants/paises-habilitados")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudieron cargar los países habilitados para tu tenant.");
+        return res.json();
+      })
       .then((paises) => {
         setPaisesHabilitados(paises);
         if (paises.length === 1) {

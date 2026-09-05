@@ -35,7 +35,10 @@ export function RevisionPage() {
     if (faltantes.length === 0) return;
     faltantes.forEach((paisId) => {
       docFetch(`/taxonomia?pais_id=${paisId}`)
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error("No se pudo cargar la taxonomía.");
+          return res.json();
+        })
         .then((titulos) => setTitulosPorPais((t) => ({ ...t, [paisId]: titulos })))
         .catch(() => setTitulosPorPais((t) => ({ ...t, [paisId]: [] })));
     });

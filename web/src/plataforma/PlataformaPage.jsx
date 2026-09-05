@@ -45,7 +45,10 @@ export function PlataformaPage() {
       .then(setTenants)
       .catch((err) => setError(err.message));
     authFetch("/api/plataforma/paises")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudo cargar la lista de países.");
+        return res.json();
+      })
       .then(setPaises)
       .catch(() => setPaises([]));
   };
@@ -54,16 +57,18 @@ export function PlataformaPage() {
 
   useEffect(() => {
     docFetch("/taxonomia/categorias")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudieron cargar las categorías.");
+        return res.json();
+      })
       .then(setCategorias)
       .catch(() => setCategorias([]));
   }, [docFetch]);
 
   const cargarTitulosPais = () => {
-    if (!taxonomiaPaisId) {
-      setTaxonomiaTitulos(null);
-      return;
-    }
+    setTaxonomiaError(null);
+    setTaxonomiaTitulos(null);
+    if (!taxonomiaPaisId) return;
     docFetch(`/plataforma/taxonomia/titulos?pais_id=${taxonomiaPaisId}`)
       .then((res) => {
         if (!res.ok) throw new Error("No se pudieron cargar los títulos de este país.");
