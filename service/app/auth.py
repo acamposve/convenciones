@@ -90,10 +90,12 @@ def get_plataforma_claims(request: Request) -> PlataformaClaims:
     if payload.get("tenant_id") is not None:
         raise HTTPException(403, "Este endpoint es exclusivo del rol de Plataforma.")
 
-    return PlataformaClaims(
-        user_id=uuid.UUID(payload["user_id"]),
-        role=payload.get(_ROLE_CLAIM, ""),
-    )
+    try:
+        user_id = uuid.UUID(payload["user_id"])
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(401, f"Token invalido: falta o esta mal formado user_id ({exc}).") from exc
+
+    return PlataformaClaims(user_id=user_id, role=payload.get(_ROLE_CLAIM, ""))
 
 
 def require_plataforma_role(request: Request, *roles: str) -> PlataformaClaims:

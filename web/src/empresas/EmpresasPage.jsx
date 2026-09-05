@@ -154,9 +154,12 @@ export function EmpresasPage() {
             <select
               required value={form.pais_id}
               onChange={(e) => actualizarCampo("pais_id", e.target.value)}
-              disabled={paisesHabilitados === null}
             >
-              <option value="">— elegir país —</option>
+              {/* Nunca disabled (spec-taxonomia-por-pais.md Bloque C): un <select> disabled
+                  no participa de la validacion HTML, asi que el required de arriba dejaria
+                  de bloquear el submit mientras carga -- el placeholder de "cargando" hace
+                  el mismo trabajo sin perder esa validacion. */}
+              <option value="">{paisesHabilitados === null ? "Cargando países…" : "— elegir país —"}</option>
               {(paisesHabilitados ?? []).map((p) => (
                 <option key={p.id} value={p.id}>{p.nombre}</option>
               ))}

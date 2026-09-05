@@ -147,6 +147,37 @@ def test_get_plataforma_claims_rechaza_con_403_un_token_de_tenant():
     assert exc.value.status_code == 403
 
 
+def test_get_plataforma_claims_con_user_id_mal_formado_da_401_no_500():
+    # uuid.UUID(...) sin capturar convertiria un user_id invalido en un 500 -- debe
+    # tratarse como token invalido (401), igual que un JWT malformado.
+    token = _token_plataforma(user_id="esto-no-es-un-uuid")
+    request = _request({"Authorization": f"Bearer {token}"})
+
+    with pytest.raises(HTTPException) as exc:
+        auth.get_plataforma_claims(request)
+
+    assert exc.value.status_code == 401
+
+
+def test_get_plataforma_claims_sin_user_id_da_401_no_500():
+    token = pyjwt.encode(
+        {
+            auth._ROLE_CLAIM: "PlataformaAdmin",
+            "iss": JWT_ISSUER,
+            "aud": JWT_AUDIENCE,
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        },
+        JWT_SIGNING_KEY,
+        algorithm="HS256",
+    )
+    request = _request({"Authorization": f"Bearer {token}"})
+
+    with pytest.raises(HTTPException) as exc:
+        auth.get_plataforma_claims(request)
+
+    assert exc.value.status_code == 401
+
+
 def test_require_plataforma_role_permite_cuando_el_rol_coincide():
     token = _token_plataforma(role="PlataformaAdmin")
     request = _request({"Authorization": f"Bearer {token}"})

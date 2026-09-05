@@ -680,10 +680,10 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
             JOIN empresas e ON e.id = d.empresa_id
             JOIN taxonomia_titulos t ON t.pais_id = e.pais_id AND t.activo = true
             JOIN taxonomia_categorias c ON c.id = t.categoria_id
-            WHERE d.id = %s
+            WHERE d.id = %s AND d.tenant_id = %s
             ORDER BY c.id, t.id
             """,
-            (documento_id,),
+            (documento_id, tenant_id),
         )
         titulos = cur.fetchall()
 

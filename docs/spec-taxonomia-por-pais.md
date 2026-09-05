@@ -1,7 +1,9 @@
 # Spec — Taxonomía por país y activación de Uruguay (Fase 8, alcance acotado)
 
 > **Depende de:** `constitution.md` v2.1.0 (Art. II.3, Art. VII.4)
-> **Estado:** borrador
+> **Estado:** implementado (Bloques A-D, ver checklist §7). Uruguay activado técnicamente
+> (clonado, alta de empresa, pipeline y comparador filtran por país); activación
+> **comercial** (`paises.activo`) sigue pendiente de validación legal, §3.5.
 > **Alcance:** de las cinco cosas que el roadmap agrupa bajo "Fase 8", esta spec cubre
 > únicamente **taxonomía por país + activación de Uruguay** — la única parte con decisiones
 > ya cerradas con el cliente. SSO/SAML, aislamiento de datos dedicado y mejora continua del
@@ -73,16 +75,19 @@ Ninguna — quedaron resueltas con el usuario (§2) y por relectura cuidadosa de
 
 ## 6. Plan de implementación
 
-- [ ] **Bloque A — Schema**: `taxonomia_titulos.pais_id`/`activo`, `empresas.pais_id`, secuencia de clonado, backfill a Venezuela, migración incremental + verificación contra Postgres real (mismo patrón que `010_resumen_ejecutivo.sql`)
-- [ ] **Bloque B — Backend Plataforma**: `require_plataforma_role()` en `app/auth.py`; endpoints de clonado/alta/edición/activación de títulos; verificado con un JWT de Plataforma real (rol `PlataformaAdmin`, `tenant_id=null`) contra el stack completo
-- [ ] **Bloque C — Pipeline + revisión**: `_procesar_pipeline()` filtra títulos por país de la empresa; `GET /taxonomia` filtra por `pais_id`; alta de empresa pide país (limitado a `tenant_paises_habilitados`); verificado clasificando un documento de una empresa uruguaya de prueba contra el set clonado, confirmando que nunca aparece un título venezolano
-- [ ] **Bloque D — Demo de Uruguay de punta a punta**: clonar Venezuela → Uruguay vía Plataforma, crear empresa uruguaya, subir un documento, confirmar que se clasifica solo contra títulos uruguayos y que el comparador no mezcla países
+- [x] **Bloque A — Schema**: `taxonomia_titulos.pais_id`/`activo`, `empresas.pais_id`, secuencia de clonado, backfill a Venezuela, migración incremental + verificación contra Postgres real (mismo patrón que `010_resumen_ejecutivo.sql`)
+- [x] **Bloque B — Backend Plataforma**: `require_plataforma_role()` en `app/auth.py`; endpoints de clonado/alta/edición/activación de títulos; verificado con un JWT de Plataforma real (rol `PlataformaAdmin`, `tenant_id=null`) contra el stack completo
+- [x] **Bloque C — Pipeline + revisión**: `_procesar_pipeline()` filtra títulos por país de la empresa; `GET /taxonomia` filtra por `pais_id`; alta de empresa pide país (limitado a `tenant_paises_habilitados`); verificado clasificando un documento de una empresa uruguaya de prueba contra el set clonado, confirmando que nunca aparece un título venezolano
+- [x] **Bloque D — Demo de Uruguay de punta a punta**: clonar Venezuela → Uruguay vía Plataforma (nueva sección "Taxonomía por país" en `PlataformaPage.jsx`), crear empresa uruguaya, subir un documento, confirmar que se clasifica solo contra títulos uruguayos y que el comparador no mezcla países
 
 ## 7. Checklist resumido
 
-- [ ] A. Schema
-- [ ] B. Backend Plataforma (clonado + edición)
-- [ ] C. Pipeline + revisión filtran por país
-- [ ] D. Demo de punta a punta (Uruguay activado)
+- [x] A. Schema
+- [x] B. Backend Plataforma (clonado + edición)
+- [x] C. Pipeline + revisión filtran por país
+- [x] D. Demo de punta a punta (Uruguay activado)
 
-*(Se actualiza a medida que avanzamos, mismo criterio que las specs de Fases 2-7.)*
+*(Se actualiza a medida que avanzamos, mismo criterio que las specs de Fases 2-7. Falta de*
+*este ciclo, fuera de alcance por decisión §2: marco legal de Uruguay, validación legal del*
+*set clonado, activación comercial de `paises.activo` para Uruguay, SSO/SAML, aislamiento*
+*de datos dedicado.)*
