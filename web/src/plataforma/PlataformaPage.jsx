@@ -417,6 +417,14 @@ export function PlataformaPage() {
                         type="text"
                         value={edicionTitulo.nombre}
                         onChange={(e) => setEdicionTitulo((f) => ({ ...f, nombre: e.target.value }))}
+                        style={{ marginBottom: "0.3rem", width: "100%" }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Descripción"
+                        value={edicionTitulo.descripcion}
+                        onChange={(e) => setEdicionTitulo((f) => ({ ...f, descripcion: e.target.value }))}
+                        style={{ width: "100%" }}
                       />
                     </td>
                     <td>

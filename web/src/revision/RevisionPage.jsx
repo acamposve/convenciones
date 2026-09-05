@@ -170,15 +170,31 @@ export function RevisionPage() {
                 <td>
                   {cl.estado_revision === "pendiente" ? (
                     <>
-                      <select
-                        value={correcciones[cl.id] ?? cl.titulo_id ?? ""}
-                        onChange={(e) => setCorrecciones((c) => ({ ...c, [cl.id]: e.target.value }))}
-                      >
-                        <option value="">— sin clasificar —</option>
-                        {(titulosPorPais[cl.empresa_pais_id] ?? []).map((t) => (
-                          <option key={t.id} value={t.id}>{t.categoria_nombre} · {t.nombre}</option>
-                        ))}
-                      </select>
+                      {(() => {
+                        const opciones = titulosPorPais[cl.empresa_pais_id] ?? [];
+                        // El titulo sugerido por el pipeline puede haberse desactivado
+                        // despues de clasificar -- sin esta opcion extra, el <select>
+                        // queda con un value que no matchea ninguna <option> y se ve en
+                        // blanco, como si no hubiera sugerencia (spec Bloque C).
+                        const tituloFueraDeLista =
+                          cl.titulo_id != null && !opciones.some((t) => t.id === cl.titulo_id);
+                        return (
+                          <select
+                            value={correcciones[cl.id] ?? cl.titulo_id ?? ""}
+                            onChange={(e) => setCorrecciones((c) => ({ ...c, [cl.id]: e.target.value }))}
+                          >
+                            <option value="">— sin clasificar —</option>
+                            {tituloFueraDeLista && (
+                              <option value={cl.titulo_id} disabled>
+                                {cl.titulo_nombre} (inactivo)
+                              </option>
+                            )}
+                            {opciones.map((t) => (
+                              <option key={t.id} value={t.id}>{t.categoria_nombre} · {t.nombre}</option>
+                            ))}
+                          </select>
+                        );
+                      })()}
                       <input
                         type="text"
                         placeholder="Campo comparativo (ej. 15 días hábiles)"

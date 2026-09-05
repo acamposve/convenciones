@@ -154,7 +154,7 @@ export function EmpresasPage() {
             <select
               required value={form.pais_id}
               onChange={(e) => actualizarCampo("pais_id", e.target.value)}
-              disabled={!paisesHabilitados || paisesHabilitados.length === 0}
+              disabled={paisesHabilitados === null}
             >
               <option value="">— elegir país —</option>
               {(paisesHabilitados ?? []).map((p) => (

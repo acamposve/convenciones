@@ -124,6 +124,7 @@ def listar_taxonomia(pais_id: int):
     # correccion podria ofrecer un titulo de otro pais. Solo titulos activos, igual criterio
     # que el pipeline de clasificacion (Art IV.5): uno desactivado no deberia poder elegirse.
     with get_conn() as conn, conn.cursor() as cur:
+        _validar_pais_id(cur, pais_id, "pais_id")
         cur.execute(
             """
             SELECT t.id, t.nombre, c.id AS categoria_id, c.nombre AS categoria_nombre
@@ -175,6 +176,7 @@ def listar_titulos_taxonomia_plataforma(request: Request, pais_id: int):
     # lectura, visible a los tres roles de Plataforma (Bloque D, PlataformaPage.jsx).
     require_plataforma_role(request, "PlataformaAdmin", "PlataformaSoporte", "PlataformaAuditor")
     with get_conn() as conn, conn.cursor() as cur:
+        _validar_pais_id(cur, pais_id, "pais_id")
         cur.execute(
             """
             SELECT t.id, t.nombre, t.descripcion, t.activo, t.categoria_id, c.nombre AS categoria_nombre
@@ -874,10 +876,36 @@ def aprobar_clausula(
     claims = require_role(request, "AdminTenant", "Revisor")
     with get_conn() as conn, conn.cursor() as cur:
         if titulo_id is not None:
-            cur.execute("SELECT categoria_id FROM taxonomia_titulos WHERE id = %s", (titulo_id,))
+            # Fase 8 (spec-taxonomia-por-pais.md Bloque C, Art II.3): el candado de pais no
+            # puede vivir solo en el dropdown del frontend -- sin esto, un request manipulado
+            # podia corregir una clausula con un titulo de OTRO pais (o desactivado). Se
+            # resuelve el pais de la empresa dueña del documento de esta clausula y se exige
+            # que el titulo sea de ese mismo pais y este activo.
+            cur.execute(
+                """
+                SELECT e.pais_id
+                FROM clausulas cl
+                JOIN documentos d ON d.id = cl.documento_id
+                JOIN empresas e ON e.id = d.empresa_id
+                WHERE cl.id = %s AND cl.tenant_id = %s
+                """,
+                (clausula_id, claims.tenant_id),
+            )
+            clausula_fila = cur.fetchone()
+            if clausula_fila is None:
+                raise HTTPException(404, "clausula no encontrada")
+
+            cur.execute(
+                "SELECT categoria_id FROM taxonomia_titulos WHERE id = %s AND pais_id = %s AND activo = true",
+                (titulo_id, clausula_fila["pais_id"]),
+            )
             fila = cur.fetchone()
             if fila is None:
-                raise HTTPException(422, f"titulo_id {titulo_id} no existe en la taxonomía")
+                raise HTTPException(
+                    422,
+                    f"titulo_id {titulo_id} no existe, no corresponde al país de esta empresa, "
+                    "o está inactivo",
+                )
             cur.execute(
                 "UPDATE clausulas SET titulo_id = %s, categoria_id = %s WHERE id = %s AND tenant_id = %s",
                 (titulo_id, fila["categoria_id"], clausula_id, claims.tenant_id),

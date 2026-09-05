@@ -97,3 +97,70 @@ def test_require_role_rechaza_con_403_cuando_el_rol_no_esta_permitido():
         auth.require_role(request, "AdminTenant", "Revisor", "Editor")
 
     assert exc.value.status_code == 403
+
+
+def _token_plataforma(role: str = "PlataformaAdmin", **overrides) -> str:
+    # TokenService.cs omite el claim tenant_id por completo para un usuario de Plataforma
+    # (nunca lo emite como null/"") -- este helper refleja exactamente eso, sin pasar
+    # tenant_id salvo que un test lo pida explicitamente via overrides.
+    payload = {
+        "user_id": str(uuid.uuid4()),
+        auth._ROLE_CLAIM: role,
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        **overrides,
+    }
+    return pyjwt.encode(payload, JWT_SIGNING_KEY, algorithm="HS256")
+
+
+# Fase 8 (spec-taxonomia-por-pais.md §3.3): candado nuevo para los endpoints de taxonomia
+# por pais -- exclusivo de un usuario de Plataforma, que nunca trae tenant_id en el token.
+def test_get_plataforma_claims_extrae_user_id_y_rol_de_un_token_sin_tenant_id():
+    token = _token_plataforma(role="PlataformaSoporte")
+    request = _request({"Authorization": f"Bearer {token}"})
+
+    claims = auth.get_plataforma_claims(request)
+
+    assert claims.role == "PlataformaSoporte"
+    assert isinstance(claims.user_id, uuid.UUID)
+
+
+def test_get_plataforma_claims_sin_authorization_header_da_401():
+    request = _request({})
+
+    with pytest.raises(HTTPException) as exc:
+        auth.get_plataforma_claims(request)
+
+    assert exc.value.status_code == 401
+
+
+def test_get_plataforma_claims_rechaza_con_403_un_token_de_tenant():
+    # Un token de tenant valido (con tenant_id), aunque diga rol PlataformaAdmin, no debe
+    # colarse por este candado -- es exclusivo de tokens que de verdad no tienen tenant_id.
+    token = _token(role="PlataformaAdmin")
+    request = _request({"Authorization": f"Bearer {token}"})
+
+    with pytest.raises(HTTPException) as exc:
+        auth.get_plataforma_claims(request)
+
+    assert exc.value.status_code == 403
+
+
+def test_require_plataforma_role_permite_cuando_el_rol_coincide():
+    token = _token_plataforma(role="PlataformaAdmin")
+    request = _request({"Authorization": f"Bearer {token}"})
+
+    claims = auth.require_plataforma_role(request, "PlataformaAdmin")
+
+    assert claims.role == "PlataformaAdmin"
+
+
+def test_require_plataforma_role_rechaza_con_403_cuando_el_rol_no_esta_permitido():
+    token = _token_plataforma(role="PlataformaAuditor")
+    request = _request({"Authorization": f"Bearer {token}"})
+
+    with pytest.raises(HTTPException) as exc:
+        auth.require_plataforma_role(request, "PlataformaAdmin")
+
+    assert exc.value.status_code == 403
