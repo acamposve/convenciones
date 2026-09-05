@@ -129,14 +129,28 @@ CREATE TABLE taxonomia_categorias (
     requiere_campo_comparacion_economica    BOOLEAN NOT NULL
 );
 
+-- Fase 8 (spec-taxonomia-por-pais.md, Art II.3): el nucleo de categorias de arriba es
+-- comun a los 4 paises -- lo que se versiona por pais es la capa de titulos. pais_id no
+-- compone la PK: un titulo clonado recibe un id nuevo (taxonomia_titulos_clon_seq), asi
+-- que clausulas.titulo_id / titulo_articulo_ley.titulo_id siguen apuntando sin ambiguedad
+-- a un titulo de un pais especifico sin ningun cambio en esas FKs.
 CREATE TABLE taxonomia_titulos (
     id            INTEGER PRIMARY KEY,
     nombre        TEXT NOT NULL,
     descripcion   TEXT,
-    categoria_id  INTEGER NOT NULL REFERENCES taxonomia_categorias(id)
+    categoria_id  INTEGER NOT NULL REFERENCES taxonomia_categorias(id),
+    pais_id       INTEGER NOT NULL REFERENCES paises(id),
+    -- Nunca se borra un titulo (integridad referencial con clausulas ya clasificadas) --
+    -- se desactiva. El pipeline (Art IV.5) y GET /taxonomia solo ofrecen activo=true.
+    activo        BOOLEAN NOT NULL DEFAULT true
 );
 
 CREATE INDEX idx_taxonomia_titulos_categoria_id ON taxonomia_titulos(categoria_id);
+CREATE INDEX idx_taxonomia_titulos_pais_id ON taxonomia_titulos(pais_id);
+
+-- IDs nuevos para titulos clonados a un pais nuevo (Bloque B) -- arranca por encima de los
+-- ~64 ids legado de Venezuela, con holgura de sobra.
+CREATE SEQUENCE taxonomia_titulos_clon_seq START WITH 1000;
 
 -- Marco legal (Art. II.6 / IV.5 bis de la constitucion, Fase 4 / spec-marco-legal.md):
 -- catalogo de leyes por pais, igual criterio que la taxonomia -- global, sin tenant_id.
@@ -240,6 +254,11 @@ CREATE INDEX idx_localidades_estado_id ON localidades(estado_id);
 CREATE TABLE empresas (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id     UUID NOT NULL REFERENCES tenants(id),
+    -- Fase 8 (spec-taxonomia-por-pais.md §3.2): pais explicito, elegido al crear la
+    -- empresa -- NO se deriva de estado_id (opcional hoy; estados/localidades de paises
+    -- distintos a Venezuela todavia no estan sembradas). Determina que capa de
+    -- taxonomia_titulos usa el pipeline de clasificacion (Art IV.5) para sus documentos.
+    pais_id       INTEGER NOT NULL REFERENCES paises(id),
     nombre        TEXT NOT NULL,
     rif           TEXT,
     sector_id     INTEGER REFERENCES sectores(id),

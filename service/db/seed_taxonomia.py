@@ -23,6 +23,9 @@ def main() -> None:
 
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT id FROM paises WHERE codigo = 'VE'")
+            pais_id_venezuela = cur.fetchone()[0]
+
             for categoria in data["categorias"]:
                 cur.execute(
                     """
@@ -42,14 +45,16 @@ def main() -> None:
             for titulo in data["titulos"]:
                 cur.execute(
                     """
-                    INSERT INTO taxonomia_titulos (id, nombre, descripcion, categoria_id)
-                    VALUES (%(id)s, %(nombre)s, %(descripcion)s, %(categoria_id)s)
+                    INSERT INTO taxonomia_titulos
+                        (id, nombre, descripcion, categoria_id, pais_id)
+                    VALUES (%(id)s, %(nombre)s, %(descripcion)s, %(categoria_id)s,
+                            %(pais_id)s)
                     ON CONFLICT (id) DO UPDATE SET
                         nombre = EXCLUDED.nombre,
                         descripcion = EXCLUDED.descripcion,
                         categoria_id = EXCLUDED.categoria_id
                     """,
-                    titulo,
+                    {**titulo, "pais_id": pais_id_venezuela},
                 )
         conn.commit()
 

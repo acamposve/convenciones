@@ -22,7 +22,7 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import storage
-from app.auth import require_role
+from app.auth import require_plataforma_role, require_role
 from app.classification import build_system_prompt, check_legal_compliance, classify_clause, summarize_clause
 from app.config import WEB_ORIGINS
 from app.db import get_conn
@@ -118,17 +118,189 @@ def listar_tenants():
 
 
 @app.get("/taxonomia")
-def listar_taxonomia():
+def listar_taxonomia(pais_id: int):
+    # Fase 8 (spec-taxonomia-por-pais.md Bloque C): antes no filtraba nada -- dos paises
+    # nunca comparten id de titulo (Art II.3 §3.1), asi que sin este filtro el dropdown de
+    # correccion podria ofrecer un titulo de otro pais. Solo titulos activos, igual criterio
+    # que el pipeline de clasificacion (Art IV.5): uno desactivado no deberia poder elegirse.
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             """
             SELECT t.id, t.nombre, c.id AS categoria_id, c.nombre AS categoria_nombre
             FROM taxonomia_titulos t
             JOIN taxonomia_categorias c ON c.id = t.categoria_id
+            WHERE t.pais_id = %s AND t.activo = true
             ORDER BY c.nombre, t.nombre
-            """
+            """,
+            (pais_id,),
         )
         return cur.fetchall()
+
+
+@app.get("/taxonomia/categorias")
+def listar_categorias_taxonomia():
+    # Nucleo global, igual para los 4 paises (Art II.3 §3.1) -- lo usa el panel de
+    # Plataforma para poblar el selector de categoria al agregar un titulo nuevo.
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id, nombre FROM taxonomia_categorias ORDER BY nombre")
+        return cur.fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Plataforma — taxonomia por pais (Fase 8, spec-taxonomia-por-pais.md Bloque B, Art
+# II.3/VII.4). Excepcion deliberada al patron "Plataforma vive en api/ (.NET)": las tablas
+# de taxonomia son propiedad exclusiva de este servicio (schema.sql, seeds, clasificacion),
+# el .NET ni siquiera las mapea — asi que el clonado/edicion vive aca, gateado por
+# require_plataforma_role() en vez del require_role() de arriba (un usuario de Plataforma
+# no tiene tenant_id). Las cuatro acciones son exclusivas de PlataformaAdmin (spec §3.3).
+# ---------------------------------------------------------------------------
+
+
+def _validar_pais_id(cur, pais_id: int, campo: str) -> None:
+    cur.execute("SELECT 1 FROM paises WHERE id = %s", (pais_id,))
+    if cur.fetchone() is None:
+        raise HTTPException(422, f"{campo} {pais_id} no existe en paises")
+
+
+def _validar_categoria_id(cur, categoria_id: int) -> None:
+    cur.execute("SELECT 1 FROM taxonomia_categorias WHERE id = %s", (categoria_id,))
+    if cur.fetchone() is None:
+        raise HTTPException(422, f"categoria_id {categoria_id} no existe en la taxonomía")
+
+
+@app.get("/plataforma/taxonomia/titulos")
+def listar_titulos_taxonomia_plataforma(request: Request, pais_id: int):
+    # A diferencia de GET /taxonomia (solo activo=true, para el dropdown de correccion),
+    # Plataforma necesita ver TAMBIEN los desactivados para poder reactivarlos -- de solo
+    # lectura, visible a los tres roles de Plataforma (Bloque D, PlataformaPage.jsx).
+    require_plataforma_role(request, "PlataformaAdmin", "PlataformaSoporte", "PlataformaAuditor")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT t.id, t.nombre, t.descripcion, t.activo, t.categoria_id, c.nombre AS categoria_nombre
+            FROM taxonomia_titulos t
+            JOIN taxonomia_categorias c ON c.id = t.categoria_id
+            WHERE t.pais_id = %s
+            ORDER BY c.nombre, t.nombre
+            """,
+            (pais_id,),
+        )
+        return cur.fetchall()
+
+
+@app.post("/plataforma/taxonomia/clonar", status_code=201)
+def clonar_taxonomia(
+    request: Request,
+    pais_origen_id: int = Form(...),
+    pais_destino_id: int = Form(...),
+):
+    require_plataforma_role(request, "PlataformaAdmin")
+    with get_conn() as conn, conn.cursor() as cur:
+        _validar_pais_id(cur, pais_origen_id, "pais_origen_id")
+        _validar_pais_id(cur, pais_destino_id, "pais_destino_id")
+
+        # Evita duplicar por clonar dos veces (spec §3.3) -- para reintentar, el pais
+        # destino debe estar vacio.
+        cur.execute("SELECT 1 FROM taxonomia_titulos WHERE pais_id = %s LIMIT 1", (pais_destino_id,))
+        if cur.fetchone() is not None:
+            raise HTTPException(
+                422,
+                f"pais_destino_id {pais_destino_id} ya tiene títulos; "
+                "para volver a clonar, el país destino debe estar vacío.",
+            )
+
+        # ids nuevos via taxonomia_titulos_clon_seq (nunca reutiliza los ids legado de
+        # Venezuela) -- misma categoria_id (nucleo compartido, Art II.3), mismo nombre y
+        # descripcion. Solo copia titulos activos: uno desactivado en origen no se propaga.
+        cur.execute(
+            """
+            INSERT INTO taxonomia_titulos (id, nombre, descripcion, categoria_id, pais_id)
+            SELECT nextval('taxonomia_titulos_clon_seq'), nombre, descripcion, categoria_id, %s
+            FROM taxonomia_titulos
+            WHERE pais_id = %s AND activo = true
+            RETURNING id
+            """,
+            (pais_destino_id, pais_origen_id),
+        )
+        ids_nuevos = [fila["id"] for fila in cur.fetchall()]
+        if not ids_nuevos:
+            raise HTTPException(
+                422, f"pais_origen_id {pais_origen_id} no tiene títulos activos para clonar"
+            )
+        conn.commit()
+    return {"pais_origen_id": pais_origen_id, "pais_destino_id": pais_destino_id, "titulos_clonados": len(ids_nuevos)}
+
+
+@app.post("/plataforma/taxonomia/titulos", status_code=201)
+def crear_titulo_taxonomia(
+    request: Request,
+    pais_id: int = Form(...),
+    categoria_id: int = Form(...),
+    nombre: str = Form(...),
+    descripcion: Optional[str] = Form(None),
+):
+    require_plataforma_role(request, "PlataformaAdmin")
+    with get_conn() as conn, conn.cursor() as cur:
+        _validar_pais_id(cur, pais_id, "pais_id")
+        _validar_categoria_id(cur, categoria_id)
+        cur.execute(
+            """
+            INSERT INTO taxonomia_titulos (id, nombre, descripcion, categoria_id, pais_id)
+            VALUES (nextval('taxonomia_titulos_clon_seq'), %s, %s, %s, %s)
+            RETURNING id, nombre, descripcion, categoria_id, pais_id, activo
+            """,
+            (nombre, descripcion, categoria_id, pais_id),
+        )
+        titulo = cur.fetchone()
+        conn.commit()
+    return titulo
+
+
+@app.put("/plataforma/taxonomia/titulos/{titulo_id}")
+def editar_titulo_taxonomia(
+    request: Request,
+    titulo_id: int,
+    nombre: str = Form(...),
+    categoria_id: int = Form(...),
+    descripcion: Optional[str] = Form(None),
+):
+    require_plataforma_role(request, "PlataformaAdmin")
+    with get_conn() as conn, conn.cursor() as cur:
+        _validar_categoria_id(cur, categoria_id)
+        cur.execute(
+            """
+            UPDATE taxonomia_titulos SET nombre = %s, descripcion = %s, categoria_id = %s
+            WHERE id = %s
+            RETURNING id, nombre, descripcion, categoria_id, pais_id, activo
+            """,
+            (nombre, descripcion, categoria_id, titulo_id),
+        )
+        titulo = cur.fetchone()
+        if titulo is None:
+            raise HTTPException(404, f"titulo_id {titulo_id} no existe en la taxonomía")
+        conn.commit()
+    return titulo
+
+
+@app.put("/plataforma/taxonomia/titulos/{titulo_id}/activo")
+def activar_titulo_taxonomia(
+    request: Request,
+    titulo_id: int,
+    activo: bool = Form(...),
+):
+    # Nunca DELETE (spec §3.3): preserva integridad referencial con clausulas ya
+    # clasificadas contra este titulo (clausulas.titulo_id, titulo_articulo_ley.titulo_id).
+    require_plataforma_role(request, "PlataformaAdmin")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE taxonomia_titulos SET activo = %s WHERE id = %s RETURNING id, nombre, pais_id, activo",
+            (activo, titulo_id),
+        )
+        titulo = cur.fetchone()
+        if titulo is None:
+            raise HTTPException(404, f"titulo_id {titulo_id} no existe en la taxonomía")
+        conn.commit()
+    return titulo
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +346,7 @@ def listar_localidades(estado_id: int):
 
 _EMPRESA_CAMPOS_SELECT = """
     e.id, e.nombre, e.rif, e.contacto_nombre, e.contacto_email, e.created_at,
+    e.pais_id, p.nombre AS pais_nombre,
     e.sector_id, s.nombre AS sector_nombre,
     e.tipo_id, t.nombre AS tipo_nombre,
     e.categoria_id, c.nombre AS categoria_nombre,
@@ -183,6 +356,7 @@ _EMPRESA_CAMPOS_SELECT = """
 """
 _EMPRESA_JOINS = """
     FROM empresas e
+    JOIN paises p ON p.id = e.pais_id
     LEFT JOIN sectores s ON s.id = e.sector_id
     LEFT JOIN tipos_empresa t ON t.id = e.tipo_id
     LEFT JOIN categorias_sector c ON c.id = e.categoria_id
@@ -192,10 +366,31 @@ _EMPRESA_JOINS = """
 """
 
 
+@app.get("/tenants/paises-habilitados")
+def listar_paises_habilitados(request: Request):
+    # Fase 8 (spec-taxonomia-por-pais.md §3.2): el selector de pais al dar de alta una
+    # empresa solo ofrece los paises que el tenant tiene licenciados -- no tiene sentido
+    # una empresa en un pais que el tenant no pago (tenant_paises_habilitados, Fase 5).
+    claims = require_role(request, "AdminTenant", "Editor")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.id, p.codigo, p.nombre
+            FROM tenant_paises_habilitados tph
+            JOIN paises p ON p.id = tph.pais_id
+            WHERE tph.tenant_id = %s
+            ORDER BY p.nombre
+            """,
+            (claims.tenant_id,),
+        )
+        return cur.fetchall()
+
+
 @app.post("/empresas", status_code=201)
 def crear_empresa(
     request: Request,
     nombre: str = Form(...),
+    pais_id: int = Form(...),
     rif: Optional[str] = Form(None),
     sector_id: Optional[int] = Form(None),
     tipo_id: Optional[int] = Form(None),
@@ -211,17 +406,28 @@ def crear_empresa(
     # claim del JWT (Art VI.2), nunca de un form field.
     claims = require_role(request, "AdminTenant", "Editor")
     with get_conn() as conn, conn.cursor() as cur:
+        # Fase 8 (spec-taxonomia-por-pais.md §3.2/§4): pais explicito elegido en el selector
+        # del form, limitado a lo que el tenant tiene licenciado -- nunca confiar en que el
+        # pais_id que manda el cliente sea uno que su tenant realmente pago.
+        cur.execute(
+            "SELECT 1 FROM tenant_paises_habilitados WHERE tenant_id = %s AND pais_id = %s",
+            (claims.tenant_id, pais_id),
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(422, f"pais_id {pais_id} no está habilitado para tu tenant")
+
         cur.execute(
             """
             INSERT INTO empresas
-                (tenant_id, nombre, rif, sector_id, tipo_id, categoria_id, actividad_id,
-                 estado_id, localidad_id, contacto_nombre, contacto_email)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (tenant_id, pais_id, nombre, rif, sector_id, tipo_id, categoria_id,
+                 actividad_id, estado_id, localidad_id, contacto_nombre, contacto_email)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (
-                claims.tenant_id, nombre, rif, sector_id, tipo_id, categoria_id,
-                actividad_id, estado_id, localidad_id, contacto_nombre, contacto_email,
+                claims.tenant_id, pais_id, nombre, rif, sector_id, tipo_id,
+                categoria_id, actividad_id, estado_id, localidad_id, contacto_nombre,
+                contacto_email,
             ),
         )
         empresa_id = cur.fetchone()["id"]
@@ -460,14 +666,22 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
         cur.execute("UPDATE documentos SET estado = 'segmentado' WHERE id = %s", (documento_id,))
         conn.commit()
 
+        # Fase 8 (spec-taxonomia-por-pais.md Bloque C, Art II.3): antes armaba el prompt con
+        # TODOS los titulos existentes -- ahora resuelve el pais de la empresa dueña del
+        # documento y clasifica solo contra la capa de titulos de ese pais (activos), nunca
+        # mezclando con los de otro pais clonado.
         cur.execute(
             """
             SELECT t.id, t.nombre, t.descripcion, c.id AS categoria_id, c.nombre AS categoria_nombre,
                    c.requiere_campo_comparacion_economica
-            FROM taxonomia_titulos t
+            FROM documentos d
+            JOIN empresas e ON e.id = d.empresa_id
+            JOIN taxonomia_titulos t ON t.pais_id = e.pais_id AND t.activo = true
             JOIN taxonomia_categorias c ON c.id = t.categoria_id
+            WHERE d.id = %s
             ORDER BY c.id, t.id
-            """
+            """,
+            (documento_id,),
         )
         titulos = cur.fetchall()
 
@@ -620,7 +834,7 @@ def listar_cola_revision(request: Request):
         cur.execute(
             """
             SELECT cl.id, cl.texto, cl.orden, cl.confianza,
-                   cl.documento_id, d.empresa_id, e.nombre AS empresa_nombre,
+                   cl.documento_id, d.empresa_id, e.nombre AS empresa_nombre, e.pais_id AS empresa_pais_id,
                    cl.titulo_id, t.nombre AS titulo_nombre, cl.categoria_id, c.nombre AS categoria_nombre,
                    cl.cumplimiento_legal, cl.cumplimiento_justificacion,
                    cl.estado_revision, cl.campo_comparativo,
@@ -903,7 +1117,8 @@ def _obtener_negociacion(negociacion_id, tenant_id) -> dict:
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            SELECT n.id, n.estado, n.fecha_inicio, n.fecha_cierre, n.empresa_id, e.nombre AS empresa_nombre
+            SELECT n.id, n.estado, n.fecha_inicio, n.fecha_cierre, n.empresa_id,
+                   e.nombre AS empresa_nombre, e.pais_id AS empresa_pais_id
             FROM negociaciones n
             JOIN empresas e ON e.id = n.empresa_id
             WHERE n.id = %s AND n.tenant_id = %s

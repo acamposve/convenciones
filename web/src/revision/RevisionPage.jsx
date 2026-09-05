@@ -18,16 +18,28 @@ const ESTADO_LABEL = { aprobado: "Aprobado", rechazado: "Rechazado" };
 export function RevisionPage() {
   const { rol, docFetch } = useAuth();
   const [cola, setCola] = useState(null);
-  const [titulos, setTitulos] = useState([]);
+  const [titulosPorPais, setTitulosPorPais] = useState({}); // { [pais_id]: [titulo, ...] }
   const [correcciones, setCorrecciones] = useState({}); // { [clausulaId]: titulo_id elegido }
   const [camposComparativos, setCamposComparativos] = useState({}); // { [clausulaId]: texto }
   const [resumenes, setResumenes] = useState({}); // { [clausulaId]: texto }
   const [error, setError] = useState(null);
   const [procesando, setProcesando] = useState(null);
 
+  // Fase 8 (spec-taxonomia-por-pais.md Bloque C): la cola puede mezclar clausulas de
+  // empresas de paises distintos (cada una con su propia capa de titulos, Art II.3) -- se
+  // carga la taxonomia de cada pais presente en la cola por separado, nunca una lista unica
+  // mezclando titulos que no le corresponden a una clausula.
   useEffect(() => {
-    docFetch("/taxonomia").then((res) => res.json()).then(setTitulos).catch(() => setTitulos([]));
-  }, [docFetch]);
+    const paisesEnCola = [...new Set((cola ?? []).map((cl) => cl.empresa_pais_id))];
+    const faltantes = paisesEnCola.filter((paisId) => !(paisId in titulosPorPais));
+    if (faltantes.length === 0) return;
+    faltantes.forEach((paisId) => {
+      docFetch(`/taxonomia?pais_id=${paisId}`)
+        .then((res) => res.json())
+        .then((titulos) => setTitulosPorPais((t) => ({ ...t, [paisId]: titulos })))
+        .catch(() => setTitulosPorPais((t) => ({ ...t, [paisId]: [] })));
+    });
+  }, [cola, docFetch, titulosPorPais]);
 
   const cargarCola = () => {
     docFetch("/revision")
@@ -160,7 +172,7 @@ export function RevisionPage() {
                         onChange={(e) => setCorrecciones((c) => ({ ...c, [cl.id]: e.target.value }))}
                       >
                         <option value="">— sin clasificar —</option>
-                        {titulos.map((t) => (
+                        {(titulosPorPais[cl.empresa_pais_id] ?? []).map((t) => (
                           <option key={t.id} value={t.id}>{t.categoria_nombre} · {t.nombre}</option>
                         ))}
                       </select>

@@ -59,3 +59,45 @@ def require_role(request: Request, *roles: str) -> TokenClaims:
     if claims.role not in roles:
         raise HTTPException(403, f"Rol '{claims.role}' no autorizado para esta accion.")
     return claims
+
+
+class PlataformaClaims:
+    def __init__(self, user_id: uuid.UUID, role: str):
+        self.user_id = user_id
+        self.role = role
+
+
+def get_plataforma_claims(request: Request) -> PlataformaClaims:
+    """Analogo a get_claims(), pero para un usuario de Plataforma (Art VII.4): TokenService
+    (api/) omite el claim tenant_id por completo para estos usuarios -- get_claims() de
+    arriba asume que el claim siempre existe y revienta con KeyError/TypeError si no. Un
+    token de tenant (con tenant_id) tambien se rechaza aca: este candado es exclusivo para
+    acciones de Plataforma (Fase 8, spec-taxonomia-por-pais.md §3.3)."""
+    token = _extract_token(request)
+    if not token:
+        raise HTTPException(401, "No autenticado: falta el token de acceso.")
+    try:
+        payload = jwt.decode(
+            token,
+            JWT_SIGNING_KEY,
+            algorithms=["HS256"],
+            issuer=JWT_ISSUER,
+            audience=JWT_AUDIENCE,
+        )
+    except jwt.PyJWTError as exc:
+        raise HTTPException(401, f"Token invalido o expirado: {exc}") from exc
+
+    if payload.get("tenant_id") is not None:
+        raise HTTPException(403, "Este endpoint es exclusivo del rol de Plataforma.")
+
+    return PlataformaClaims(
+        user_id=uuid.UUID(payload["user_id"]),
+        role=payload.get(_ROLE_CLAIM, ""),
+    )
+
+
+def require_plataforma_role(request: Request, *roles: str) -> PlataformaClaims:
+    claims = get_plataforma_claims(request)
+    if claims.role not in roles:
+        raise HTTPException(403, f"Rol '{claims.role}' no autorizado para esta accion.")
+    return claims
