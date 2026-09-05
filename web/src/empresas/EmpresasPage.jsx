@@ -9,6 +9,7 @@ const PUEDE_GESTIONAR = ["AdminTenant", "Editor"]; // spec-empresas-comparacion.
 export function EmpresasPage() {
   const { rol, docFetch } = useAuth();
   const [catalogos, setCatalogos] = useState(null);
+  const [paisesHabilitados, setPaisesHabilitados] = useState(null);
   const [empresas, setEmpresas] = useState(null);
   const [localidades, setLocalidades] = useState([]);
   const [error, setError] = useState(null);
@@ -17,6 +18,7 @@ export function EmpresasPage() {
 
   const [form, setForm] = useState({
     nombre: "",
+    pais_id: "",
     rif: "",
     sector_id: "",
     tipo_id: "",
@@ -33,6 +35,23 @@ export function EmpresasPage() {
       .then((res) => res.json())
       .then(setCatalogos)
       .catch(() => setError("No se pudieron cargar los catálogos."));
+  }, [docFetch]);
+
+  // Fase 8 (spec-taxonomia-por-pais.md §3.2/§4): el selector solo ofrece los paises que el
+  // tenant tiene licenciados -- si es uno solo, se preselecciona (caso de hoy: Venezuela).
+  useEffect(() => {
+    docFetch("/tenants/paises-habilitados")
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudieron cargar los países habilitados para tu tenant.");
+        return res.json();
+      })
+      .then((paises) => {
+        setPaisesHabilitados(paises);
+        if (paises.length === 1) {
+          setForm((f) => ({ ...f, pais_id: String(paises[0].id) }));
+        }
+      })
+      .catch(() => setError("No se pudieron cargar los países habilitados para tu tenant."));
   }, [docFetch]);
 
   useEffect(() => {
@@ -98,7 +117,9 @@ export function EmpresasPage() {
         throw new Error(data?.detail ?? "No se pudo crear la empresa.");
       }
       setForm({
-        nombre: "", rif: "", sector_id: "", tipo_id: "", categoria_id: "", actividad_id: "",
+        nombre: "",
+        pais_id: paisesHabilitados?.length === 1 ? String(paisesHabilitados[0].id) : "",
+        rif: "", sector_id: "", tipo_id: "", categoria_id: "", actividad_id: "",
         estado_id: "", localidad_id: "", contacto_nombre: "", contacto_email: "",
       });
       setReloadToken((t) => t + 1);
@@ -127,6 +148,22 @@ export function EmpresasPage() {
               type="text" required value={form.nombre}
               onChange={(e) => actualizarCampo("nombre", e.target.value)}
             />
+          </label>
+          <label className="field">
+            <span className="field-label">País</span>
+            <select
+              required value={form.pais_id}
+              onChange={(e) => actualizarCampo("pais_id", e.target.value)}
+            >
+              {/* Nunca disabled (spec-taxonomia-por-pais.md Bloque C): un <select> disabled
+                  no participa de la validacion HTML, asi que el required de arriba dejaria
+                  de bloquear el submit mientras carga -- el placeholder de "cargando" hace
+                  el mismo trabajo sin perder esa validacion. */}
+              <option value="">{paisesHabilitados === null ? "Cargando países…" : "— elegir país —"}</option>
+              {(paisesHabilitados ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span className="field-label">RIF</span>
@@ -228,6 +265,7 @@ export function EmpresasPage() {
           <thead>
             <tr>
               <th>Nombre</th>
+              <th>País</th>
               <th>Sector</th>
               <th>Tipo</th>
               <th>Estado</th>
@@ -239,12 +277,13 @@ export function EmpresasPage() {
           <tbody>
             {empresas.length === 0 && (
               <tr>
-                <td className="table-empty" colSpan={7}>Todavía no hay empresas en el catálogo.</td>
+                <td className="table-empty" colSpan={8}>Todavía no hay empresas en el catálogo.</td>
               </tr>
             )}
             {empresas.map((e) => (
               <tr key={e.id}>
                 <td>{e.nombre}</td>
+                <td>{e.pais_nombre}</td>
                 <td>{e.sector_nombre ?? "—"}</td>
                 <td>{e.tipo_nombre ?? "—"}</td>
                 <td>{e.estado_nombre ?? "—"}</td>

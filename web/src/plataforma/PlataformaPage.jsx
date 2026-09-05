@@ -5,17 +5,36 @@ const PUEDE_VER = ["PlataformaAdmin", "PlataformaSoporte", "PlataformaAuditor"];
 const PUEDE_EDITAR = ["PlataformaAdmin", "PlataformaSoporte"];
 const PUEDE_ADMIN = ["PlataformaAdmin"];
 
+// Los endpoints de taxonomia (service/app/main.py) usan Form(...), no JSON -- a diferencia
+// del resto de este panel, que habla con api/ (.NET) en JSON.
+function toFormData(campos) {
+  const formData = new FormData();
+  Object.entries(campos).forEach(([k, v]) => formData.append(k, v));
+  return formData;
+}
+
 // Panel de Plataforma (Fase 5, spec-plataforma.md): gestion de tenants despues de creados.
 // El alta de un tenant nuevo es self-service (RegisterPage.jsx) -- esto no crea tenants,
 // los administra.
 export function PlataformaPage() {
-  const { rol, logout, authFetch } = useAuth();
+  const { rol, logout, authFetch, docFetch } = useAuth();
   const [tenants, setTenants] = useState(null);
   const [paises, setPaises] = useState(null);
   const [error, setError] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [licenciaForm, setLicenciaForm] = useState({}); // { [tenantId]: {planLicencia, fechaVencimiento} }
   const [nuevoUsuario, setNuevoUsuario] = useState({ email: "", password: "", rol: "PlataformaSoporte" });
+
+  // Fase 8 (spec-taxonomia-por-pais.md Bloque B/D, Art II.3): a diferencia de todo lo de
+  // arriba (api/, .NET), el clonado/edicion de taxonomia vive en el servicio Python -- por
+  // eso usa docFetch, no authFetch (ver nota junto a los endpoints en service/app/main.py).
+  const [categorias, setCategorias] = useState([]);
+  const [taxonomiaPaisId, setTaxonomiaPaisId] = useState("");
+  const [taxonomiaTitulos, setTaxonomiaTitulos] = useState(null);
+  const [clonarOrigenId, setClonarOrigenId] = useState("");
+  const [nuevoTitulo, setNuevoTitulo] = useState({ categoria_id: "", nombre: "", descripcion: "" });
+  const [edicionTitulo, setEdicionTitulo] = useState(null); // { id, nombre, descripcion, categoria_id }
+  const [taxonomiaError, setTaxonomiaError] = useState(null);
 
   const cargar = () => {
     authFetch("/api/plataforma/tenants")
@@ -26,12 +45,40 @@ export function PlataformaPage() {
       .then(setTenants)
       .catch((err) => setError(err.message));
     authFetch("/api/plataforma/paises")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudo cargar la lista de países.");
+        return res.json();
+      })
       .then(setPaises)
       .catch(() => setPaises([]));
   };
 
   useEffect(cargar, [authFetch, reloadToken]);
+
+  useEffect(() => {
+    docFetch("/taxonomia/categorias")
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudieron cargar las categorías.");
+        return res.json();
+      })
+      .then(setCategorias)
+      .catch(() => setCategorias([]));
+  }, [docFetch]);
+
+  const cargarTitulosPais = () => {
+    setTaxonomiaError(null);
+    setTaxonomiaTitulos(null);
+    if (!taxonomiaPaisId) return;
+    docFetch(`/plataforma/taxonomia/titulos?pais_id=${taxonomiaPaisId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudieron cargar los títulos de este país.");
+        return res.json();
+      })
+      .then(setTaxonomiaTitulos)
+      .catch((err) => setTaxonomiaError(err.message));
+  };
+
+  useEffect(cargarTitulosPais, [docFetch, taxonomiaPaisId]);
 
   if (!PUEDE_VER.includes(rol)) {
     return (
@@ -53,6 +100,63 @@ export function PlataformaPage() {
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  async function accionTaxonomia(path, options, mensajeError) {
+    setTaxonomiaError(null);
+    try {
+      const res = await docFetch(path, options);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.detail ?? mensajeError);
+      }
+      cargarTitulosPais();
+      return true;
+    } catch (err) {
+      setTaxonomiaError(err.message);
+      return false;
+    }
+  }
+
+  function clonarTaxonomia(e) {
+    e.preventDefault();
+    if (!clonarOrigenId) return;
+    accionTaxonomia(
+      "/plataforma/taxonomia/clonar",
+      { method: "POST", body: toFormData({ pais_origen_id: clonarOrigenId, pais_destino_id: taxonomiaPaisId }) },
+      "No se pudo clonar la taxonomía."
+    );
+  }
+
+  function agregarTitulo(e) {
+    e.preventDefault();
+    accionTaxonomia(
+      "/plataforma/taxonomia/titulos",
+      { method: "POST", body: toFormData({ ...nuevoTitulo, pais_id: taxonomiaPaisId }) },
+      "No se pudo agregar el título."
+    ).then((ok) => {
+      if (ok) setNuevoTitulo({ categoria_id: "", nombre: "", descripcion: "" });
+    });
+  }
+
+  function guardarEdicionTitulo() {
+    if (!edicionTitulo) return;
+    const { id, ...datos } = edicionTitulo;
+    accionTaxonomia(
+      `/plataforma/taxonomia/titulos/${id}`,
+      { method: "PUT", body: toFormData(datos) },
+      "No se pudo editar el título."
+    ).then((ok) => {
+      if (ok) setEdicionTitulo(null);
+    });
+  }
+
+  function toggleActivoTitulo(titulo) {
+    accionTaxonomia(
+      `/plataforma/taxonomia/titulos/${titulo.id}/activo`,
+      { method: "PUT", body: toFormData({ activo: !titulo.activo }) },
+      "No se pudo actualizar el título."
+    );
   }
 
   function guardarLicencia(tenantId) {
@@ -242,6 +346,171 @@ export function PlataformaPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      <h2>Taxonomía por país (Art. II.3)</h2>
+      {taxonomiaError && <div className="banner banner-error">{taxonomiaError}</div>}
+      <label className="field" style={{ maxWidth: "20rem" }}>
+        <span className="field-label">País</span>
+        <select
+          value={taxonomiaPaisId}
+          onChange={(e) => {
+            setTaxonomiaError(null);
+            setEdicionTitulo(null);
+            setClonarOrigenId("");
+            setTaxonomiaPaisId(e.target.value);
+          }}
+        >
+          <option value="">— elegir país —</option>
+          {paises?.map((p) => (
+            <option key={p.id} value={p.id}>{p.nombre}</option>
+          ))}
+        </select>
+      </label>
+
+      {taxonomiaPaisId && taxonomiaTitulos === null && <p className="banner-muted">Cargando títulos…</p>}
+
+      {taxonomiaPaisId && taxonomiaTitulos !== null && taxonomiaTitulos.length === 0 && (
+        <div className="card">
+          <div className="card-body">
+            <p>
+              Este país todavía no tiene títulos propios. Un país nuevo arranca clonando el set de
+              otro ya activo (spec-taxonomia-por-pais.md §3.1) — a partir de ahí es independiente.
+            </p>
+            {PUEDE_ADMIN.includes(rol) ? (
+              <form onSubmit={clonarTaxonomia} style={{ display: "flex", gap: "0.6rem", alignItems: "flex-end" }}>
+                <label className="field">
+                  <span className="field-label">Clonar desde</span>
+                  <select required value={clonarOrigenId} onChange={(e) => setClonarOrigenId(e.target.value)}>
+                    <option value="">— elegir país origen —</option>
+                    {paises?.filter((p) => String(p.id) !== taxonomiaPaisId).map((p) => (
+                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                    ))}
+                  </select>
+                </label>
+                <button className="btn-primary" type="submit">Clonar</button>
+              </form>
+            ) : (
+              <p className="banner-muted">Necesitás rol PlataformaAdmin para clonar.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {taxonomiaTitulos && taxonomiaTitulos.length > 0 && (
+        <>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Categoría</th>
+                <th>Activo</th>
+                {PUEDE_ADMIN.includes(rol) && <th>Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {taxonomiaTitulos.map((t) =>
+                edicionTitulo?.id === t.id ? (
+                  <tr key={t.id}>
+                    <td>
+                      <input
+                        type="text"
+                        value={edicionTitulo.nombre}
+                        onChange={(e) => setEdicionTitulo((f) => ({ ...f, nombre: e.target.value }))}
+                        style={{ marginBottom: "0.3rem", width: "100%" }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Descripción"
+                        value={edicionTitulo.descripcion}
+                        onChange={(e) => setEdicionTitulo((f) => ({ ...f, descripcion: e.target.value }))}
+                        style={{ width: "100%" }}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={edicionTitulo.categoria_id}
+                        onChange={(e) => setEdicionTitulo((f) => ({ ...f, categoria_id: e.target.value }))}
+                      >
+                        {categorias.map((c) => (
+                          <option key={c.id} value={c.id}>{c.nombre}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <span className={`badge ${t.activo ? "badge-aprobado" : ""}`}>{t.activo ? "sí" : "no"}</span>
+                    </td>
+                    <td>
+                      <button className="btn-primary" onClick={guardarEdicionTitulo}>Guardar</button>{" "}
+                      <button className="btn-secondary" onClick={() => setEdicionTitulo(null)}>Cancelar</button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={t.id}>
+                    <td>{t.nombre}</td>
+                    <td>{t.categoria_nombre}</td>
+                    <td>
+                      <span className={`badge ${t.activo ? "badge-aprobado" : ""}`}>{t.activo ? "sí" : "no"}</span>
+                    </td>
+                    {PUEDE_ADMIN.includes(rol) && (
+                      <td>
+                        <button
+                          className="btn-secondary"
+                          onClick={() =>
+                            setEdicionTitulo({
+                              id: t.id, nombre: t.nombre, descripcion: t.descripcion ?? "",
+                              categoria_id: t.categoria_id,
+                            })
+                          }
+                        >
+                          Editar
+                        </button>{" "}
+                        <button className="btn-secondary" onClick={() => toggleActivoTitulo(t)}>
+                          {t.activo ? "Desactivar" : "Activar"}
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+
+          {PUEDE_ADMIN.includes(rol) && (
+            <form onSubmit={agregarTitulo} className="card">
+              <div className="card-body">
+                <h3>Agregar título</h3>
+                <label className="field">
+                  <span className="field-label">Nombre</span>
+                  <input
+                    type="text" required value={nuevoTitulo.nombre}
+                    onChange={(e) => setNuevoTitulo((f) => ({ ...f, nombre: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">Categoría</span>
+                  <select
+                    required value={nuevoTitulo.categoria_id}
+                    onChange={(e) => setNuevoTitulo((f) => ({ ...f, categoria_id: e.target.value }))}
+                  >
+                    <option value="">— elegir categoría —</option>
+                    {categorias.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span className="field-label">Descripción</span>
+                  <input
+                    type="text" value={nuevoTitulo.descripcion}
+                    onChange={(e) => setNuevoTitulo((f) => ({ ...f, descripcion: e.target.value }))}
+                  />
+                </label>
+                <button className="btn-primary" type="submit">Agregar título</button>
+              </div>
+            </form>
+          )}
+        </>
       )}
 
       {PUEDE_ADMIN.includes(rol) && (

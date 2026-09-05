@@ -23,9 +23,22 @@ export function NegociacionDetailPage() {
   const [formReunion, setFormReunion] = useState({ fecha: "", asistentes: "", resumen: "" });
   const [formAcuerdo, setFormAcuerdo] = useState({ titulo_id: "", texto_acordado: "", peticion_id: "", oferta_id: "" });
 
+  // Fase 8 (spec-taxonomia-por-pais.md Bloque C): la taxonomia depende del pais de la
+  // empresa de ESTA negociacion (Art II.3) -- se pide recien cuando se conoce ese pais,
+  // nunca una lista global que podria mezclar titulos de otro pais.
   useEffect(() => {
-    docFetch("/taxonomia").then((res) => res.json()).then(setTitulos).catch(() => setTitulos([]));
-  }, [docFetch]);
+    if (!negociacion?.empresa_pais_id) {
+      setTitulos([]);
+      return;
+    }
+    docFetch(`/taxonomia?pais_id=${negociacion.empresa_pais_id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudo cargar la taxonomía.");
+        return res.json();
+      })
+      .then(setTitulos)
+      .catch(() => setTitulos([]));
+  }, [docFetch, negociacion?.empresa_pais_id]);
 
   useEffect(() => {
     let cancelado = false;

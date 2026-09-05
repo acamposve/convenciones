@@ -23,6 +23,15 @@ def main() -> None:
 
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT id FROM paises WHERE codigo = 'VE'")
+            fila_venezuela = cur.fetchone()
+            if fila_venezuela is None:
+                raise RuntimeError(
+                    "No existe el pais Venezuela (codigo 'VE') en la tabla paises -- "
+                    "aplica schema.sql (o la migracion 002_auth.sql) antes de correr este seed."
+                )
+            pais_id_venezuela = fila_venezuela[0]
+
             for categoria in data["categorias"]:
                 cur.execute(
                     """
@@ -42,14 +51,16 @@ def main() -> None:
             for titulo in data["titulos"]:
                 cur.execute(
                     """
-                    INSERT INTO taxonomia_titulos (id, nombre, descripcion, categoria_id)
-                    VALUES (%(id)s, %(nombre)s, %(descripcion)s, %(categoria_id)s)
+                    INSERT INTO taxonomia_titulos
+                        (id, nombre, descripcion, categoria_id, pais_id)
+                    VALUES (%(id)s, %(nombre)s, %(descripcion)s, %(categoria_id)s,
+                            %(pais_id)s)
                     ON CONFLICT (id) DO UPDATE SET
                         nombre = EXCLUDED.nombre,
                         descripcion = EXCLUDED.descripcion,
                         categoria_id = EXCLUDED.categoria_id
                     """,
-                    titulo,
+                    {**titulo, "pais_id": pais_id_venezuela},
                 )
         conn.commit()
 
