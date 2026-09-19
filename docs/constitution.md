@@ -1,6 +1,6 @@
 # Constitución del Proyecto — Comparador de Documentos Legales
 
-> **Versión:** 2.1.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-08-29
+> **Versión:** 2.3.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-19
 > **Origen:** `documento_arquitectura_comparador_convenciones.docx` (preparado para Alex Campos, 8 de agosto de 2026)
 > **Enmienda 2.0.0:** redefine el modelo de tenant (Art. I.3) tras revisar el código legado
 > completo (`legacy/`). El valor original del producto era la comparación cross-empresa
@@ -16,6 +16,34 @@
 > (Art. VI.7); aclara que la taxonomía versionada por país (Art. II.3) sigue sin
 > implementarse a nivel de esquema y define el mecanismo de clonado. Replantea el
 > roadmap (Art. X) intercalando estas fases delante de la expansión de países.
+> **Enmienda 2.2.0:** adopta el plan de migración técnica descrito en
+> `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` (raíz del repo — el nombre del archivo es
+> heredado y engañoso: el destino real es **Supabase**, no Firebase, que el propio plan
+> descarta explícitamente por incompatible con el modelo relacional del Art. III).
+> Redefine Art. V: el backend se unifica en **C#/.NET 10 LTS** (absorbe ingesta, OCR,
+> segmentación y clasificación de IA, hoy en el microservicio Python/FastAPI separado) y la
+> base de datos pasa de Azure PostgreSQL Flexible Server autoadministrado a **Supabase**
+> (PostgreSQL gestionado con Row Level Security nativo, Auth y Storage integrados). Ajusta
+> Art. VIII.1 en consecuencia. **Esta es una decisión de infraestructura/stack, no de
+> producto o alcance** — no toca Art. I, IV ni VI (protegidos por la regla de enmienda),
+> y el corte (cutover) es progresivo: Python sigue atendiendo tráfico real hasta que el
+> plan complete su Fase 5.2; hasta entonces, este documento describe el **stack objetivo**,
+> no el desplegado. Migración de código y de infraestructura pendientes — ver el plan para
+> el detalle fase por fase.
+> **Enmienda 2.3.0:** se retira **Azure como proveedor de infraestructura**. Se eliminó del
+> repositorio todo lo relacionado a Azure: `infra/terraform/` completo (Container Apps,
+> PostgreSQL Flexible Server, ACR, Storage Account), los workflows de GitHub Actions que
+> desplegaban ahí (`terraform.yml`, `deploy-apps.yml`), y el soporte a Azure Blob Storage en
+> `service/app/storage.py` (queda solo el fallback a disco local que ya existía). Redefine
+> Art. V — fila "Infraestructura": ya no es "Azure Container Apps", queda **sin decidir**;
+> el deploy a un proveedor nuevo es trabajo futuro, fuera del alcance de esta enmienda.
+> Motivo: el ACR del demo (`comparadordemoacr`) quedó en un estado `REGISTRY_NOT_READY` no
+> atribuible a permisos, red ni configuración (confirmado contra la API de Azure) — en vez
+> de seguir apostando por Azure para el demo, se decide cambiar de proveedor. **Efecto
+> práctico inmediato: no hay ningún ambiente desplegado en la nube** — el proyecto corre
+> solo local (`docs/bootstrap-demo.md`) hasta que se elija y configure el proveedor nuevo.
+> Igual que la Enmienda 2.2.0, esto es una decisión de infraestructura, no de producto o
+> alcance — no toca Art. I, IV ni VI.
 
 Este documento fija los principios y decisiones de arquitectura que gobiernan el diseño e implementación del nuevo Comparador de Documentos Legales. Cualquier decisión técnica o de producto que lo contradiga debe justificarse explícitamente y, si se acepta, disparar una enmienda a esta constitución.
 
@@ -93,17 +121,20 @@ Flujo obligatorio, en este orden, con revisión humana como puerta de publicaci�
 
 ## Artículo V — Stack técnico
 
-| Componente | Decisión | Motivo |
-|---|---|---|
-| API principal | C# / .NET (última LTS) | Preferencia confirmada; adecuado para lógica de negocio, multi-tenancy, auth, licenciamiento |
-| Servicio de IA | Python (FastAPI), microservicio separado, consumido async vía cola | Ecosistema natural para LLM/OCR/texto; desacopla de la API |
-| Motor de IA | LLM vía API (Claude), salida estructurada | Evita entrenar/mantener modelos propios; usa las ~6.400 cláusulas como referencia |
-| Base de datos | PostgreSQL o Azure SQL, multi-tenant por columna `tenant_id` | Esquema compartido simple para arrancar; migrable a aislamiento por tenant |
-| Almacenamiento de documentos | Blob storage cifrado en reposo (Azure Blob / S3) | Los PDFs no deben vivir en el filesystem de la app, a diferencia del legado |
-| Cola de tareas | Azure Service Bus / RabbitMQ | Desacopla ingesta/extracción IA del resto de la app |
-| Frontend | SPA (React) | Portal de tenant, cola de revisión, reportes web |
-| Autenticación | OIDC estándar + SSO/SAML vía proveedor (WorkOS o Auth0) | SAML propio es costoso y frágil de mantener |
-| Infraestructura | Contenedores (Docker) en Azure Container Apps, con ruta a Kubernetes | Simple para demo, escala sin reescritura |
+**[Enmienda 2.2.0]** Stack objetivo tras adoptar `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`.
+La columna "Decisión anterior" documenta lo reemplazado (Art. V v2.1.0), vigente en
+producción hasta el cutover (Fase 5.2 del plan) — ver nota de Enmienda 2.2.0 arriba.
+
+| Componente | Decisión | Decisión anterior (hasta cutover) | Motivo del cambio |
+|---|---|---|---|
+| API principal + Servicio de IA | **C# / .NET 10 LTS, servicio único** — absorbe ingesta, OCR, segmentación, clasificación (vía `Microsoft.Extensions.AI` / `IChatClient`) y toda la lógica de negocio | API .NET (última LTS) + microservicio Python (FastAPI) separado, consumido async vía cola | Elimina la duplicación de stack y el costo operativo de mantener dos runtimes; `Microsoft.Extensions.AI` da abstracciones de observabilidad/costos/caching equivalentes a lo que Python aportaba |
+| Motor de IA | LLM vía API (Claude), salida estructurada, vía `IChatClient` | LLM vía API (Claude), salida estructurada | Mismo proveedor y principio; cambia solo el cliente/SDK |
+| Base de datos | **Supabase** (PostgreSQL 16 gestionado) con **Row Level Security nativo**, multi-tenant por `tenant_id` | Azure PostgreSQL Flexible Server autoadministrado (o Azure SQL), multi-tenant por columna `tenant_id` | Mismo motor relacional (compatibilidad 100% con `schema.sql`); RLS nativo refuerza el aislamiento por tenant (Art. VI.2) a nivel de base de datos, no solo en código; Auth y Storage integrados |
+| Almacenamiento de documentos | Supabase Storage (S3-compatible, con RLS) | Blob storage cifrado en reposo (Azure Blob / S3) | Mismo principio de cifrado y privacidad por defecto (Art. VI.1); RLS unifica la política de acceso con la de base de datos |
+| Cola de tareas | `System.Threading.Channels` en proceso + `BackgroundService` (.NET) | Azure Service Bus / RabbitMQ | Suficiente mientras el volumen no exija cola distribuida; revisar bajo Art. VIII si el volumen crece — no es una regresión de desacople, es in-process dentro del mismo servicio unificado |
+| Frontend | SPA (React) | SPA (React) | Sin cambio |
+| Autenticación | Supabase Auth (GoTrue, JWT) como base; SSO/SAML vía proveedor (WorkOS o Auth0) sobre Supabase Auth cuando se active (Art. VII.2) | OIDC estándar + SSO/SAML vía proveedor (WorkOS o Auth0) | Autenticación y base de datos bajo el mismo proveedor simplifica RLS (`auth.jwt()` nativo); SSO/SAML enterprise se mantiene como capa adicional, sin cambio de plan |
+| Infraestructura | **Contenedores (Docker) — proveedor de nube sin decidir.** `[Enmienda 2.3.0]` Se retiró Azure (Terraform, Container Apps); el objetivo de "un único contenedor de API" (antes dos: `api` + `ai-service`) se mantiene, pero sobre qué proveedor todavía es una decisión pendiente, fuera del alcance de esta constitución hasta que se tome | Contenedores (Docker) en Azure Container Apps (`api` + `ai-service` separados), con ruta a Kubernetes | Azure Container Apps ya no es la decisión vigente (Enmienda 2.3.0); el resto de motivos (menos superficie de infraestructura, sin Postgres autoadministrado) sigue aplicando una vez que se elija el proveedor nuevo |
 
 ## Artículo VI — Seguridad y privacidad (no negociables)
 
@@ -124,7 +155,7 @@ Flujo obligatorio, en este orden, con revisión humana como puerta de publicaci�
 
 ## Artículo VIII — Escalabilidad
 
-1. Punto de partida: multi-tenancy por columna (`tenant_id`) sobre base de datos gestionada, con el servicio de IA como worker asíncrono separado — suficiente para demo y primeros clientes.
+1. Punto de partida: multi-tenancy por columna (`tenant_id`) sobre base de datos gestionada (Supabase, Art. V), con el procesamiento de IA como worker asíncrono en proceso (`BackgroundService` .NET, Art. V) — suficiente para demo y primeros clientes; con ruta a extraerse como servicio separado si el volumen lo exige. **[Enmienda 2.2.0 — antes: microservicio Python separado]**
 2. Ruta de crecimiento: aislamiento de datos por tenant (schema o BD dedicada) para clientes grandes que lo exijan por compliance; escalado horizontal del worker de IA independiente de la API; caché/reuso de extracciones para documentos públicos compartidos entre tenants.
 
 ## Artículo IX — Migración desde el sistema legado

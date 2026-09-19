@@ -31,6 +31,8 @@ Ver [`constitution.md`](constitution.md) Art. VI (Seguridad y privacidad) para l
 
 ## CI/CD y Infraestructura
 
-- Todos los secrets (DB passwords, API keys, etc.) en Azure Key Vault o GitHub Secrets, nunca en el repo
-- Acceso a Azure: MFA obligatorio
+- Todos los secrets (DB passwords, API keys, etc.) en el gestor de secrets del proveedor de
+  deploy que se elija (hoy sin decidir, ver constitution.md Enmienda 2.3.0) o en GitHub
+  Secrets, nunca en el repo
+- Acceso a la infraestructura de producción: MFA obligatorio, sea cual sea el proveedor
 - Logs: auditar acceso a contenido privado de tenants

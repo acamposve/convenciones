@@ -2,7 +2,18 @@
 **Proyecto:** Comparador de Convenciones Colectivas de Trabajo  
 **Rol:** Senior Software Developer & Modernization Architect  
 **Fecha:** Septiembre 2026  
-**Versión de Análisis:** 1.0.0  
+**Versión de Análisis:** 1.0.0
+
+> **⚠️ Snapshot pre-Fase 1:** este informe es el diagnóstico que motivó
+> `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` y su Fase 1. La sección 4.2 (y el puntaje de
+> "Observabilidad y Resiliencia Operacional: 1.5/5") describe el estado **antes** de que esa
+> Fase 1 se implementara en este mismo repositorio: hoy ya existe logging estructurado JSON
+> en Python y en la API .NET (Serilog), `try/except` global en `_procesar_pipeline()`, y
+> `ErrorBoundary` en el frontend. No se actualizó el puntaje retroactivamente porque este
+> documento es un diagnóstico fechado, no una spec viva — ver `docs/CHANGELOG.md` para el
+> estado actual. **Además, se escribió asumiendo Azure como proveedor de nube** (varias
+> secciones lo dan por hecho) — eso también cambió: se retiró Azure del proyecto (Enmienda
+> 2.3.0 de `constitution.md`), sin proveedor nuevo decidido todavía.
 
 ---
 
@@ -150,8 +161,12 @@ A pesar de sus grandes aciertos, la modernización presenta áreas donde la madu
   * `service/app/main.py` en Python absorbió el 90% de la lógica de negocio y se convirtió en un **monolito de 1.478 líneas de código**, manejando altas de empresas, negociaciones, reuniones, revisión de cláusulas, biblioteca pública y consultas directas SQL con `psycopg`.
 * **Consecuencia:** Duplicación conceptual del acceso a datos (Entity Framework Core en C# con mapeos específicos de Npgsql vs. SQL crudo en Python).
 
-### 4.2. Brecha Crítica en Observabilidad y Logging (Riesgo Operacional P0)
-Confirmado por la auditoría interna del equipo (`docs/plan-logging.md`):
+### 4.2. Brecha Crítica en Observabilidad y Logging (Riesgo Operacional P0) — **[RESUELTO por Fase 1]**
+Confirmado por la auditoría interna del equipo (`docs/plan-logging.md`) **al momento de este
+diagnóstico**. La Fase 1 del plan de migración ya cerró los tres puntos de abajo en este
+mismo repositorio (logging JSON en Python y .NET vía Serilog, `try/except` global en
+`_procesar_pipeline()` con `_marcar_error` garantizado) — se deja el texto original como
+registro histórico del hallazgo, no como estado actual:
 * **Cero logging estructurado:** No hay uso del módulo `logging` en Python (cero `import logging` en el código de producción), y solo existían 3 `print()` sin traceback.
 * **Cero logging en .NET:** No hay integración de `ILogger<T>`, Serilog o Application Insights; no existe un solo bloque `try/catch` en los controladores C#.
 * **Fallas silenciosas en Background Tasks:** El procesamiento del pipeline en `service/app/main.py` se ejecuta mediante `BackgroundTasks` de FastAPI sin un `try/except` global. Si la base de datos o el servicio de almacenamiento fallan a mitad del proceso, el documento queda atascado para siempre en estado intermedio (`extraido`/`segmentado`), no transiciona a `error`, y los operadores no tienen forma de saber qué ocurrió.

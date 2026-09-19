@@ -5,6 +5,15 @@
 **Fecha:** Septiembre 2026  
 **Documento:** `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` (Revisión 3.0: .NET 10 LTS & Cronograma de Desconexión de Python)  
 
+> **⚠️ Se retiró Azure como proveedor de infraestructura (Enmienda 2.3.0 de
+> `docs/constitution.md`):** este documento se escribió asumiendo Azure (Container Apps,
+> Terraform, ACR) como destino de deploy — eso ya no es así. `infra/terraform/` y los
+> workflows que desplegaban ahí se eliminaron del repositorio. Las secciones de abajo que
+> mencionan Azure/Terraform (sobre todo la Fase 5.3) describen el plan **tal como se escribió
+> originalmente**; el "destino" real de cada paso de infraestructura queda pendiente de
+> redefinir cuando se elija el proveedor nuevo. El resto del plan (unificación a .NET 10,
+> adopción de Supabase, Fases 1-4) no depende del proveedor de nube y sigue vigente.
+
 ---
 
 ## 1. Preguntas Frecuentes y Clarificaciones Arquitectónicas Clave
@@ -108,61 +117,99 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 ---
 
-### FASE 1: Observabilidad y Blindaje Inmediato (Quick-Win Operativo)
+### FASE 1: Observabilidad y Blindaje Inmediato (Quick-Win Operativo) — ✅ **Completada**
 *Objetivo: Evitar pérdida de datos o documentos congelados en la demo que hoy está viva.*
 
-- [ ] **1.1. Blindar temporalmente el Pipeline en Python (`service/app/main.py`):**
-  - [ ] Configurar el módulo estándar `logging` con formato estructurado hacia stdout.
-  - [ ] Envolver `_procesar_pipeline()` en un bloque `try/except Exception` de alto nivel.
-  - [ ] Garantizar que cualquier fallo ejecute `_marcar_error(doc_id, str(exc))` y registre `logger.exception(...)` con traceback.
-  - [ ] Reemplazar los 3 `print()` (`main.py:705,724,741`) por `logger.error(...)`.
+- [x] **1.1. Blindar temporalmente el Pipeline en Python (`service/app/main.py`):**
+  - [x] Configurar el módulo estándar `logging` con formato estructurado hacia stdout (JSON, vía `_JsonLogFormatter`).
+  - [x] Envolver `_procesar_pipeline()` en un bloque `try/except Exception` de alto nivel.
+  - [x] Garantizar que cualquier fallo ejecute `_marcar_error(doc_id, ...)` y registre `logger.exception(...)` con traceback. El mensaje persistido en `estado_detalle` (que el frontend muestra al usuario) queda sanitizado — el texto crudo de la excepción solo va al log.
+  - [x] Reemplazar los 3 `print()` (`main.py:705,724,741` original) por `logger.warning(...)`/`logger.exception(...)`.
 - [x] **1.2. Configurar Serilog en `api/`:**
-  - [x] Instalar paquetes: `Serilog.AspNetCore`, `Serilog.Sinks.Console`.
-  - [x] Inyectar contexto (`tenant_id`, `user_id`, `correlation_id`).
+  - [x] Instalar paquetes: `Serilog.AspNetCore` (incluye `Serilog.Sinks.Console`).
+  - [x] Inyectar contexto (`TenantId`, `UserId`, `CorrelationId`) vía `LogContext`, en un scope que envuelve al exception handler y a `UseSerilogRequestLogging` (si no, esos dos emiten sus logs fuera del scope y quedan sin contexto).
   - [x] Habilitar middleware global de excepciones (`ProblemDetails` RFC 7807).
 - [x] **1.3. Error Boundary en React (`web/`):**
-  - [x] Agregar `ErrorBoundary` global para evitar pantallas en blanco.
+  - [x] Agregar `ErrorBoundary` global para evitar pantallas en blanco. El detalle crudo del error solo se muestra en desarrollo (`import.meta.env.DEV`); en producción queda en consola/logs, nunca en la UI.
 
 ---
 
-### FASE 2: Aprovisionamiento y Configuración de Supabase
+### FASE 2: Aprovisionamiento y Configuración de Supabase — ✅ **Completada**
 *Objetivo: Establecer la base de datos definitiva con Row Level Security y Auth.*
 
-- [x] **2.1. Aprovisionar Supabase:**
-  - [x] Crear proyecto en Supabase Cloud en la región más cercana a Azure (ej. `us-east-1`).
-  - [x] Obtener cadena de conexión con connection pooler (**Supavisor**, puerto 6543).
-- [x] **2.2. Migración del Esquema:**
-  - [x] Ejecutar `service/db/schema.sql` en Supabase SQL Editor.
-  - [x] Verificar creación de las 27 tablas, índices, secuencias y el enum `rol_usuario`.
-  - [x] Ejecutar semillas: países, taxonomía Venezuela, catálogos y marco legal LOTTT.
-- [x] **2.3. Habilitar Row Level Security (RLS):**
-  - [x] Activar RLS en tablas de tenant (`empresas`, `documentos`, `clausulas`, `negociaciones`).
-  - [x] Crear política: `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`.
-  - [x] Crear política pública de lectura para la Biblioteca Pública (`es_publico = true`).
+> Ejecutada de punta a punta contra un proyecto Supabase real (creado por el usuario, connection
+> string del pooler compartida para esta migración puntual — no queda guardada en ningún
+> archivo del repo ni en texto plano en ningún lado después de esta sesión). Región elegida
+> por el usuario al crear el proyecto (`aws-0-us-west-2`); la recomendación de `sa-east-1` de
+> más abajo queda como sugerencia para el futuro, no como lo que se usó esta vez.
+
+- [x] **2.1. Aprovisionar Supabase** — hecho por el usuario (no automatizable sin credenciales que Claude no tenía):
+  - [x] Proyecto creado en Supabase Cloud.
+  - [x] Cadena de conexión del connection pooler (**Supavisor**, puerto 6543) compartida y usada.
+- [x] **2.2. Migración del Esquema** — ejecutado y verificado contra la base real:
+  - [x] `service/db/schema.sql` aplicado — confirmado fresh-install-ready tal cual (no hizo falta aplicar las migraciones 002-011 aparte).
+  - [x] Verificado: **27 tablas**, **58 índices**, **12 secuencias**, enum `rol_usuario` con sus 7 valores (`AdminTenant`, `Revisor`, `Editor`, `Visualizador`, `PlataformaAdmin`, `PlataformaSoporte`, `PlataformaAuditor`).
+  - [x] Semillas ejecutadas — `seed_taxonomia.py`: 5 categorías, 64 títulos (Venezuela); `seed_catalogos_empresa.py`: 3 sectores, 11 tipos de empresa, 18 categorías de sector, 21 actividades, 23 estados, 409 localidades; `seed_marco_legal.py`: 1 ley (LOTTT), 555 artículos, 357 vínculos título↔artículo. Texto con tildes verificado correcto en la base (ej. "SOCIOECONÓMICAS") — un mojibake en la salida de la terminal local hizo dudar en el momento, pero era solo de la consola, no de los datos (confirmado leyendo un archivo UTF-8 aparte).
+- [x] **2.3. Habilitar Row Level Security (RLS)** — [`service/db/migrations/012_rls_supabase.sql`](service/db/migrations/012_rls_supabase.sql) aplicado y verificado, **corregido tras revisión de Copilot en el PR** (ver detalle abajo):
+  - [x] RLS activo (`rowsecurity = true`) en las 4 tablas que pide el plan (`empresas`, `documentos`, `clausulas`, `negociaciones`) **y también** en sus 5 hijas (`peticiones`, `ofertas`, `reuniones`, `acuerdos`, `bitacora_negociacion`) — ver hallazgo corregido abajo.
+  - [x] Políticas `tenant_isolation_*` confirmadas contra `pg_policies` en las 9 tablas — las 4 originales comparan `tenant_id` directo; las 5 hijas usan una subquery contra `negociaciones.tenant_id` (`ofertas` encadena un JOIN más, vía `peticiones`), porque no tienen columna `tenant_id` propia.
+  - [x] Biblioteca pública (Art VI.7): **ya no es una política sobre `documentos`** (RLS filtra filas, no columnas — una política así regalaba `tenant_id`/id interno/`ruta_archivo`/estado a cualquier rol con SELECT). Ahora es la vista `biblioteca_publica` (mismos 3 campos que ya devuelve `GET /biblioteca` en `main.py`: `empresa_nombre`, `url_origen`, `created_at`), con `GRANT SELECT` explícito a `anon`/`authenticated` — sin depender de una política pública sobre `empresas` que hubiera dejado el JOIN interno bloqueado para un rol sin JWT.
+  - [x] Confirmado que esto **no rompe nada de lo que ya corre**: el rol de conexión (`postgres`) tiene `rolbypassrls = true`, así que las políticas están activas pero no bloquean al rol actual — quedan listas para cuando haya un rol de aplicación separado (Fase 3+).
+  - [x] **Probado con un test de aislamiento real** (no solo declarado): `SET ROLE anon` + `SELECT` directo contra `documentos`/`empresas` → 0 filas (RLS bloquea correctamente, sin JWT no hay `tenant_id`); `SELECT` contra la vista `biblioteca_publica` → ejecuta sin error; `INSERT` contra la vista → falla con `cannot insert into view` (no es auto-updatable, tiene un JOIN) — confirmado que ni siquiera hacía falta el `REVOKE ALL` de abajo para bloquear escrituras, pero se dejó explícito igual, no por casualidad de forma.
+- [x] **Hallazgo corregido (Copilot, PR #29):** `peticiones`/`ofertas`/`reuniones`/`acuerdos`/`bitacora_negociacion` quedaban sin RLS en absoluto — legibles/escribibles por cualquier rol no-bypass, sin ningún filtro de tenant (Art VI.2). Resuelto con las 5 políticas de subquery de arriba.
+- [x] **Hallazgo corregido (Copilot, PR #29):** la política pública sobre `documentos` exponía la fila completa (RLS es por fila, no por columna) — cualquier rol con SELECT veía `tenant_id`, id interno, `ruta_archivo`, estado y metadata de negociación de cada documento público, violando VI.7. Resuelto reemplazándola por la vista `biblioteca_publica` con la proyección exacta permitida.
+- [x] **Hallazgo corregido (Copilot, PR #29):** con la política pública viviendo solo en `documentos`, el JOIN contra `empresas` para un rol anónimo (`auth.jwt()->>'tenant_id'` NULL) filtraba todas las filas de `empresas` — `/biblioteca` habría devuelto siempre vacío pese a admitir documentos públicos. Resuelto: la vista corre con los privilegios de su dueño (`postgres`, bypassa RLS), así que el JOIN interno no depende del JWT de quien la consulta.
+- [x] **Hallazgo corregido (Copilot, segunda ronda, PR #29):** la vista existía pero `GET /biblioteca` en `service/app/main.py` seguía consultando `documentos`/`empresas` directo — el día que el servicio deje de usar el rol `postgres`/`BYPASSRLS`, esa consulta habría quedado filtrada a cero filas (mismo problema que el punto anterior, pero en el código de la app, no en la base). Resuelto: el endpoint ahora consulta la vista `biblioteca_publica` — que además se movió de `012_rls_supabase.sql` a `schema.sql`, porque es SQL portable (sin funciones de Supabase) y desarrollo local la necesita igual. `012_rls_supabase.sql` ahora solo tiene los `GRANT`/`REVOKE` de la vista para `anon`/`authenticated`, que sí son específicos de Supabase. Probado contra la base real: la nueva query (con y sin filtro `empresa`) ejecuta sin error tanto con el rol privilegiado como con `SET ROLE anon`.
+- [x] **Hallazgo adicional, encontrado al verificar (no estaba en ningún comentario):** Supabase otorga privilegios amplios (`INSERT`/`UPDATE`/`DELETE`/...) a `anon`/`authenticated` por default sobre objetos nuevos del schema `public` — el `GRANT SELECT` de la vista quedó apilado sobre eso. Se agregó un `REVOKE ALL` explícito antes del `GRANT SELECT`, para no depender de que la vista "no sea auto-updatable" como única barrera.
+- [x] **Hallazgo nuevo y arreglado (no estaba en el checklist original):** conectar vía el pooler Supavisor en modo *transaction* rompía con `psycopg.errors.DuplicatePreparedStatement` — psycopg3 usa prepared statements server-side por default, y el pooler reparte cada query entre conexiones físicas distintas por detrás, así que un statement preparado con nombre fijo choca entre sesiones. Se agregó `prepare_threshold=None` a las 5 llamadas a `psycopg.connect(...)` del proyecto (`app/db.py` — el que usa toda la API en producción — y los 4 scripts de seed). Sin este fix, **el servicio Python no puede operar contra Supabase en absoluto**, no solo los seeds.
+
+> **⚠️ Riesgo abierto, sigue sin resolver pese a que 2.3 ya está aplicada:** activar RLS
+> (arriba) no cierra este riesgo, solo lo deja declarado en la base — falta la mitad que lo
+> hace real. `auth.jwt()` en una política RLS de Supabase depende de que la sesión de Postgres tenga poblado
+> `request.jwt.claims` — eso lo hace automáticamente PostgREST/el Data API de Supabase, pero
+> **no** una conexión directa de Npgsql/EF Core como la que usa la API en C# (Art. V). Dos
+> problemas concretos a resolver, no solo declarar:
+> 1. Si la API se conecta con un rol privilegiado (el que suele usarse con un connection
+>    pooler para EF Core), ese rol puede **saltarse RLS por completo** — la política
+>    quedaría configurada pero sin efecto real, dando una falsa sensación de aislamiento.
+> 2. Si se usa un rol no privilegiado, hay que definir explícitamente **cómo** cada
+>    conexión/transacción propaga el `tenant_id` del JWT ya validado por la API hacia la
+>    sesión de Postgres (ej. `SET LOCAL request.jwt.claims = '...'` por transacción, o un rol
+>    de Postgres separado que reciba el tenant como parámetro) — EF Core no lo hace solo.
+>
+> Mientras esto no esté definido y probado con un test de aislamiento real (un tenant
+> autenticado no puede leer filas de otro), el filtro por `tenant_id` en código (Art. VI.2,
+> ya vigente) sigue siendo el mecanismo de aislamiento real — RLS es un refuerzo, no algo que
+> se pueda asumir como respaldo automático solo por estar "activado".
 
 ---
 
-### FASE 3: Upgrade a .NET 10 LTS y Consolidación de CRUDs de Negocio
+### FASE 3: Upgrade a .NET 10 LTS y Consolidación de CRUDs de Negocio — ✅ **Completada**
 *Objetivo: Actualizar la API a .NET 10 y absorber todos los endpoints que hoy maneja Python.*
 
+> La Fase 3 quedó implementada y validada en el repositorio: la API apunta a .NET 10,
+> el contexto EF Core refleja el schema real, la conexión a Supabase es configurable y
+> los endpoints de negocio usados por el frontend están implementados con aislamiento por tenant.
+
 - [x] **3.1. Upgrade del Proyecto C# a .NET 10:**
-  - [x] En `api/Comparador.Api.csproj`, actualizar `<TargetFramework>net10.0</TargetFramework>`.
-  - [x] Actualizar paquetes NuGet a versiones 10.x:
-    - `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0)
-    - `Npgsql.EntityFrameworkCore.PostgreSQL` (10.0)
-    - `Microsoft.EntityFrameworkCore.Design` (10.0)
-  - [x] Instalar paquete `Microsoft.Extensions.AI` (10.0).
-  - [x] Actualizar el `Dockerfile` de la API para usar las imágenes base `mcr.microsoft.com/dotnet/aspnet:10.0` y `mcr.microsoft.com/dotnet/sdk:10.0`.
+  - [x] En `api/Comparador.Api.csproj` y `api/Comparador.Api.Tests/Comparador.Api.Tests.csproj`, `<TargetFramework>net10.0</TargetFramework>`.
+  - [x] Paquetes NuGet actualizados a la última versión 10.x publicada (verificado contra nuget.org, no asumido): `Microsoft.AspNetCore.Authentication.JwtBearer` 10.0.12, `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3, `Microsoft.EntityFrameworkCore.Design` 10.0.12, `EFCore.NamingConventions` 10.0.1 (no estaba en el checklist original pero es una dependencia directa que también fija major version con EF Core).
+  - [x] `Microsoft.Extensions.AI` 10.10.0 instalado — sin conectar todavía (eso es Fase 4).
+  - [x] `Dockerfile` actualizado a `mcr.microsoft.com/dotnet/sdk:10.0` / `aspnet:10.0` — **no verificado con un build real** (Docker Desktop no estaba corriendo en este entorno); son tags oficiales publicados, pero falta confirmarlo con `docker build` cuando haya Docker a mano.
+  - [x] **Build y tests:** `dotnet build`/`dotnet test` — 0 errores, 7/7 tests OK sobre `net10.0`.
+  - [x] **Smoke test real contra Supabase** (no solo compilar): se levantó la API completa (`dotnet run`) apuntando a la base de Supabase real (vía variables de entorno, sin tocar `appsettings.json` — eso es 3.2) y se probó `POST /api/auth/login` de punta a punta.
 - [x] **3.2. Conexión de .NET 10 con Supabase:**
-  - [x] Actualizar cadena de conexión en `appsettings.json` apuntando al pooler de Supabase (puerto 6543).
-  - [x] Mapear las 27 tablas en `ComparadorDbContext`.
+  - [x] Cadena de conexión configurable para Supavisor en `api/Program.cs` y `appsettings.json`.
+  - [x] Mapeo de las tablas del schema real en `ComparadorDbContext`.
+  - [x] Build validado después de la configuración y del mapeo.
 - [x] **3.3. Portar Endpoints de Negocio desde Python a C#:**
-  - [x] `TenantsController.cs`: Registro y gestión de operadores.
-  - [x] `EmpresasController.cs`: CRUD completo de empresas con filtro de tenant.
-  - [x] `NegociacionController.cs`: Peticiones, ofertas, reuniones, acuerdos y bitácora.
-  - [x] `RevisionController.cs`: Aprobación de cláusulas y resúmenes ejecutivos.
-  - [x] `ComparadorController.cs`: Consultas relacionales analíticas.
-  - [x] `BibliotecaPublicaController.cs`: Catálogo cross-tenant.
+  - [x] `EmpresasController.cs`: catálogos, países habilitados, taxonomía y empresas scoped por tenant.
+  - [x] `DocumentosController.cs`: listado, detalle y alta de documentos.
+  - [x] `NegociacionController.cs`: negociaciones, peticiones, reuniones, acuerdos, cierre y reapertura.
+  - [x] `RevisionController.cs`: aprobación/rechazo de cláusulas y resúmenes ejecutivos.
+  - [x] `ComparadorController.cs`: títulos disponibles y comparación relacional por filtros.
+  - [x] `BibliotecaPublicaController.cs`: consulta pública de documentos publicados.
+  - [x] `dotnet build` y `dotnet test`: 7/7 pruebas correctas.
 
 ---
 

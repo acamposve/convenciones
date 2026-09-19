@@ -1,7 +1,16 @@
 # Plan — Cobertura de logging (post-auditoría)
 
-> **Estado:** borrador, no iniciado — documento de planificación interna, no una spec cerrada
-> con decisiones del cliente (a diferencia de los demás `docs/spec-*.md`).
+> **Estado:** **Bloque A completado** (ver abajo); B y E sin empezar; C y D parcialmente
+> cubiertos como efecto colateral de la Fase 1 del plan de migración (no porque este
+> documento en sí se haya ejecutado como plan — ver detalle en cada bloque). Documento de
+> planificación interna, no una spec cerrada con decisiones del cliente (a diferencia de los
+> demás `docs/spec-*.md`); la sección "Contexto" de abajo queda como el diagnóstico
+> **original** de la auditoría (2026-09-05), no como estado actual — el estado actual está en
+> el checklist de la sección "Checklist resumido".
+> **Relación con la migración de stack:** el Bloque A de este plan es exactamente la Fase 1.1
+> de [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+> (blindaje temporal del pipeline Python mientras se construye la versión .NET 10) — es un
+> parche operativo, no trabajo que sobreviva al cutover de Fase 5.
 > **Origen:** auditoría de cobertura de logging en los tres componentes (`api/`, `service/`,
 > `web/`), hecha en sesión del 2026-09-05, a pedido explícito de validar que "todo el código
 > tiene logs".
@@ -35,7 +44,7 @@ mitad de camino, o `segment_clauses()` lanza algo no previsto — el documento q
 para siempre en estado `extraido`/`segmentado`, nunca pasa a `error`, y no queda ningún
 rastro server-side de qué pasó ni con qué `documento_id`. Nadie se entera.
 
-## Bloque A — Blindar `_procesar_pipeline()` y adoptar `logging` en el servicio Python
+## Bloque A — Blindar `_procesar_pipeline()` y adoptar `logging` en el servicio Python — ✅ **Completado**
 
 **Problema:** el pipeline completo corre en background sin un `try/except` global; un fallo
 de infraestructura deja el documento atascado sin pasar a `estado='error'` y sin ningún log.
@@ -56,20 +65,25 @@ capturan pierden el punto exacto de la falla dentro del SDK de Anthropic.
   de un `_procesar_pipeline` de prueba) y confirmar que el documento pasa a `error` con un
   `estado_detalle` útil, y que el log muestra el traceback completo, no solo un mensaje.
 
-## Bloque B — Logging de fallos en integraciones externas (Blob Storage, Anthropic, Postgres)
+## Bloque B — Logging de fallos en integraciones externas (Storage, Anthropic, Postgres)
 
-**Problema:** `service/app/storage.py:25` (subida a Azure Blob Storage),
+> **⚠️ Se retiró Azure Blob Storage (Enmienda 2.3.0 de `constitution.md`):** `storage.py` ya
+> no sube a Azure — hoy solo escribe a disco local, sin manejo de error propio tampoco
+> (mismo problema, otro backend). El punto de abajo sobre `container.upload_blob(...)` ya no
+> aplica tal cual; el problema real (falta de logging en la escritura del original) sigue
+> vigente y se retoma cuando se elija el proveedor de storage nuevo.
+
+**Problema:** `service/app/storage.py` (persistencia del documento original),
 `service/app/classification.py` (las 3 llamadas a la API de Anthropic) y
 `service/app/db.py:9-12` (`get_conn`) no tienen ningún manejo de error propio — cualquier
-fallo de estos tres servicios externos es indistinguible de cualquier otro error en los logs,
-y no se puede diferenciar, por ejemplo, un `RateLimitError` de Anthropic de un timeout de red
-o de una respuesta malformada del SDK.
+fallo de estos servicios externos (o de la escritura a disco) es indistinguible de cualquier
+otro error en los logs, y no se puede diferenciar, por ejemplo, un `RateLimitError` de
+Anthropic de un timeout de red o de una respuesta malformada del SDK.
 
 **Trabajo estimado:**
-- `storage.py`: envolver `container.upload_blob(...)` en `try/except`, loguear con
-  `logger.exception` incluyendo el nombre del blob y el tenant, re-lanzar para que el
-  llamador siga devolviendo el error al usuario (no cambiar el comportamiento visible, solo
-  agregar el rastro).
+- `storage.py`: envolver la escritura del documento original en `try/except`, loguear con
+  `logger.exception` incluyendo el tenant, re-lanzar para que el llamador siga devolviendo
+  el error al usuario (no cambiar el comportamiento visible, solo agregar el rastro).
 - `classification.py`: capturar por separado errores conocidos del SDK de Anthropic (rate
   limit, timeout, conexión) vs. errores de parseo de la respuesta, y loguear cada tipo
   distinto para poder diferenciarlos después en los logs de Azure.
@@ -79,7 +93,12 @@ o de una respuesta malformada del SDK.
   generados durante la demo en vivo con el cliente (ya planeada) muestren mensajes
   diferenciados si algo falla, en vez de un traceback genérico sin contexto.
 
-## Bloque C — Logging básico en la API .NET
+## Bloque C — Logging básico en la API .NET — 🟡 **Parcial**
+
+**Ya cubierto por Fase 1.2 del plan de migración:** Serilog configurado en `Program.cs` (con
+salida JSON), `ILogger<T>` inyectado en `AuthController` (login exitoso/fallido, tenant
+suspendido). **Pendiente:** `PlataformaController` y `TokenService` todavía no tienen
+`ILogger` inyectado — ver "Trabajo estimado" abajo, que sigue vigente para esa parte.
 
 **Problema:** no existe ningún `ILogger<T>` ni framework de logging configurado; tampoco hay
 un solo `try/catch` en todo `api/`. Cualquier excepción no controlada (JWT mal configurado,
@@ -99,7 +118,13 @@ Core imprime por default, sin ningún dato de negocio (qué tenant, qué usuario
 - Verificación: provocar un login fallido y una excepción no controlada (ej. token JWT mal
   formado) contra un ambiente local, confirmar que aparecen en los logs con contexto útil.
 
-## Bloque D — `console.error` y manejo de errores visible en el frontend
+## Bloque D — `console.error` y manejo de errores visible en el frontend — 🟡 **Parcial**
+
+**Ya cubierto por Fase 1.3 del plan de migración:** `ErrorBoundary` global agregado en
+`web/src/main.jsx` (con `console.error` en `componentDidCatch`) — captura errores de
+**render** no manejados. **Pendiente:** el `console.error` en los 26 `.catch(` de fetch
+(errores de **red/API**, un problema distinto al que resuelve un Error Boundary) sigue sin
+hacerse — ver "Trabajo estimado" abajo.
 
 **Problema:** cero `console.error` en las 26 rutas `.catch(` de `web/src/**/*.jsx`. Cuando un
 usuario reporta un bug, no hay ningún rastro en la consola del navegador para diagnosticarlo
@@ -134,18 +159,23 @@ diferirlo hasta que haya un consumidor real de esas alertas (Azure Monitor, etc.
 
 ## Checklist resumido
 
-- [ ] A. Blindar `_procesar_pipeline()` completo + adoptar `logging` en el servicio Python
+- [x] A. Blindar `_procesar_pipeline()` completo + adoptar `logging` en el servicio Python
 - [ ] B. Logging de fallos en Blob Storage, Anthropic API y conexión a Postgres
 - [ ] C. Logging básico (`ILogger`) en la API .NET — Controllers y `TokenService`
+      (🟡 `AuthController` y `Program.cs`/Serilog hechos; falta `PlataformaController` y `TokenService`)
 - [ ] D. `console.error` en los 26 `.catch(` del frontend + evaluar Error Boundary
+      (🟡 Error Boundary hecho; falta `console.error` en los `.catch(` de fetch)
 - [ ] E. Nivel de severidad para fallos de autenticación (depende de A/C, decisión más que
       trabajo)
 
 ## Fuera de alcance (por ahora)
 
-- **Framework de logging externo** (Serilog, Application Insights, structured logging a un
+- ~~**Framework de logging externo** (Serilog, Application Insights, structured logging a un
   sink centralizado): el logging default de Azure Container Apps (captura de stdout) alcanza
-  para este primer paso. Evaluar como fase posterior si el volumen de logs lo justifica.
+  para este primer paso. Evaluar como fase posterior si el volumen de logs lo justifica.~~
+  **Superado:** la Fase 1.2 de `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` (adoptada,
+  Enmienda 2.2.0 de `constitution.md`) ya integró `Serilog.AspNetCore` en `api/` con salida
+  JSON estructurada — este punto ya no está fuera de alcance, está hecho.
 - **Alertas automáticas** sobre los eventos de seguridad del Bloque E: requiere un consumidor
   (Azure Monitor u otro) que hoy no existe — este plan solo deja el rastro, no configura
   alertas.

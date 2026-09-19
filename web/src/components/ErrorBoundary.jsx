@@ -28,7 +28,11 @@ export class ErrorBoundary extends React.Component {
             <p style={{ marginTop: "0.5rem", marginBottom: "1rem" }}>
               La aplicación encontró un problema inesperado al renderizar esta vista.
             </p>
-            {this.state.error && (
+            {/* El detalle crudo del error puede incluir URLs internas, nombres de
+                librerías o mensajes de respuestas del backend — solo se muestra en
+                desarrollo. En producción queda únicamente en la consola (componentDidCatch)
+                y, para errores del pipeline, en los logs del servicio. */}
+            {import.meta.env.DEV && this.state.error && (
               <pre
                 style={{
                   background: "#1e1e1e",

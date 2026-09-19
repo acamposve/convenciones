@@ -9,18 +9,28 @@ Cualquier cambio técnico o de producto que contradiga la constitución requiere
 2. Proponer una enmienda a la constitución
 3. Registrar la razón de la enmienda en el documento
 
+> **⚠️ Migración de stack en curso (Enmienda 2.2.0 de la constitución):** el proyecto migra
+> a C#/.NET 10 unificado + Supabase, según
+> [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md).
+> La estructura y comandos de abajo describen el stack **desplegado hoy** (`service/`
+> sigue activo); no se ha portado código todavía. Ver Art. V de `constitution.md` para el
+> stack objetivo.
+
+> **⚠️ Se eliminó la infraestructura de Azure** (`infra/terraform/`, los workflows de deploy):
+> el proyecto va a redesplegar a otro proveedor, todavía sin decidir. Hoy no hay ningún
+> ambiente en la nube activo — solo desarrollo local.
+
 ## Estructura del repo
 
 | Carpeta | Qué es |
 |---|---|
-| `api/` | API .NET 8 — autenticación, datos, tenants |
-| `service/` | Microservicio Python/FastAPI — IA, extracción, segmentación, clasificación |
+| `api/` | API .NET 10 LTS (Fase 3.1 ya aplicada) — autenticación, datos, tenants. Destino final del microservicio Python tras el cutover (plan de migración, Fase 3-5) |
+| `service/` | Microservicio Python/FastAPI — IA, extracción, segmentación, clasificación. El plan de migración prevé eliminarlo (Fase 5.4) |
 | `web/` | Frontend React + Vite |
-| `infra/terraform/` | IaC — Azure Container Apps, PostgreSQL, ACR, Storage |
 | `docs/` | Documentación: constitution, specs, taxonomías, marcos legales |
 | `db/` | Scripts SQL: schema, seeds, fixtures de prueba |
 | `legacy/` | SaaS PHP legado — referencia arquitectónica, **no se porta código de aquí** |
-| `.github/workflows/` | CI/CD: build, test, plan/apply Terraform, deploy |
+| `.github/workflows/` | CI: build + test de los tres componentes (`ci.yml`). Sin deploy |
 
 ## Fases del proyecto
 

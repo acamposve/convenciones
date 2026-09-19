@@ -25,7 +25,9 @@ def main() -> None:
     ley = data["ley"]
     articulos = data["articulos"]
 
-    with psycopg.connect(database_url) as conn:
+    # prepare_threshold=None: evita prepared statements server-side, que chocan al conectar
+    # via el pooler Supavisor de Supabase en modo transaction (ver app/db.py).
+    with psycopg.connect(database_url, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM paises WHERE codigo = %s", (ley["pais_codigo"],))
             fila = cur.fetchone()

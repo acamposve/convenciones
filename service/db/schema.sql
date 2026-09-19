@@ -426,6 +426,24 @@ CREATE INDEX idx_clausulas_tenant_id ON clausulas(tenant_id);
 CREATE INDEX idx_clausulas_estado_revision ON clausulas(tenant_id, estado_revision);
 CREATE INDEX idx_clausulas_estado_revision_resumen ON clausulas(tenant_id, estado_revision_resumen);
 
+-- Biblioteca publica (Art VI.7, spec-biblioteca-publica.md): la unica excepcion al
+-- aislamiento por tenant. Vista con exactamente la proyeccion que permite VI.7 --
+-- empresa_nombre, url_origen, created_at -- nunca tenant_id, id interno, ruta_archivo,
+-- estado ni ninguna columna de clausulas. GET /biblioteca (main.py) consulta esta vista en
+-- vez de documentos/empresas directo, asi que el mismo query funciona tanto con el rol
+-- privilegiado que usa la API hoy como con un rol RLS no-bypass el dia que exista (Supabase,
+-- db/migrations/012_rls_supabase.sql). Es SQL portable (sin funciones de Supabase), asi que
+-- vive en el schema base y no en esa migracion -- desarrollo local (docker-compose) tambien
+-- la necesita.
+CREATE VIEW biblioteca_publica AS
+SELECT
+    e.nombre AS empresa_nombre,
+    d.url_origen,
+    d.created_at
+FROM documentos d
+JOIN empresas e ON e.id = d.empresa_id
+WHERE d.es_publico = true;
+
 -- Seed minimo de paises (activo=false hasta validacion legal, ver Art. II.4 y XI.1)
 INSERT INTO paises (codigo, nombre, activo) VALUES
     ('VE', 'Venezuela', true),  -- unico activo en Fase 1 (Art. X)

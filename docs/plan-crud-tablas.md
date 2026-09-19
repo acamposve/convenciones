@@ -2,6 +2,12 @@
 
 > **Estado:** borrador, no iniciado — documento de planificación interna, no una spec cerrada
 > con decisiones del cliente (a diferencia de los demás `docs/spec-*.md`).
+> **⚠️ Relación con la migración de stack:** varios de los huecos listados abajo están en el
+> "Backend Python" (`service/app/main.py`). El plan de migración
+> ([`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md),
+> Fase 3.3) prevé portar todos los endpoints de negocio a controllers de C#. Antes de
+> implementar cualquier CRUD nuevo en Python de este plan, confirmar si conviene construirlo
+> directo en `api/` (.NET) para no duplicar trabajo que la Fase 3.3 va a reemplazar.
 > **Origen:** auditoría de cobertura CRUD (Create/Read/Update/Delete) de las 27 tablas del
 > esquema, hecha en sesión del 2026-09-05, justo después de cerrar Fase 8 (taxonomía por país).
 > **Alcance:** cerrar los huecos reales encontrados. No incluye las tablas que la auditoría

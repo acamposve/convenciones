@@ -1,6 +1,11 @@
 # Bootstrap del demo (Venezuela)
 
-> Depende de: `constitution.md` (Art. V — dos servicios separados), `auth-spec.md` §4.
+> Depende de: `constitution.md` (Art. V — stack **desplegado hoy**: dos servicios
+> separados; el Art. V objetivo tras la Enmienda 2.2.0 los unifica en un único servicio
+> .NET 10 — ver [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)),
+> `auth-spec.md` §4. Los pasos de este documento siguen siendo los correctos para correr el
+> demo localmente **hasta que el código migre** (Fase 3-4 del plan); no se ha tocado nada
+> de esto todavía.
 > Objetivo: dejar documentado y automatizado el orden real que hoy hace falta para poder
 > loguearse por primera vez. Antes era tribal knowledge (tres comandos manuales, sin
 > documentar, en un orden que si se rompe da `Unauthorized` sin explicación).
@@ -59,8 +64,9 @@ predecibles sin pasar por el formulario cada vez que se levanta el compose desde
 
 El microservicio Python (`service/app/main.py` — ingesta, extracción, segmentación,
 clasificación, Art. IV pasos 1-5) **sí está containerizado** mediante
-[`service/Dockerfile`](../service/Dockerfile). El workflow de Azure construye esa imagen y
-la publica como `comparador-ai-service`.
+[`service/Dockerfile`](../service/Dockerfile). Se eliminó el workflow que antes construía y
+publicaba esa imagen a Azure (`deploy-apps.yml`, Enmienda 2.3.0 de `constitution.md`) — hoy
+no hay ningún pipeline de publicación, solo el build local de abajo.
 
 Para el demo local, `service/docker-compose.yml` todavía no lo levanta automáticamente.
 Puedes iniciarlo en otro terminal con Python:
@@ -96,12 +102,14 @@ propio CORS (`WEB_ORIGIN` en `.env`, default `http://localhost:5173`) para acept
 llamadas directas desde el navegador en ese origen.
 
 La siembra de la taxonomía (`db/seed_taxonomia.py`, ~60 títulos reales de Venezuela) no se
-ejecuta desde este compose local; el workflow de Azure sí la ejecuta antes de sembrar el
-usuario AdminTenant. Para una base local ya creada, ejecútala manualmente desde `service/`.
+ejecuta desde este compose local (el workflow que antes la ejecutaba antes de sembrar el
+usuario AdminTenant se eliminó junto con el deploy a Azure). Para una base local ya creada,
+ejecútala manualmente desde `service/`.
 
 ## Decisión que vale la pena señalar
 
-El `Dockerfile` del servicio Python empaqueta `pymupdf`, `pytesseract` y Tesseract OCR para
-Azure. La decisión pendiente para desarrollo local es agregarlo al mismo compose, porque
-eso requiere definir el uso de `db:5432` dentro de la red Docker y cómo se inyectará
-`ANTHROPIC_API_KEY`; por ahora se ejecuta como proceso local o como contenedor independiente.
+El `Dockerfile` del servicio Python empaqueta `pymupdf`, `pytesseract` y Tesseract OCR —
+listo para correr en cualquier contenedor, sin nada específico de un proveedor de nube. La
+decisión pendiente para desarrollo local es agregarlo al mismo compose, porque eso requiere
+definir el uso de `db:5432` dentro de la red Docker y cómo se inyectará `ANTHROPIC_API_KEY`;
+por ahora se ejecuta como proceso local o como contenedor independiente.

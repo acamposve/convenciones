@@ -3,6 +3,16 @@
 > **Estado:** Draft v0.1 · **Depende de:** `constitution.md` (Artículos III, VI, VII)
 > **Tipo:** Transversal — no forma parte de la cadena ingesta → análisis → categorización; es consumido por las tres etapas y por el portal web.
 
+> **⚠️ Migración de stack (Enmienda 2.2.0):** esta spec documenta la emisión de JWT
+> **propia** en .NET (`TokenService.GenerarAccessToken`, hashing argon2/bcrypt local,
+> `refresh_token` en la tabla `usuarios`), que es lo que corre hoy. El Art. V objetivo
+> (`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`) reemplaza esta capa por **Supabase Auth
+> (GoTrue)** — el flujo conceptual (claims `user_id`/`tenant_id`/`role`/`pais`, aislamiento
+> por tenant vía JWT, revisión del rol Plataforma sin `tenant_id`) se mantiene, pero la
+> implementación de emisión/validación de tokens cambia de raíz. Esta spec necesita una
+> revisión dedicada cuando esa parte del plan se ejecute (Fase 2-3); no se ha tocado código
+> todavía.
+
 ## 1. Propósito
 
 Definir cómo se identifica a un usuario, a qué tenant pertenece, qué rol tiene, y cómo se hace cumplir el aislamiento por tenant (Art. III, VI.2) en cada request de la API. Esta spec cubre solo lo necesario para **Fase 1 — MVP Venezuela** (Art. X); deja el punto de extensión para SSO/SAML de Fase 3 sin activarlo, según Art. VII.2 ("previsto desde el inicio, aunque no se active para la demo").

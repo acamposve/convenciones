@@ -1,5 +1,11 @@
 # Database — Schema, Seeds, Fixtures
 
+> **Migración de stack en curso (Enmienda 2.2.0 de `constitution.md`):** `schema.sql` sigue
+> siendo la fuente del esquema también bajo Supabase (importación directa, sin reescritura —
+> ver `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` §Fase 2.2). El seed en Python
+> (`seed_admin_user.py`) es del stack desplegado hoy; se porta a .NET junto con el resto del
+> servicio (Fase 3-4 del plan). Nada de esto se ha tocado todavía.
+
 ## Estructura
 
 | Archivo | Propósito |
@@ -47,7 +53,7 @@ Herramienta: Flyway, Liquibase, o o managed en Django/EF si pasan a ORM.
 ## Backup y datos sensibles
 
 - **Datos de prueba en `fixtures/`:** NO se comitean a git (o solo en `.gitignore`)
-- **Credenciales en `docker-compose.yml`:** Reemplazar en producción con secrets de Azure Key Vault
+- **Credenciales en `docker-compose.yml`:** Reemplazar en producción con el gestor de secrets del proveedor de deploy que se elija
 - **Documentos legados:** Privados (Art. VI de constitution.md), bajo `db/fixtures/` con acceso restringido
 
 ---
