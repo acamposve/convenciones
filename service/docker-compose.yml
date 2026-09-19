@@ -57,8 +57,11 @@ services:
       Jwt__AccessTokenMinutes: "15"
       Jwt__RefreshTokenDays: "7"
       Cors__WebOrigin: "http://localhost:${WEB_PORT:-5173}"
+      Storage__Root: "/app/storage"
     ports:
       - "${API_PORT:-5080}:8080"
+    volumes:
+      - api_storage:/app/storage
 
   web:
     build:
@@ -82,3 +85,4 @@ services:
 
 volumes:
   db_data:
+  api_storage:

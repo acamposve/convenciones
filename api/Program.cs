@@ -3,6 +3,7 @@ using Comparador.Api.Data;
 using Comparador.Api.Models;
 using Comparador.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -30,7 +31,33 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 // ('AdminTenant', 'Revisor', ...) para que coincidan exactamente con los nombres del enum
 // C#. Sin esto, Npgsql aplica snake_case por default (AdminTenant -> admin_tenant) y el
 // login revienta con "Received enum value 'AdminTenant' ... wasn't found on enum".
-var dataSourceBuilder = new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("Default"));
+var connectionString = new[]
+    {
+        Environment.GetEnvironmentVariable("SUPABASE_DB_URL"),
+        builder.Configuration.GetConnectionString("Default")
+    }
+    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+var usesSupabaseUrl = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SUPABASE_DB_URL"));
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    var supabase = builder.Configuration.GetSection("Supabase");
+    var host = supabase["PoolerHost"];
+    var username = supabase["Username"];
+    var password = supabase["Password"];
+    if (!string.IsNullOrWhiteSpace(host) && !string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
+    {
+        connectionString = $"Host={host};Port={supabase["PoolerPort"] ?? "6543"};Database={supabase["Database"] ?? "postgres"};Username={username};Password={password};Pooling=false";
+    }
+}
+
+connectionString ??= "Host=localhost;Port=5433;Database=convenciones;Username=convenciones;Password=convenciones";
+if (usesSupabaseUrl && !connectionString.Contains("Pooling=", StringComparison.OrdinalIgnoreCase))
+{
+    connectionString += ";Pooling=false";
+}
+
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
 dataSourceBuilder.MapEnum<RolUsuario>("rol_usuario", nameTranslator: new NpgsqlNullNameTranslator());
 var dataSource = dataSourceBuilder.Build();
 
@@ -43,6 +70,11 @@ builder.Services.AddDbContext<ComparadorDbContext>(opt =>
        .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddHttpClient("public-url")
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false
+    });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
