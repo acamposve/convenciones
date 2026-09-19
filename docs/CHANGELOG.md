@@ -21,9 +21,10 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   [`service/db/migrations/012_rls_supabase.sql`](../service/db/migrations/012_rls_supabase.sql)
   (RLS) aplicado y verificado contra la base real — RLS activo en las 9 tablas de tenant
   (incluidas las 5 hijas de `negociaciones`, sin `tenant_id` propio, vía subquery), biblioteca
-  pública expuesta como vista de solo lectura (`biblioteca_publica`, no como política sobre
-  `documentos`), confirmado con un test de aislamiento real (`SET ROLE anon`) y que no rompe
-  las conexiones actuales (el rol de conexión tiene `rolbypassrls`)
+  pública expuesta como vista de solo lectura en `schema.sql` (`biblioteca_publica`, no como
+  política sobre `documentos`; `GET /biblioteca` en `main.py` ya la consulta a ella en vez de
+  las tablas directo), confirmado con un test de aislamiento real (`SET ROLE anon`) y que no
+  rompe las conexiones actuales (el rol de conexión tiene `rolbypassrls`)
 
 ### Fixed
 - `service/app/db.py` y los 4 scripts de `service/db/seed_*.py`: conectar contra Supabase vía

@@ -77,31 +77,17 @@ ALTER TABLE reuniones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE acuerdos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bitacora_negociacion ENABLE ROW LEVEL SECURITY;
 
--- Biblioteca publica (Art VI.7, spec-biblioteca-publica.md): la unica excepcion al
--- aislamiento por tenant NO se implementa como politica publica sobre `documentos` -- RLS
--- filtra FILAS, no columnas: una politica "es_publico = true" sobre la tabla completa le
--- regalaria a cualquier rol con SELECT el tenant_id, el id interno, ruta_archivo, estado y
--- metadata de negociacion de cada documento publico, cuando VI.7 solo permite exponer
--- nombre de empresa, URL de origen y fecha de creacion. En cambio, se expone una vista de
--- solo lectura con exactamente esa proyeccion -- la misma que ya usa GET /biblioteca en
--- service/app/main.py (listar_biblioteca_publica), asi que esto formaliza a nivel de base
--- lo que el endpoint ya hace a nivel de aplicacion.
+-- Biblioteca publica (Art VI.7, spec-biblioteca-publica.md): la vista `biblioteca_publica`
+-- ya vive en schema.sql (es SQL portable, sin funciones de Supabase -- desarrollo local
+-- tambien la necesita, y GET /biblioteca en main.py la consulta directamente en vez de
+-- documentos/empresas). Acá solo va lo que SI es especifico de Supabase: los grants para
+-- que un rol RLS no-bypass (anon/authenticated) pueda leerla. No hace falta una politica
+-- publica sobre `documentos`/`empresas` para que el JOIN interno de la vista funcione: una
+-- vista corre con los privilegios de su dueno por default en Postgres (no se declara
+-- `security_invoker`), y esta se crea con un rol BYPASSRLS -- el JOIN ignora las politicas
+-- tenant_isolation sin importar que rol externo consulte la vista. El filtro real (que
+-- documento es publico) lo hace el WHERE de la vista, no RLS.
 --
--- Por que no hace falta una politica publica sobre `empresas` para que el JOIN funcione:
--- una vista corre con los privilegios de su dueno por default en Postgres (no se declara
--- `security_invoker`), y esta se crea con un rol BYPASSRLS -- el JOIN interno ignora las
--- politicas de `documentos`/`empresas` sin importar que rol externo consulte la vista. El
--- filtro real (que documento es publico) lo hace el WHERE de la vista, no RLS -- por eso es
--- seguro exponerla incluso a un rol anonimo sin JWT.
-CREATE VIEW biblioteca_publica AS
-SELECT
-    e.nombre AS empresa_nombre,
-    d.url_origen,
-    d.created_at
-FROM documentos d
-JOIN empresas e ON e.id = d.empresa_id
-WHERE d.es_publico = true;
-
 -- anon/authenticated son los roles estandar que Supabase crea en todo proyecto nuevo, y por
 -- default les otorga privilegios amplios (INSERT/UPDATE/DELETE/...) sobre objetos nuevos del
 -- schema public via ALTER DEFAULT PRIVILEGES -- el REVOKE explicito no es defensivo de mas:

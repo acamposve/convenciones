@@ -1208,25 +1208,32 @@ def comparar(
 # clausulas, resumenes ni tenant_id -- eso queda privado aunque el documento sea publico.
 # No depende de que el pipeline haya clasificado ni de revision humana (spec-biblioteca-
 # publica.md Bloque unico): alcanza con es_publico=true, que ya se valida en la ingesta.
+#
+# Consulta la vista `biblioteca_publica` (schema.sql) en vez de documentos/empresas
+# directo: la vista ya trae exactamente esta proyeccion y el filtro es_publico=true
+# encapsulados, asi que este query funciona igual con el rol privilegiado que usa la API
+# hoy y con un rol RLS no-bypass el dia que exista (Supabase, db/migrations/
+# 012_rls_supabase.sql) -- si esto siguiera leyendo la tabla directo, ese dia el JOIN
+# quedaria filtrado a cero filas para una peticion anonima (tenant_id NULL en el JWT).
 # ---------------------------------------------------------------------------
 
 
 @app.get("/biblioteca")
 def listar_biblioteca_publica(empresa: Optional[str] = None):
-    filtros = ["d.es_publico = true"]
+    filtros = []
     params: list = []
     if empresa:
-        filtros.append("e.nombre ILIKE %s")
+        filtros.append("empresa_nombre ILIKE %s")
         params.append(f"%{empresa}%")
+    where = f"WHERE {' AND '.join(filtros)}" if filtros else ""
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             f"""
-            SELECT e.nombre AS empresa_nombre, d.url_origen, d.created_at
-            FROM documentos d
-            JOIN empresas e ON e.id = d.empresa_id
-            WHERE {' AND '.join(filtros)}
-            ORDER BY e.nombre, d.created_at DESC
+            SELECT empresa_nombre, url_origen, created_at
+            FROM biblioteca_publica
+            {where}
+            ORDER BY empresa_nombre, created_at DESC
             """,
             params,
         )
