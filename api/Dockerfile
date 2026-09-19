@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
 # api/ contiene Comparador.Api.csproj Y Comparador.sln, asi que el auto-discovery de
@@ -8,7 +8,7 @@ COPY . .
 RUN dotnet restore Comparador.Api.csproj
 RUN dotnet publish Comparador.Api.csproj -c Release -o /app
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
 EXPOSE 8080

@@ -24,7 +24,7 @@ Cualquier cambio técnico o de producto que contradiga la constitución requiere
 
 | Carpeta | Qué es |
 |---|---|
-| `api/` | API .NET 8 — autenticación, datos, tenants. Destino final del microservicio Python tras el cutover (plan de migración, Fase 3-5) |
+| `api/` | API .NET 10 LTS (Fase 3.1 ya aplicada) — autenticación, datos, tenants. Destino final del microservicio Python tras el cutover (plan de migración, Fase 3-5) |
 | `service/` | Microservicio Python/FastAPI — IA, extracción, segmentación, clasificación. El plan de migración prevé eliminarlo (Fase 5.4) |
 | `web/` | Frontend React + Vite |
 | `docs/` | Documentación: constitution, specs, taxonomías, marcos legales |

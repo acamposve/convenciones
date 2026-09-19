@@ -182,21 +182,28 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 ---
 
-### FASE 3: Upgrade a .NET 10 LTS y Consolidación de CRUDs de Negocio
+### FASE 3: Upgrade a .NET 10 LTS y Consolidación de CRUDs de Negocio — 🟡 **3.1 completa, 3.2/3.3 pendientes (ver nota)**
 *Objetivo: Actualizar la API a .NET 10 y absorber todos los endpoints que hoy maneja Python.*
 
-- [ ] **3.1. Upgrade del Proyecto C# a .NET 10:**
-  - [ ] En `api/Comparador.Api.csproj`, actualizar `<TargetFramework>net10.0</TargetFramework>`.
-  - [ ] Actualizar paquetes NuGet a versiones 10.x:
-    - `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0)
-    - `Npgsql.EntityFrameworkCore.PostgreSQL` (10.0)
-    - `Microsoft.EntityFrameworkCore.Design` (10.0)
-  - [ ] Instalar paquete `Microsoft.Extensions.AI` (10.0).
-  - [ ] Actualizar el `Dockerfile` de la API para usar las imágenes base `mcr.microsoft.com/dotnet/aspnet:10.0` y `mcr.microsoft.com/dotnet/sdk:10.0`.
-- [ ] **3.2. Conexión de .NET 10 con Supabase:**
+> **Nota de alcance:** 3.1 es una actualización de framework acotada y verificable de punta
+> a punta — se hizo y se probó en esta sesión. 3.2 (mapear 27 tablas en EF Core) y sobre todo
+> 3.3 (portar ~1.500 líneas de lógica de negocio de Python a 6 controllers C# nuevos) son
+> ordenes de magnitud más grandes — no son "una tarea", son varias. Se corta acá para que el
+> usuario revise 3.1 (que ya compila, testea y corrió en vivo contra Supabase) antes de
+> encarar 3.2/3.3, en vez de entregar todo junto sin checkpoints intermedios.
+
+- [x] **3.1. Upgrade del Proyecto C# a .NET 10:**
+  - [x] En `api/Comparador.Api.csproj` y `api/Comparador.Api.Tests/Comparador.Api.Tests.csproj`, `<TargetFramework>net10.0</TargetFramework>`.
+  - [x] Paquetes NuGet actualizados a la última versión 10.x publicada (verificado contra nuget.org, no asumido): `Microsoft.AspNetCore.Authentication.JwtBearer` 10.0.12, `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3, `Microsoft.EntityFrameworkCore.Design` 10.0.12, `EFCore.NamingConventions` 10.0.1 (no estaba en el checklist original pero es una dependencia directa que también fija major version con EF Core).
+  - [x] `Microsoft.Extensions.AI` 10.10.0 instalado — sin conectar todavía (eso es Fase 4).
+  - [x] `Dockerfile` actualizado a `mcr.microsoft.com/dotnet/sdk:10.0` / `aspnet:10.0` — **no verificado con un build real** (Docker Desktop no estaba corriendo en este entorno); son tags oficiales publicados, pero falta confirmarlo con `docker build` cuando haya Docker a mano.
+  - [x] **Build y tests:** `dotnet build`/`dotnet test` — 0 errores, 7/7 tests OK sobre `net10.0`.
+  - [x] **Smoke test real contra Supabase** (no solo compilar): se levantó la API completa (`dotnet run`) apuntando a la base de Supabase real (vía variables de entorno, sin tocar `appsettings.json` — eso es 3.2) y se probó `POST /api/auth/login` de punta a punta.
+- [ ] **3.2. Conexión de .NET 10 con Supabase** — sin empezar, con un hallazgo crítico ya encontrado durante el smoke test de 3.1:
   - [ ] Actualizar cadena de conexión en `appsettings.json` apuntando al pooler de Supabase (puerto 6543).
-  - [ ] Mapear las 27 tablas en `ComparadorDbContext`.
-- [ ] **3.3. Portar Endpoints de Negocio desde Python a C#:**
+  - [ ] Mapear las 27 tablas en `ComparadorDbContext` (hoy solo mapea las necesarias para auth: `Usuarios`, `Tenants`, `RefreshTokens`, `ResetPasswordTokens` — faltan ~23).
+  - [ ] **Hallazgo crítico, ya diagnosticado y con fix conocido:** con una cadena de conexión Npgsql normal contra el pooler de Supabase, el primer comando (`SELECT` de login) funciona, pero el segundo comando en la misma request (`INSERT` a `bitacora_accesos` vía `ExecuteSqlInterpolatedAsync`) se cuelga y expira a los ~30-35s con `Npgsql.NpgsqlException: Timeout during reading attempt` — reproducido 3/3 veces, no es un blip de red. Causa: **doble pooling** — el pool propio de Npgsql sobre el pool de transacciones de Supavisor. Agregar `Pooling=false` a la cadena de conexión lo resuelve: probado 3/3 veces, requests de ~3s con respuesta correcta, cero errores en el log. Falta decidir **dónde** aplicar esto (`appsettings.json` vs. parámetro del `NpgsqlDataSourceBuilder` en `Program.cs`) cuando se haga 3.2 de verdad — acá solo queda diagnosticado y verificado, no aplicado al código todavía.
+- [ ] **3.3. Portar Endpoints de Negocio desde Python a C#:** sin empezar.
   - [ ] `TenantsController.cs`: Registro y gestión de operadores.
   - [ ] `EmpresasController.cs`: CRUD completo de empresas con filtro de tenant.
   - [ ] `NegociacionController.cs`: Peticiones, ofertas, reuniones, acuerdos y bitácora.

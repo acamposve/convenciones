@@ -4,9 +4,10 @@
 
 > **Migración de stack en curso (Enmienda 2.2.0):** este documento describe el stack
 > **objetivo** tras adoptar [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
-> (C#/.NET 10 unificado + Supabase). El stack **desplegado hoy** sigue siendo .NET 8 +
-> Python/FastAPI + PostgreSQL — Python sigue atendiendo tráfico real hasta el cutover
-> (Fase 5.2 del plan). Nada de esto se ha portado a código todavía.
+> (C#/.NET 10 unificado + Supabase). El stack **desplegado hoy** es **.NET 10 LTS** (Fase 3.1
+> ya aplicada: `api/` corre sobre `net10.0`) **+ Python/FastAPI + PostgreSQL** — Python sigue
+> atendiendo la mayoría de la lógica de negocio (Fase 3.3 pendiente) y sigue siendo la base
+> de datos local, no Supabase todavía (Fase 3.2 pendiente).
 >
 > **Sin infraestructura en la nube (Enmienda 2.3.0):** se retiró Azure (Terraform, Container
 > Apps) — hoy no hay ningún ambiente desplegado, el proyecto corre solo local. El proveedor
@@ -148,8 +149,8 @@ que no hace falta reescribirlos para el proveedor nuevo, solo definir dónde cor
 
 ---
 
-**Stack objetivo: .NET 10 LTS (unificado) · React/Vite · Supabase (PostgreSQL + RLS) · proveedor de deploy sin decidir**
-**Stack desplegado hoy: .NET 8 · Python/FastAPI · React/Vite · PostgreSQL — sin ambiente en la nube (solo local)**
+**Stack objetivo: .NET 10 LTS (unificado, API + IA) · React/Vite · Supabase (PostgreSQL + RLS) · proveedor de deploy sin decidir**
+**Stack desplegado hoy: .NET 10 LTS (API, sin unificar todavía) · Python/FastAPI (IA + mayoría de la lógica de negocio) · React/Vite · PostgreSQL local — sin ambiente en la nube**
 
 Justificación detallada de cada decisión y del plan de transición en
 [`constitution.md`](constitution.md) Art. V y en
