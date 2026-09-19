@@ -85,7 +85,9 @@ def _obtener_o_crear_tenant(cur) -> tuple:
 def main() -> None:
     database_url = os.environ["DATABASE_URL"]
 
-    with psycopg.connect(database_url) as conn:
+    # prepare_threshold=None: evita prepared statements server-side, que chocan al conectar
+    # via el pooler Supavisor de Supabase en modo transaction (ver app/db.py).
+    with psycopg.connect(database_url, prepare_threshold=None) as conn:
         with conn.cursor() as cur:
             tenant_id, nombre_empresa = _obtener_o_crear_tenant(cur)
             conn.commit()

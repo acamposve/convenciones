@@ -132,33 +132,32 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 ---
 
-### FASE 2: Aprovisionamiento y Configuración de Supabase — 🟡 **Parcial: preparado, no ejecutado**
+### FASE 2: Aprovisionamiento y Configuración de Supabase — ✅ **Completada**
 *Objetivo: Establecer la base de datos definitiva con Row Level Security y Auth.*
 
-> **Bloqueo real:** 2.1 requiere crear/usar un proyecto en una cuenta de Supabase — un signup
-> o una acción dentro de una cuenta en la nube que Claude no puede hacer por su cuenta (no hay
-> token de acceso de Supabase disponible en este entorno, y crear cuentas está fuera de lo que
-> se automatiza sin permiso explícito). Sin un proyecto real, 2.2 y 2.3 tampoco se pueden
-> **ejecutar** contra una base viva — lo que sí se dejó listo es el trabajo de preparación
-> (ver detalle en cada punto). Falta que decidas cómo seguir con 2.1 — ver nota al final del
-> checklist.
+> Ejecutada de punta a punta contra un proyecto Supabase real (creado por el usuario, connection
+> string del pooler compartida para esta migración puntual — no queda guardada en ningún
+> archivo del repo ni en texto plano en ningún lado después de esta sesión). Región elegida
+> por el usuario al crear el proyecto (`aws-0-us-west-2`); la recomendación de `sa-east-1` de
+> más abajo queda como sugerencia para el futuro, no como lo que se usó esta vez.
 
-- [ ] **2.1. Aprovisionar Supabase** — 🔴 pendiente, requiere acción tuya (no automatizable sin credenciales):
-  - [ ] Crear proyecto en Supabase Cloud, en una región cercana a los usuarios finales (Venezuela → `sa-east-1`, no hay ya una referencia a "cerca de Azure" porque Azure se retiró, Enmienda 2.3.0).
-  - [ ] Obtener cadena de conexión con connection pooler (**Supavisor**, puerto 6543).
-- [ ] **2.2. Migración del Esquema** — 🟡 preparado, pendiente de ejecutar contra un proyecto real:
-  - [ ] Ejecutar `service/db/schema.sql` en Supabase SQL Editor (o `psql`) — **verificado que es fresh-install-ready tal cual está**: define las 27 tablas, índices, secuencias y el enum `rol_usuario` en un solo archivo (no hace falta aplicar las migraciones 002-011 aparte, ya están incorporadas).
-  - [ ] Verificar creación de las 27 tablas, índices, secuencias y el enum `rol_usuario`.
-  - [ ] Ejecutar semillas: `service/db/seed_taxonomia.py` (países + taxonomía Venezuela), `service/db/seed_catalogos_empresa.py`, `service/db/seed_marco_legal.py` (LOTTT) — ya existen y funcionan contra cualquier Postgres vía `DATABASE_URL`, no específicos de Azure ni de Supabase.
-- [x] **2.3. Habilitar Row Level Security (RLS)** — SQL escrita y lista en [`service/db/migrations/012_rls_supabase.sql`](service/db/migrations/012_rls_supabase.sql), **no ejecutada** (no hay proyecto contra el cual correrla):
-  - [x] Activar RLS en tablas de tenant (`empresas`, `documentos`, `clausulas`, `negociaciones`).
-  - [x] Crear política: `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`.
-  - [x] Crear política pública de lectura para la Biblioteca Pública (`es_publico = true`), solo sobre `documentos` (nunca `clausulas`, spec-biblioteca-publica.md).
-  - [ ] **Nuevo hallazgo, sin resolver:** `peticiones`, `ofertas`, `reuniones`, `acuerdos` y `bitacora_negociacion` (hijas de `negociaciones`, spec-negociacion.md) no tienen columna `tenant_id` propia — quedan fuera de esta migración. Si hace falta RLS ahí también, es una política con subquery contra `negociaciones` (o agregarles `tenant_id`), decisión pendiente.
+- [x] **2.1. Aprovisionar Supabase** — hecho por el usuario (no automatizable sin credenciales que Claude no tenía):
+  - [x] Proyecto creado en Supabase Cloud.
+  - [x] Cadena de conexión del connection pooler (**Supavisor**, puerto 6543) compartida y usada.
+- [x] **2.2. Migración del Esquema** — ejecutado y verificado contra la base real:
+  - [x] `service/db/schema.sql` aplicado — confirmado fresh-install-ready tal cual (no hizo falta aplicar las migraciones 002-011 aparte).
+  - [x] Verificado: **27 tablas**, **58 índices**, **12 secuencias**, enum `rol_usuario` con sus 7 valores (`AdminTenant`, `Revisor`, `Editor`, `Visualizador`, `PlataformaAdmin`, `PlataformaSoporte`, `PlataformaAuditor`).
+  - [x] Semillas ejecutadas — `seed_taxonomia.py`: 5 categorías, 64 títulos (Venezuela); `seed_catalogos_empresa.py`: 3 sectores, 11 tipos de empresa, 18 categorías de sector, 21 actividades, 23 estados, 409 localidades; `seed_marco_legal.py`: 1 ley (LOTTT), 555 artículos, 357 vínculos título↔artículo. Texto con tildes verificado correcto en la base (ej. "SOCIOECONÓMICAS") — un mojibake en la salida de la terminal local hizo dudar en el momento, pero era solo de la consola, no de los datos (confirmado leyendo un archivo UTF-8 aparte).
+- [x] **2.3. Habilitar Row Level Security (RLS)** — [`service/db/migrations/012_rls_supabase.sql`](service/db/migrations/012_rls_supabase.sql) aplicado y verificado:
+  - [x] RLS activo (`rowsecurity = true`) en `empresas`, `documentos`, `clausulas`, `negociaciones`.
+  - [x] 5 políticas creadas y confirmadas contra `pg_policies`: `tenant_isolation_*` (una por tabla, `FOR ALL`) + `biblioteca_publica_documentos` (`FOR SELECT`, solo `documentos`, nunca `clausulas`).
+  - [x] Confirmado que esto **no rompe nada de lo que ya corre**: el rol de conexión (`postgres`) tiene `rolbypassrls = true`, así que las políticas están activas pero no bloquean al rol actual — quedan listas para cuando haya un rol de aplicación separado (Fase 3+).
+  - [ ] **Hallazgo sin resolver (igual que antes):** `peticiones`, `ofertas`, `reuniones`, `acuerdos` y `bitacora_negociacion` (hijas de `negociaciones`, spec-negociacion.md) no tienen columna `tenant_id` propia — quedan fuera de esta migración. Si hace falta RLS ahí también, es una política con subquery contra `negociaciones` (o agregarles `tenant_id`), decisión pendiente.
+- [x] **Hallazgo nuevo y arreglado (no estaba en el checklist original):** conectar vía el pooler Supavisor en modo *transaction* rompía con `psycopg.errors.DuplicatePreparedStatement` — psycopg3 usa prepared statements server-side por default, y el pooler reparte cada query entre conexiones físicas distintas por detrás, así que un statement preparado con nombre fijo choca entre sesiones. Se agregó `prepare_threshold=None` a las 5 llamadas a `psycopg.connect(...)` del proyecto (`app/db.py` — el que usa toda la API en producción — y los 4 scripts de seed). Sin este fix, **el servicio Python no puede operar contra Supabase en absoluto**, no solo los seeds.
 
-> **⚠️ Riesgo abierto, a resolver ANTES de que la RLS de 2.3 sea el mecanismo real de
-> aislamiento (la SQL ya está escrita, ver arriba, pero eso no cierra este riesgo):**
-> `auth.jwt()` en una política RLS de Supabase depende de que la sesión de Postgres tenga poblado
+> **⚠️ Riesgo abierto, sigue sin resolver pese a que 2.3 ya está aplicada:** activar RLS
+> (arriba) no cierra este riesgo, solo lo deja declarado en la base — falta la mitad que lo
+> hace real. `auth.jwt()` en una política RLS de Supabase depende de que la sesión de Postgres tenga poblado
 > `request.jwt.claims` — eso lo hace automáticamente PostgREST/el Data API de Supabase, pero
 > **no** una conexión directa de Npgsql/EF Core como la que usa la API en C# (Art. V). Dos
 > problemas concretos a resolver, no solo declarar:
