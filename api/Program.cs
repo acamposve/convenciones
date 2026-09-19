@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Comparador.Api.Data;
 using Comparador.Api.Models;
@@ -7,8 +8,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Npgsql.NameTranslation;
+using Serilog;
+using Serilog.Context;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configuración de Serilog: Logging estructurado a consola (capturado por Container Apps)
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{TenantId}] [{UserId}] {Message:lj}{NewLine}{Exception}"));
 
 // El tipo `rol_usuario` es un ENUM nativo de Postgres (creado por SQL plano, no por EF).
 // Npgsql 8 ya no lo mapea a RolUsuario automaticamente ("unmapped enums requiere opt-in") —
@@ -71,21 +81,55 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
+// Middleware global de manejo de excepciones no controladas (RFC 7807 ProblemDetails + Log estructurado)
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/problem+json";
+
+        var exceptionHandlerPathFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+        var ex = exceptionHandlerPathFeature?.Error;
+
+        Log.Error(ex, "Excepción no controlada procesando solicitud en {Path}", context.Request.Path);
+
+        var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+        {
+            Status = StatusCodes.Status500InternalServerError,
+            Title = "Error interno del servidor",
+            Detail = app.Environment.IsDevelopment() ? ex?.Message : "Ocurrió un error inesperado al procesar la solicitud.",
+            Instance = context.Request.Path
+        };
+
+        await context.Response.WriteAsJsonAsync(problem);
+    });
+});
+
+app.UseSerilogRequestLogging();
+
 app.UseCors(CorsPolicyWeb);
 
 app.UseAuthentication();
 
 // Middleware de aislamiento por tenant (Art. VI.2): expone tenant_id del JWT
 // como HttpContext.Items["tenant_id"] para que cada repositorio lo use como filtro
-// obligatorio. Ningún endpoint debe leer tenant_id de la URL o del body.
+// obligatorio y enriquece el LogContext de Serilog.
 app.Use(async (context, next) =>
 {
     var tenantClaim = context.User?.FindFirst("tenant_id")?.Value;
-    if (tenantClaim != null)
+    var userClaim = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? context.User?.FindFirst("sub")?.Value;
+
+    using (LogContext.PushProperty("TenantId", tenantClaim ?? "Anonymous"))
+    using (LogContext.PushProperty("UserId", userClaim ?? "Anonymous"))
     {
-        context.Items["tenant_id"] = tenantClaim;
+        if (tenantClaim != null)
+        {
+            context.Items["tenant_id"] = tenantClaim;
+        }
+        await next();
     }
-    await next();
 });
 
 app.UseAuthorization();

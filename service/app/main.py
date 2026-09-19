@@ -12,6 +12,7 @@ columna `estado` (pendiente -> extraido -> segmentado -> clasificado | error), q
 existia para eso. Sigue sin haber cola de tareas (Azure Service Bus, Art V) — sigue siendo
 la simplificacion de demo señalada explicitamente.
 """
+import logging
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -28,6 +29,13 @@ from app.config import WEB_ORIGINS
 from app.db import get_conn
 from app.extraction import ExtractionError, extract_text
 from app.segmentation import segment_clauses
+
+logger = logging.getLogger("comparador.service")
+if not logger.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+    )
 
 app = FastAPI(title="Comparador de Documentos Legales — demo Venezuela")
 
@@ -621,6 +629,7 @@ def crear_documento(
 
 
 def _marcar_error(documento_id: int, mensaje: str) -> None:
+    logger.error("Marcando documento %s con error: %s", documento_id, mensaje)
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
             "UPDATE documentos SET estado = 'error', estado_detalle = %s WHERE id = %s",
@@ -649,24 +658,30 @@ def _articulos_relacionados_a_titulo(cur, titulo_id: int, tenant_id: uuid.UUID) 
 
 
 def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes, extension: str) -> None:
+    logger.info("Iniciando procesamiento de pipeline para documento %s (tenant %s)", documento_id, tenant_id)
     try:
-        texto = extract_text(contenido, extension)
-    except ExtractionError as exc:
-        _marcar_error(documento_id, str(exc))
-        return
+        try:
+            texto = extract_text(contenido, extension)
+        except ExtractionError as exc:
+            logger.warning("Fallo de extraccion de texto en documento %s: %s", documento_id, exc)
+            _marcar_error(documento_id, str(exc))
+            return
 
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("UPDATE documentos SET estado = 'extraido' WHERE id = %s", (documento_id,))
-        conn.commit()
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("UPDATE documentos SET estado = 'extraido' WHERE id = %s", (documento_id,))
+            conn.commit()
+        logger.info("Documento %s: texto extraído correctamente", documento_id)
 
-    clausulas_texto = segment_clauses(texto)
-    if not clausulas_texto:
-        _marcar_error(documento_id, "No se pudo segmentar ninguna clausula del texto extraido.")
-        return
+        clausulas_texto = segment_clauses(texto)
+        if not clausulas_texto:
+            logger.warning("No se pudo segmentar ninguna cláusula en documento %s", documento_id)
+            _marcar_error(documento_id, "No se pudo segmentar ninguna clausula del texto extraido.")
+            return
 
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("UPDATE documentos SET estado = 'segmentado' WHERE id = %s", (documento_id,))
-        conn.commit()
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("UPDATE documentos SET estado = 'segmentado' WHERE id = %s", (documento_id,))
+            conn.commit()
+        logger.info("Documento %s: segmentadas %d cláusulas", documento_id, len(clausulas_texto))
 
         # Fase 8 (spec-taxonomia-por-pais.md Bloque C, Art II.3): antes armaba el prompt con
         # TODOS los titulos existentes -- ahora resuelve el pais de la empresa dueña del
@@ -687,83 +702,91 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
         )
         titulos = cur.fetchall()
 
-    titulo_by_id = {t["id"]: t for t in titulos}
-    system_prompt = build_system_prompt(titulos)
-    fallos = 0
+        titulo_by_id = {t["id"]: t for t in titulos}
+        system_prompt = build_system_prompt(titulos)
+        fallos = 0
 
-    with get_conn() as conn, conn.cursor() as cur:
-        for orden, texto_clausula in enumerate(clausulas_texto, start=1):
-            titulo_id = None
-            categoria_id = None
-            confianza = None
-            try:
-                resultado = classify_clause(texto_clausula, titulos, system_prompt)
-                titulo_id = resultado["titulo_id"]
-                categoria_id = resultado["categoria_id"]
-                confianza = resultado["confianza"]
-            except Exception as exc:  # nunca abortar todo el documento por una clausula
-                print(f"[clasificacion] documento {documento_id} orden {orden}: {exc}")
-                fallos += 1
-
-            # Art IV.5 bis (spec-marco-legal.md): solo se llama al modelo si el titulo ya
-            # asignado tiene articulos de ley vinculados -- si no, 'no_aplica' sin gastar
-            # una llamada extra. Nunca bloquea el pipeline: un fallo acá deja la señal en
-            # NULL, igual que un fallo de clasificacion deja titulo_id en NULL.
-            cumplimiento_legal = None
-            cumplimiento_justificacion = None
-            if titulo_id is not None:
-                articulos_relacionados = _articulos_relacionados_a_titulo(cur, titulo_id, tenant_id)
-                if not articulos_relacionados:
-                    cumplimiento_legal = "no_aplica"
-                else:
-                    try:
-                        resultado_legal = check_legal_compliance(texto_clausula, articulos_relacionados)
-                        cumplimiento_legal = resultado_legal["cumplimiento"]
-                        cumplimiento_justificacion = resultado_legal["justificacion"]
-                    except Exception as exc:
-                        print(f"[cumplimiento] documento {documento_id} orden {orden}: {exc}")
-
-            # Art IV.6/6 bis (spec-resumen-ejecutivo.md): campo_comparativo solo se pide si
-            # la categoria del titulo lo requiere; resumen_ejecutivo siempre se intenta si
-            # ya hay titulo. Un fallo acá no bloquea el pipeline, igual que clasificacion y
-            # cumplimiento legal -- ambos quedan NULL y con estado_revision_resumen='pendiente'.
-            campo_comparativo = None
-            resumen_ejecutivo = None
-            if titulo_id is not None:
-                titulo = titulo_by_id[titulo_id]
+        with get_conn() as conn, conn.cursor() as cur:
+            for orden, texto_clausula in enumerate(clausulas_texto, start=1):
+                titulo_id = None
+                categoria_id = None
+                confianza = None
                 try:
-                    resultado_resumen = summarize_clause(
-                        texto_clausula, titulo["nombre"], titulo["requiere_campo_comparacion_economica"]
-                    )
-                    resumen_ejecutivo = resultado_resumen["resumen_ejecutivo"]
-                    campo_comparativo = resultado_resumen["campo_comparativo"]
-                except Exception as exc:
-                    print(f"[resumen] documento {documento_id} orden {orden}: {exc}")
+                    resultado = classify_clause(texto_clausula, titulos, system_prompt)
+                    titulo_id = resultado["titulo_id"]
+                    categoria_id = resultado["categoria_id"]
+                    confianza = resultado["confianza"]
+                except Exception as exc:  # nunca abortar todo el documento por una clausula
+                    logger.exception("[clasificacion] documento %s orden %s: %s", documento_id, orden, exc)
+                    fallos += 1
 
+                # Art IV.5 bis (spec-marco-legal.md): solo se llama al modelo si el titulo ya
+                # asignado tiene articulos de ley vinculados -- si no, 'no_aplica' sin gastar
+                # una llamada extra. Nunca bloquea el pipeline: un fallo acá deja la señal en
+                # NULL, igual que un fallo de clasificacion deja titulo_id en NULL.
+                cumplimiento_legal = None
+                cumplimiento_justificacion = None
+                if titulo_id is not None:
+                    articulos_relacionados = _articulos_relacionados_a_titulo(cur, titulo_id, tenant_id)
+                    if not articulos_relacionados:
+                        cumplimiento_legal = "no_aplica"
+                    else:
+                        try:
+                            resultado_legal = check_legal_compliance(texto_clausula, articulos_relacionados)
+                            cumplimiento_legal = resultado_legal["cumplimiento"]
+                            cumplimiento_justificacion = resultado_legal["justificacion"]
+                        except Exception as exc:
+                            logger.exception("[cumplimiento] documento %s orden %s: %s", documento_id, orden, exc)
+
+                # Art IV.6/6 bis (spec-resumen-ejecutivo.md): campo_comparativo solo se pide si
+                # la categoria del titulo lo requiere; resumen_ejecutivo siempre se intenta si
+                # ya hay titulo. Un fallo acá no bloquea el pipeline, igual que clasificacion y
+                # cumplimiento legal -- ambos quedan NULL y con estado_revision_resumen='pendiente'.
+                campo_comparativo = None
+                resumen_ejecutivo = None
+                if titulo_id is not None:
+                    titulo = titulo_by_id[titulo_id]
+                    try:
+                        resultado_resumen = summarize_clause(
+                            texto_clausula, titulo["nombre"], titulo["requiere_campo_comparacion_economica"]
+                        )
+                        resumen_ejecutivo = resultado_resumen["resumen_ejecutivo"]
+                        campo_comparativo = resultado_resumen["campo_comparativo"]
+                    except Exception as exc:
+                        logger.exception("[resumen] documento %s orden %s: %s", documento_id, orden, exc)
+
+                cur.execute(
+                    """
+                    INSERT INTO clausulas
+                        (documento_id, tenant_id, texto, titulo_id, categoria_id, orden, confianza,
+                         cumplimiento_legal, cumplimiento_justificacion, campo_comparativo, resumen_ejecutivo)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        documento_id, tenant_id, texto_clausula, titulo_id, categoria_id, orden, confianza,
+                        cumplimiento_legal, cumplimiento_justificacion, campo_comparativo, resumen_ejecutivo,
+                    ),
+                )
+            conn.commit()
+
+        detalle = None
+        if fallos:
+            detalle = f"{fallos} de {len(clausulas_texto)} clausulas no pudieron clasificarse automaticamente."
+
+        with get_conn() as conn, conn.cursor() as cur:
             cur.execute(
-                """
-                INSERT INTO clausulas
-                    (documento_id, tenant_id, texto, titulo_id, categoria_id, orden, confianza,
-                     cumplimiento_legal, cumplimiento_justificacion, campo_comparativo, resumen_ejecutivo)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    documento_id, tenant_id, texto_clausula, titulo_id, categoria_id, orden, confianza,
-                    cumplimiento_legal, cumplimiento_justificacion, campo_comparativo, resumen_ejecutivo,
-                ),
+                "UPDATE documentos SET estado = 'clasificado', estado_detalle = %s WHERE id = %s",
+                (detalle, documento_id),
             )
-        conn.commit()
+            conn.commit()
+        logger.info("Documento %s: pipeline finalizado (clasificado%s)", documento_id, f" con {fallos} fallos" if fallos else "")
 
-    detalle = None
-    if fallos:
-        detalle = f"{fallos} de {len(clausulas_texto)} clausulas no pudieron clasificarse automaticamente."
-
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            "UPDATE documentos SET estado = 'clasificado', estado_detalle = %s WHERE id = %s",
-            (detalle, documento_id),
-        )
-        conn.commit()
+    except Exception as exc:
+        logger.exception("Fallo catastrofico no controlado en pipeline para documento %s: %s", documento_id, exc)
+        try:
+            _marcar_error(documento_id, f"Fallo interno en procesamiento: {exc}")
+        except Exception as db_exc:
+            logger.exception("No se pudo persistir estado de error para documento %s: %s", documento_id, db_exc)
 
 
 def _obtener_documento(documento_id: int, tenant_id: uuid.UUID) -> dict:
