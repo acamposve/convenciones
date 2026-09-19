@@ -28,7 +28,12 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 // ('AdminTenant', 'Revisor', ...) para que coincidan exactamente con los nombres del enum
 // C#. Sin esto, Npgsql aplica snake_case por default (AdminTenant -> admin_tenant) y el
 // login revienta con "Received enum value 'AdminTenant' ... wasn't found on enum".
-var dataSourceBuilder = new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("Default"));
+var connectionString =
+    Environment.GetEnvironmentVariable("SUPABASE_DB_URL")
+    ?? builder.Configuration.GetConnectionString("Default")
+    ?? "Host=localhost;Port=5433;Database=convenciones;Username=convenciones;Password=convenciones";
+
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
 dataSourceBuilder.MapEnum<RolUsuario>("rol_usuario", nameTranslator: new NpgsqlNullNameTranslator());
 var dataSource = dataSourceBuilder.Build();
 

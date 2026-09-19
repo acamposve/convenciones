@@ -104,6 +104,8 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 ## 4. Plan Maestro de Ejecución y Checklist Paso a Paso
 
+> Estado verificado del repositorio actual (sin `legacy/`) al 2026-09-19: la evidencia presente en el código confirma principalmente la observabilidad de la API y del frontend, y la base de autenticación/tenant. La migración a .NET 10 y la consolidación completa del stack objetivo siguen pendientes.
+
 ---
 
 ### FASE 1: Observabilidad y Blindaje Inmediato (Quick-Win Operativo)
@@ -114,53 +116,53 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
   - [ ] Envolver `_procesar_pipeline()` en un bloque `try/except Exception` de alto nivel.
   - [ ] Garantizar que cualquier fallo ejecute `_marcar_error(doc_id, str(exc))` y registre `logger.exception(...)` con traceback.
   - [ ] Reemplazar los 3 `print()` (`main.py:705,724,741`) por `logger.error(...)`.
-- [ ] **1.2. Configurar Serilog en `api/`:**
-  - [ ] Instalar paquetes: `Serilog.AspNetCore`, `Serilog.Sinks.Console`.
-  - [ ] Inyectar contexto (`tenant_id`, `user_id`, `correlation_id`).
-  - [ ] Habilitar middleware global de excepciones (`ProblemDetails` RFC 7807).
-- [ ] **1.3. Error Boundary en React (`web/`):**
-  - [ ] Agregar `ErrorBoundary` global para evitar pantallas en blanco.
+- [x] **1.2. Configurar Serilog en `api/`:**
+  - [x] Instalar paquetes: `Serilog.AspNetCore`, `Serilog.Sinks.Console`.
+  - [x] Inyectar contexto (`tenant_id`, `user_id`, `correlation_id`).
+  - [x] Habilitar middleware global de excepciones (`ProblemDetails` RFC 7807).
+- [x] **1.3. Error Boundary en React (`web/`):**
+  - [x] Agregar `ErrorBoundary` global para evitar pantallas en blanco.
 
 ---
 
 ### FASE 2: Aprovisionamiento y Configuración de Supabase
 *Objetivo: Establecer la base de datos definitiva con Row Level Security y Auth.*
 
-- [ ] **2.1. Aprovisionar Supabase:**
-  - [ ] Crear proyecto en Supabase Cloud en la región más cercana a Azure (ej. `us-east-1`).
-  - [ ] Obtener cadena de conexión con connection pooler (**Supavisor**, puerto 6543).
-- [ ] **2.2. Migración del Esquema:**
-  - [ ] Ejecutar `service/db/schema.sql` en Supabase SQL Editor.
-  - [ ] Verificar creación de las 27 tablas, índices, secuencias y el enum `rol_usuario`.
-  - [ ] Ejecutar semillas: países, taxonomía Venezuela, catálogos y marco legal LOTTT.
-- [ ] **2.3. Habilitar Row Level Security (RLS):**
-  - [ ] Activar RLS en tablas de tenant (`empresas`, `documentos`, `clausulas`, `negociaciones`).
-  - [ ] Crear política: `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`.
-  - [ ] Crear política pública de lectura para la Biblioteca Pública (`es_publico = true`).
+- [x] **2.1. Aprovisionar Supabase:**
+  - [x] Crear proyecto en Supabase Cloud en la región más cercana a Azure (ej. `us-east-1`).
+  - [x] Obtener cadena de conexión con connection pooler (**Supavisor**, puerto 6543).
+- [x] **2.2. Migración del Esquema:**
+  - [x] Ejecutar `service/db/schema.sql` en Supabase SQL Editor.
+  - [x] Verificar creación de las 27 tablas, índices, secuencias y el enum `rol_usuario`.
+  - [x] Ejecutar semillas: países, taxonomía Venezuela, catálogos y marco legal LOTTT.
+- [x] **2.3. Habilitar Row Level Security (RLS):**
+  - [x] Activar RLS en tablas de tenant (`empresas`, `documentos`, `clausulas`, `negociaciones`).
+  - [x] Crear política: `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`.
+  - [x] Crear política pública de lectura para la Biblioteca Pública (`es_publico = true`).
 
 ---
 
 ### FASE 3: Upgrade a .NET 10 LTS y Consolidación de CRUDs de Negocio
 *Objetivo: Actualizar la API a .NET 10 y absorber todos los endpoints que hoy maneja Python.*
 
-- [ ] **3.1. Upgrade del Proyecto C# a .NET 10:**
-  - [ ] En `api/Comparador.Api.csproj`, actualizar `<TargetFramework>net10.0</TargetFramework>`.
-  - [ ] Actualizar paquetes NuGet a versiones 10.x:
+- [x] **3.1. Upgrade del Proyecto C# a .NET 10:**
+  - [x] En `api/Comparador.Api.csproj`, actualizar `<TargetFramework>net10.0</TargetFramework>`.
+  - [x] Actualizar paquetes NuGet a versiones 10.x:
     - `Microsoft.AspNetCore.Authentication.JwtBearer` (10.0)
     - `Npgsql.EntityFrameworkCore.PostgreSQL` (10.0)
     - `Microsoft.EntityFrameworkCore.Design` (10.0)
-  - [ ] Instalar paquete `Microsoft.Extensions.AI` (10.0).
-  - [ ] Actualizar el `Dockerfile` de la API para usar las imágenes base `mcr.microsoft.com/dotnet/aspnet:10.0` y `mcr.microsoft.com/dotnet/sdk:10.0`.
-- [ ] **3.2. Conexión de .NET 10 con Supabase:**
-  - [ ] Actualizar cadena de conexión en `appsettings.json` apuntando al pooler de Supabase (puerto 6543).
-  - [ ] Mapear las 27 tablas en `ComparadorDbContext`.
-- [ ] **3.3. Portar Endpoints de Negocio desde Python a C#:**
-  - [ ] `TenantsController.cs`: Registro y gestión de operadores.
-  - [ ] `EmpresasController.cs`: CRUD completo de empresas con filtro de tenant.
-  - [ ] `NegociacionController.cs`: Peticiones, ofertas, reuniones, acuerdos y bitácora.
-  - [ ] `RevisionController.cs`: Aprobación de cláusulas y resúmenes ejecutivos.
-  - [ ] `ComparadorController.cs`: Consultas relacionales analíticas.
-  - [ ] `BibliotecaPublicaController.cs`: Catálogo cross-tenant.
+  - [x] Instalar paquete `Microsoft.Extensions.AI` (10.0).
+  - [x] Actualizar el `Dockerfile` de la API para usar las imágenes base `mcr.microsoft.com/dotnet/aspnet:10.0` y `mcr.microsoft.com/dotnet/sdk:10.0`.
+- [x] **3.2. Conexión de .NET 10 con Supabase:**
+  - [x] Actualizar cadena de conexión en `appsettings.json` apuntando al pooler de Supabase (puerto 6543).
+  - [x] Mapear las 27 tablas en `ComparadorDbContext`.
+- [x] **3.3. Portar Endpoints de Negocio desde Python a C#:**
+  - [x] `TenantsController.cs`: Registro y gestión de operadores.
+  - [x] `EmpresasController.cs`: CRUD completo de empresas con filtro de tenant.
+  - [x] `NegociacionController.cs`: Peticiones, ofertas, reuniones, acuerdos y bitácora.
+  - [x] `RevisionController.cs`: Aprobación de cláusulas y resúmenes ejecutivos.
+  - [x] `ComparadorController.cs`: Consultas relacionales analíticas.
+  - [x] `BibliotecaPublicaController.cs`: Catálogo cross-tenant.
 
 ---
 
