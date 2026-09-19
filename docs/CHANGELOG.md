@@ -14,6 +14,25 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Frontend React: login, carga de documentos (en construcción)
 - Taxonomía real de Venezuela: 5 categorías, ~60 títulos
 - Estructura multi-tenant: 1 tenant = 1 operador
+- Fase 2 completa del plan de migración: proyecto de Supabase aprovisionado (por el usuario),
+  `schema.sql` aplicado y verificado (27 tablas, 58 índices, 12 secuencias, enum `rol_usuario`),
+  semillas cargadas (taxonomía de Venezuela: 5 categorías/64 títulos; catálogos de empresa;
+  marco legal LOTTT: 1 ley/555 artículos/357 vínculos), y
+  [`service/db/migrations/012_rls_supabase.sql`](../service/db/migrations/012_rls_supabase.sql)
+  (RLS) aplicado y verificado contra la base real — RLS activo en las 9 tablas de tenant
+  (incluidas las 5 hijas de `negociaciones`, sin `tenant_id` propio, vía subquery), biblioteca
+  pública expuesta como vista de solo lectura en `schema.sql` (`biblioteca_publica`, no como
+  política sobre `documentos`; `GET /biblioteca` en `main.py` ya la consulta a ella en vez de
+  las tablas directo), confirmado con un test de aislamiento real (`SET ROLE anon`) y que no
+  rompe las conexiones actuales (el rol de conexión tiene `rolbypassrls`)
+
+### Fixed
+- `service/app/db.py` y los 4 scripts de `service/db/seed_*.py`: conectar contra Supabase vía
+  el pooler Supavisor (modo *transaction*, puerto 6543) tiraba
+  `psycopg.errors.DuplicatePreparedStatement` — psycopg3 usa prepared statements server-side
+  por default, y el pooler reparte cada query entre conexiones físicas distintas por detrás.
+  Se agregó `prepare_threshold=None` a las 5 llamadas a `psycopg.connect(...)`. Sin este fix
+  el servicio no puede operar contra Supabase en absoluto, no solo los seeds.
 
 ### Changed
 - Constitution.md v2.0.0: redefinición de modelo tenant (ahora operador, no empresa única)
