@@ -29,6 +29,17 @@ public class RevisionController : ControllerBase
         return parsed;
     }
 
+    private Guid RequireUserId()
+    {
+        var userId = User.FindFirst("user_id")?.Value;
+        if (string.IsNullOrWhiteSpace(userId) || !Guid.TryParse(userId, out var parsed))
+        {
+            throw new UnauthorizedAccessException("No se pudo resolver el user_id del usuario autenticado.");
+        }
+
+        return parsed;
+    }
+
     [HttpGet("revision")]
     [Authorize]
     public async Task<IActionResult> GetColaRevision()
@@ -79,7 +90,22 @@ public class RevisionController : ControllerBase
 
         if (titulo_id.HasValue)
         {
-            clausula.TituloId = titulo_id.Value;
+            var paisEmpresa = await _db.Documentos
+                .Where(d => d.Id == clausula.DocumentoId)
+                .Select(d => (int?)d.Empresa!.PaisId)
+                .SingleOrDefaultAsync();
+
+            var titulo = await _db.TaxonomiaTitulos
+                .Where(t => t.Id == titulo_id.Value && t.Activo && t.PaisId == paisEmpresa)
+                .FirstOrDefaultAsync();
+
+            if (titulo == null)
+            {
+                return BadRequest(new { detail = "El título indicado no está activo o no pertenece al país de la empresa." });
+            }
+
+            clausula.TituloId = titulo.Id;
+            clausula.CategoriaId = titulo.CategoriaId;
         }
 
         if (campo_comparativo != null)
@@ -88,6 +114,7 @@ public class RevisionController : ControllerBase
         }
 
         clausula.EstadoRevision = "aprobado";
+        clausula.RevisadoPor = RequireUserId();
         clausula.RevisadoAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -106,6 +133,7 @@ public class RevisionController : ControllerBase
         }
 
         clausula.EstadoRevision = "rechazado";
+        clausula.RevisadoPor = RequireUserId();
         clausula.RevisadoAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -129,6 +157,7 @@ public class RevisionController : ControllerBase
         }
 
         clausula.EstadoRevisionResumen = "aprobado";
+        clausula.RevisadoPorResumen = RequireUserId();
         clausula.RevisadoAtResumen = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -147,6 +176,7 @@ public class RevisionController : ControllerBase
         }
 
         clausula.EstadoRevisionResumen = "rechazado";
+        clausula.RevisadoPorResumen = RequireUserId();
         clausula.RevisadoAtResumen = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
 

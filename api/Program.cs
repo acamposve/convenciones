@@ -30,10 +30,26 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 // ('AdminTenant', 'Revisor', ...) para que coincidan exactamente con los nombres del enum
 // C#. Sin esto, Npgsql aplica snake_case por default (AdminTenant -> admin_tenant) y el
 // login revienta con "Received enum value 'AdminTenant' ... wasn't found on enum".
-var connectionString =
-    Environment.GetEnvironmentVariable("SUPABASE_DB_URL")
-    ?? builder.Configuration.GetConnectionString("Default")
-    ?? "Host=localhost;Port=5433;Database=convenciones;Username=convenciones;Password=convenciones";
+var connectionString = new[]
+    {
+        Environment.GetEnvironmentVariable("SUPABASE_DB_URL"),
+        builder.Configuration.GetConnectionString("Default")
+    }
+    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    var supabase = builder.Configuration.GetSection("Supabase");
+    var host = supabase["PoolerHost"];
+    var username = supabase["Username"];
+    var password = supabase["Password"];
+    if (!string.IsNullOrWhiteSpace(host) && !string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password))
+    {
+        connectionString = $"Host={host};Port={supabase["PoolerPort"] ?? "6543"};Database={supabase["Database"] ?? "postgres"};Username={username};Password={password};Pooling=false";
+    }
+}
+
+connectionString ??= "Host=localhost;Port=5433;Database=convenciones;Username=convenciones;Password=convenciones";
 
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
 dataSourceBuilder.MapEnum<RolUsuario>("rol_usuario", nameTranslator: new NpgsqlNullNameTranslator());
