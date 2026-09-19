@@ -48,9 +48,11 @@
 ```
 
 > Diagrama del stack **objetivo**. Hoy en producción, "AI Service" sigue siendo un
-> microservicio Python (FastAPI) separado consumiendo de una cola (Service Bus/RabbitMQ) y
-> la base de datos es un Azure PostgreSQL Flexible Server autoadministrado — ver nota de
-> migración arriba.
+> microservicio Python (FastAPI) separado, y la base de datos es un Azure PostgreSQL
+> Flexible Server autoadministrado — ver nota de migración arriba. El transporte entre API
+> y AI Service **no** es una cola real: Art. V decide Service Bus/RabbitMQ, pero nunca se
+> implementó (`EVALUACION_MADUREZ_MIGRACION.md` §4.3) — hoy el pipeline corre con
+> `BackgroundTasks` de FastAPI, en memoria dentro del mismo contenedor Python.
 
 ## Flujo de procesamiento (MVP Demo)
 
@@ -74,9 +76,10 @@
 ```
 
 > Flujo **objetivo** (stack unificado en .NET 10). El pipeline desplegado hoy usa
-> PDFPlumber + Tesseract en el microservicio Python, comunicado por Service Bus/RabbitMQ —
-> los pasos conceptuales (extracción → segmentación → clasificación) no cambian, solo el
-> runtime y el transporte entre pasos.
+> PDFPlumber + Tesseract en el microservicio Python, ejecutado en memoria vía
+> `BackgroundTasks` de FastAPI (no hay cola real todavía — ver nota de la sección "Capas"
+> arriba) — los pasos conceptuales (extracción → segmentación → clasificación) no cambian,
+> solo el runtime y el mecanismo de background entre pasos.
 
 ## Entidades de datos (simplificado)
 

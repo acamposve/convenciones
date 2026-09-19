@@ -147,9 +147,12 @@ diferirlo hasta que haya un consumidor real de esas alertas (Azure Monitor, etc.
 
 ## Fuera de alcance (por ahora)
 
-- **Framework de logging externo** (Serilog, Application Insights, structured logging a un
+- ~~**Framework de logging externo** (Serilog, Application Insights, structured logging a un
   sink centralizado): el logging default de Azure Container Apps (captura de stdout) alcanza
-  para este primer paso. Evaluar como fase posterior si el volumen de logs lo justifica.
+  para este primer paso. Evaluar como fase posterior si el volumen de logs lo justifica.~~
+  **Superado:** la Fase 1.2 de `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` (adoptada,
+  Enmienda 2.2.0 de `constitution.md`) ya integró `Serilog.AspNetCore` en `api/` con salida
+  JSON estructurada — este punto ya no está fuera de alcance, está hecho.
 - **Alertas automáticas** sobre los eventos de seguridad del Bloque E: requiere un consumidor
   (Azure Monitor u otro) que hoy no existe — este plan solo deja el rastro, no configura
   alertas.

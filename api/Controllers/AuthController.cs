@@ -69,6 +69,7 @@ public class AuthController : ControllerBase
             });
             await _db.SaveChangesAsync();
             await Bitacora(usuario.Id, usuario.TenantId, "login_ok_reset_pending", ip, userAgent);
+            _logger.LogInformation("Inicio de sesión exitoso (reset pendiente) para el email: {Email}, TenantId: {TenantId}", req.Email, usuario.TenantId);
             return Ok(new LoginResponse(null, null, true, resetRaw));
         }
 
@@ -86,6 +87,7 @@ public class AuthController : ControllerBase
         usuario.UltimoLoginAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
         await Bitacora(usuario.Id, usuario.TenantId, "login_ok", ip, userAgent);
+        _logger.LogInformation("Inicio de sesión exitoso para el email: {Email}, TenantId: {TenantId}", req.Email, usuario.TenantId);
 
         return Ok(new LoginResponse(access, refreshRaw, false, null));
     }

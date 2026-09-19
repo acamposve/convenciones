@@ -12,6 +12,7 @@ columna `estado` (pendiente -> extraido -> segmentado -> clasificado | error), q
 existia para eso. Sigue sin haber cola de tareas (Azure Service Bus, Art V) — sigue siendo
 la simplificacion de demo señalada explicitamente.
 """
+import json
 import logging
 import uuid
 from pathlib import Path
@@ -30,12 +31,29 @@ from app.db import get_conn
 from app.extraction import ExtractionError, extract_text
 from app.segmentation import segment_clauses
 
+
+class _JsonLogFormatter(logging.Formatter):
+    """Logging estructurado en JSON hacia stdout (Fase 1, PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+    — Azure Log Analytics/Container Apps parsea stdout como JSON cuando el log ya viene en
+    ese formato, permitiendo filtrar/consultar por campo en vez de por texto libre."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+
 logger = logging.getLogger("comparador.service")
 if not logger.handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-    )
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(_JsonLogFormatter())
+    logging.basicConfig(level=logging.INFO, handlers=[_handler])
 
 app = FastAPI(title="Comparador de Documentos Legales — demo Venezuela")
 
@@ -687,20 +705,21 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
         # TODOS los titulos existentes -- ahora resuelve el pais de la empresa dueña del
         # documento y clasifica solo contra la capa de titulos de ese pais (activos), nunca
         # mezclando con los de otro pais clonado.
-        cur.execute(
-            """
-            SELECT t.id, t.nombre, t.descripcion, c.id AS categoria_id, c.nombre AS categoria_nombre,
-                   c.requiere_campo_comparacion_economica
-            FROM documentos d
-            JOIN empresas e ON e.id = d.empresa_id
-            JOIN taxonomia_titulos t ON t.pais_id = e.pais_id AND t.activo = true
-            JOIN taxonomia_categorias c ON c.id = t.categoria_id
-            WHERE d.id = %s AND d.tenant_id = %s
-            ORDER BY c.id, t.id
-            """,
-            (documento_id, tenant_id),
-        )
-        titulos = cur.fetchall()
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT t.id, t.nombre, t.descripcion, c.id AS categoria_id, c.nombre AS categoria_nombre,
+                       c.requiere_campo_comparacion_economica
+                FROM documentos d
+                JOIN empresas e ON e.id = d.empresa_id
+                JOIN taxonomia_titulos t ON t.pais_id = e.pais_id AND t.activo = true
+                JOIN taxonomia_categorias c ON c.id = t.categoria_id
+                WHERE d.id = %s AND d.tenant_id = %s
+                ORDER BY c.id, t.id
+                """,
+                (documento_id, tenant_id),
+            )
+            titulos = cur.fetchall()
 
         titulo_by_id = {t["id"]: t for t in titulos}
         system_prompt = build_system_prompt(titulos)
@@ -782,9 +801,17 @@ def _procesar_pipeline(documento_id: int, tenant_id: uuid.UUID, contenido: bytes
         logger.info("Documento %s: pipeline finalizado (clasificado%s)", documento_id, f" con {fallos} fallos" if fallos else "")
 
     except Exception as exc:
+        # El detalle completo (incluyendo texto crudo de la excepcion, que puede contener
+        # detalles internos de la conexion a la base u otros servicios) queda solo en el log
+        # -- estado_detalle lo persiste la API y el frontend lo muestra tal cual al usuario
+        # del tenant (DocumentDetail.jsx), asi que nunca debe llevar la excepcion cruda.
         logger.exception("Fallo catastrofico no controlado en pipeline para documento %s: %s", documento_id, exc)
         try:
-            _marcar_error(documento_id, f"Fallo interno en procesamiento: {exc}")
+            _marcar_error(
+                documento_id,
+                f"Ocurrio un error interno al procesar el documento (id {documento_id}). "
+                "Revisa los logs del servicio o contacta a soporte.",
+            )
         except Exception as db_exc:
             logger.exception("No se pudo persistir estado de error para documento %s: %s", documento_id, db_exc)
 

@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Text;
 using Comparador.Api.Data;
 using Comparador.Api.Models;
@@ -10,15 +9,18 @@ using Npgsql;
 using Npgsql.NameTranslation;
 using Serilog;
 using Serilog.Context;
+using Serilog.Formatting.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración de Serilog: Logging estructurado a consola (capturado por Container Apps)
+// Configuración de Serilog: logging estructurado JSON a consola (Container Apps captura
+// stdout; JSON permite que Azure Log Analytics filtre/consulte por campo — TenantId,
+// UserId, CorrelationId — en vez de por texto libre, criterio de éxito de Fase 1).
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)
     .Enrich.FromLogContext()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{TenantId}] [{UserId}] {Message:lj}{NewLine}{Exception}"));
+    .WriteTo.Console(new JsonFormatter()));
 
 // El tipo `rol_usuario` es un ENUM nativo de Postgres (creado por SQL plano, no por EF).
 // Npgsql 8 ya no lo mapea a RolUsuario automaticamente ("unmapped enums requiere opt-in") —
@@ -81,7 +83,42 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
-// Middleware global de manejo de excepciones no controladas (RFC 7807 ProblemDetails + Log estructurado)
+app.UseCors(CorsPolicyWeb);
+
+app.UseAuthentication();
+
+// Middleware de aislamiento por tenant (Art. VI.2): expone tenant_id del JWT
+// como HttpContext.Items["tenant_id"] para que cada repositorio lo use como filtro
+// obligatorio y enriquece el LogContext de Serilog. Va ANTES del exception handler y de
+// UseSerilogRequestLogging (más abajo) a propósito: LogContext.PushProperty usa un
+// AsyncLocal que se desapila al salir del `using`, así que si el exception handler o el
+// request logging estuvieran registrados antes (más "afuera") que este middleware,
+// emitirían su log de excepción/finalización de request DESPUÉS de que este `using` ya
+// se desapiló — y quedarían sin TenantId/UserId/CorrelationId. Para que los reciban,
+// tienen que estar anidados DENTRO de este scope, es decir, registrados después.
+app.Use(async (context, next) =>
+{
+    var tenantClaim = context.User?.FindFirst("tenant_id")?.Value;
+    // TokenService.GenerarAccessToken emite el claim custom "user_id" (no el estándar
+    // ClaimTypes.NameIdentifier/"sub") — ver api/Services/TokenService.cs.
+    var userClaim = context.User?.FindFirst("user_id")?.Value;
+    var correlationId = context.TraceIdentifier;
+
+    using (LogContext.PushProperty("TenantId", tenantClaim ?? "Anonymous"))
+    using (LogContext.PushProperty("UserId", userClaim ?? "Anonymous"))
+    using (LogContext.PushProperty("CorrelationId", correlationId))
+    {
+        if (tenantClaim != null)
+        {
+            context.Items["tenant_id"] = tenantClaim;
+        }
+        await next();
+    }
+});
+
+// Middleware global de manejo de excepciones no controladas (RFC 7807 ProblemDetails + Log
+// estructurado). Registrado después del middleware de arriba para que Log.Error() incluya
+// TenantId/UserId/CorrelationId.
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -106,31 +143,9 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
+// También después del middleware de contexto, por el mismo motivo: para que el log de
+// "Request completed" incluya TenantId/UserId/CorrelationId.
 app.UseSerilogRequestLogging();
-
-app.UseCors(CorsPolicyWeb);
-
-app.UseAuthentication();
-
-// Middleware de aislamiento por tenant (Art. VI.2): expone tenant_id del JWT
-// como HttpContext.Items["tenant_id"] para que cada repositorio lo use como filtro
-// obligatorio y enriquece el LogContext de Serilog.
-app.Use(async (context, next) =>
-{
-    var tenantClaim = context.User?.FindFirst("tenant_id")?.Value;
-    var userClaim = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                    ?? context.User?.FindFirst("sub")?.Value;
-
-    using (LogContext.PushProperty("TenantId", tenantClaim ?? "Anonymous"))
-    using (LogContext.PushProperty("UserId", userClaim ?? "Anonymous"))
-    {
-        if (tenantClaim != null)
-        {
-            context.Items["tenant_id"] = tenantClaim;
-        }
-        await next();
-    }
-});
 
 app.UseAuthorization();
 app.MapControllers();

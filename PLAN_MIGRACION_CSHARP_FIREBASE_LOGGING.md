@@ -106,20 +106,20 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 ---
 
-### FASE 1: Observabilidad y Blindaje Inmediato (Quick-Win Operativo)
+### FASE 1: Observabilidad y Blindaje Inmediato (Quick-Win Operativo) — ✅ **Completada**
 *Objetivo: Evitar pérdida de datos o documentos congelados en la demo que hoy está viva.*
 
-- [ ] **1.1. Blindar temporalmente el Pipeline en Python (`service/app/main.py`):**
-  - [ ] Configurar el módulo estándar `logging` con formato estructurado hacia stdout.
-  - [ ] Envolver `_procesar_pipeline()` en un bloque `try/except Exception` de alto nivel.
-  - [ ] Garantizar que cualquier fallo ejecute `_marcar_error(doc_id, str(exc))` y registre `logger.exception(...)` con traceback.
-  - [ ] Reemplazar los 3 `print()` (`main.py:705,724,741`) por `logger.error(...)`.
-- [ ] **1.2. Configurar Serilog en `api/`:**
-  - [ ] Instalar paquetes: `Serilog.AspNetCore`, `Serilog.Sinks.Console`.
-  - [ ] Inyectar contexto (`tenant_id`, `user_id`, `correlation_id`).
-  - [ ] Habilitar middleware global de excepciones (`ProblemDetails` RFC 7807).
-- [ ] **1.3. Error Boundary en React (`web/`):**
-  - [ ] Agregar `ErrorBoundary` global para evitar pantallas en blanco.
+- [x] **1.1. Blindar temporalmente el Pipeline en Python (`service/app/main.py`):**
+  - [x] Configurar el módulo estándar `logging` con formato estructurado hacia stdout (JSON, vía `_JsonLogFormatter`).
+  - [x] Envolver `_procesar_pipeline()` en un bloque `try/except Exception` de alto nivel.
+  - [x] Garantizar que cualquier fallo ejecute `_marcar_error(doc_id, ...)` y registre `logger.exception(...)` con traceback. El mensaje persistido en `estado_detalle` (que el frontend muestra al usuario) queda sanitizado — el texto crudo de la excepción solo va al log.
+  - [x] Reemplazar los 3 `print()` (`main.py:705,724,741` original) por `logger.warning(...)`/`logger.exception(...)`.
+- [x] **1.2. Configurar Serilog en `api/`:**
+  - [x] Instalar paquetes: `Serilog.AspNetCore` (incluye `Serilog.Sinks.Console`).
+  - [x] Inyectar contexto (`TenantId`, `UserId`, `CorrelationId`) vía `LogContext`, en un scope que envuelve al exception handler y a `UseSerilogRequestLogging` (si no, esos dos emiten sus logs fuera del scope y quedan sin contexto).
+  - [x] Habilitar middleware global de excepciones (`ProblemDetails` RFC 7807).
+- [x] **1.3. Error Boundary en React (`web/`):**
+  - [x] Agregar `ErrorBoundary` global para evitar pantallas en blanco. El detalle crudo del error solo se muestra en desarrollo (`import.meta.env.DEV`); en producción queda en consola/logs, nunca en la UI.
 
 ---
 
