@@ -48,10 +48,12 @@ public class AcuerdoCreateRequest
 public class NegociacionController : ControllerBase
 {
     private readonly ComparadorDbContext _db;
+    private readonly IConfiguration _configuration;
 
-    public NegociacionController(ComparadorDbContext db)
+    public NegociacionController(ComparadorDbContext db, IConfiguration configuration)
     {
         _db = db;
+        _configuration = configuration;
     }
 
     private Guid RequireTenantId()
@@ -419,7 +421,10 @@ public class NegociacionController : ControllerBase
         var version = (await _db.Documentos
             .Where(d => d.NegociacionId == id)
             .MaxAsync(d => (int?)d.VersionNegociacion) ?? 0) + 1;
-        var storageRoot = Path.Combine(AppContext.BaseDirectory, "storage", "negociaciones");
+        var storageRoot = Environment.GetEnvironmentVariable("STORAGE_DIR")
+            ?? _configuration["Storage:Root"]
+            ?? Path.Combine(AppContext.BaseDirectory, "storage");
+        storageRoot = Path.Combine(storageRoot, "negociaciones");
         Directory.CreateDirectory(storageRoot);
         var filePath = Path.Combine(storageRoot, $"{id}-v{version}.docx");
         using (var document = WordprocessingDocument.Create(filePath, WordprocessingDocumentType.Document))
