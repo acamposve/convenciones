@@ -32,6 +32,13 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 - No hay versión anterior en git — este repo comienza con MVP
+- Constitution.md v2.3.0: se retira Azure como proveedor de infraestructura. Se elimina
+  `infra/terraform/` completo, los workflows de GitHub Actions que desplegaban ahí
+  (`terraform.yml`, `deploy-apps.yml`) y el soporte a Azure Blob Storage en
+  `service/app/storage.py` (queda solo el fallback a disco local). Motivo: el ACR del demo
+  quedó en estado `REGISTRY_NOT_READY` no atribuible a permisos ni configuración. Efecto
+  inmediato: no hay ningún ambiente desplegado en la nube — el proyecto corre solo local
+  hasta que se elija un proveedor nuevo.
 
 ## Fases futuras
 

@@ -65,20 +65,25 @@ capturan pierden el punto exacto de la falla dentro del SDK de Anthropic.
   de un `_procesar_pipeline` de prueba) y confirmar que el documento pasa a `error` con un
   `estado_detalle` útil, y que el log muestra el traceback completo, no solo un mensaje.
 
-## Bloque B — Logging de fallos en integraciones externas (Blob Storage, Anthropic, Postgres)
+## Bloque B — Logging de fallos en integraciones externas (Storage, Anthropic, Postgres)
 
-**Problema:** `service/app/storage.py:25` (subida a Azure Blob Storage),
+> **⚠️ Se retiró Azure Blob Storage (Enmienda 2.3.0 de `constitution.md`):** `storage.py` ya
+> no sube a Azure — hoy solo escribe a disco local, sin manejo de error propio tampoco
+> (mismo problema, otro backend). El punto de abajo sobre `container.upload_blob(...)` ya no
+> aplica tal cual; el problema real (falta de logging en la escritura del original) sigue
+> vigente y se retoma cuando se elija el proveedor de storage nuevo.
+
+**Problema:** `service/app/storage.py` (persistencia del documento original),
 `service/app/classification.py` (las 3 llamadas a la API de Anthropic) y
 `service/app/db.py:9-12` (`get_conn`) no tienen ningún manejo de error propio — cualquier
-fallo de estos tres servicios externos es indistinguible de cualquier otro error en los logs,
-y no se puede diferenciar, por ejemplo, un `RateLimitError` de Anthropic de un timeout de red
-o de una respuesta malformada del SDK.
+fallo de estos servicios externos (o de la escritura a disco) es indistinguible de cualquier
+otro error en los logs, y no se puede diferenciar, por ejemplo, un `RateLimitError` de
+Anthropic de un timeout de red o de una respuesta malformada del SDK.
 
 **Trabajo estimado:**
-- `storage.py`: envolver `container.upload_blob(...)` en `try/except`, loguear con
-  `logger.exception` incluyendo el nombre del blob y el tenant, re-lanzar para que el
-  llamador siga devolviendo el error al usuario (no cambiar el comportamiento visible, solo
-  agregar el rastro).
+- `storage.py`: envolver la escritura del documento original en `try/except`, loguear con
+  `logger.exception` incluyendo el tenant, re-lanzar para que el llamador siga devolviendo
+  el error al usuario (no cambiar el comportamiento visible, solo agregar el rastro).
 - `classification.py`: capturar por separado errores conocidos del SDK de Anthropic (rate
   limit, timeout, conexión) vs. errores de parseo de la respuesta, y loguear cada tipo
   distinto para poder diferenciarlos después en los logs de Azure.

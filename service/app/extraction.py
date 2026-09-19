@@ -1,8 +1,8 @@
 """Extraccion de texto (Art IV.3): parseo nativo de PDF/Word, OCR si el PDF es escaneado.
 
-Opera sobre bytes en memoria, no sobre una ruta en disco: el original puede vivir en Azure
-Blob Storage (app/storage.py, Art V/VI.3), y el pipeline ya tiene los bytes en memoria desde
-la ingesta (main.py), asi que no hay razon para volver a tocar el filesystem para procesarlo.
+Opera sobre bytes en memoria, no sobre una ruta en disco: el original se persiste aparte
+(app/storage.py, Art V/VI.3), y el pipeline ya tiene los bytes en memoria desde la ingesta
+(main.py), asi que no hay razon para volver a tocar el filesystem para procesarlo.
 """
 import io
 

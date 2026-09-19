@@ -17,6 +17,11 @@ colectivas de trabajo mediante IA — reemplaza un SaaS PHP legado que hacía es
 > Art. V de la constitución describe el stack **objetivo**. Nada de esto se ha portado a
 > código todavía.
 
+> **Se eliminó la infraestructura de Azure (Terraform, deploy a Container Apps):** el demo
+> dejó de estar desplegado en la nube — el equipo va a redesplegar a otro proveedor, todavía
+> sin decidir. Hasta que eso se defina, el proyecto solo corre localmente
+> ([`docs/bootstrap-demo.md`](docs/bootstrap-demo.md)); `infra/` ya no existe en el repo.
+
 ## Estructura del repo
 
 | Carpeta | Qué es |
@@ -24,9 +29,8 @@ colectivas de trabajo mediante IA — reemplaza un SaaS PHP legado que hacía es
 | `api/` | API de autenticación y datos, .NET 8 (tenants, usuarios, roles, JWT) — destino final del microservicio Python según el plan de migración |
 | `service/` | Microservicio Python (FastAPI) — ingesta, extracción, segmentación y clasificación de cláusulas por IA. **Plan de migración prevé eliminarlo** (Fase 5.4) una vez completado el cutover a `api/` en .NET 10 |
 | `web/` | Frontend, React + Vite |
-| `infra/terraform/` | Infraestructura como código (Azure: Container Apps, Postgres, ACR, Storage). **Plan de migración prevé eliminar** el Postgres Flexible Server administrado (Fase 5.3) al pasar a Supabase |
-| `.github/workflows/` | CI/CD (build+test, plan/apply de Terraform, deploy a Azure) |
-| `docs/` | Constitución, specs (auth, MVP demo, plan de publicación), taxonomía de Venezuela |
+| `.github/workflows/` | CI: build + test de los tres componentes (`ci.yml`). Sin deploy — ver nota de arriba |
+| `docs/` | Constitución, specs (auth, MVP demo), taxonomía de Venezuela |
 | `legacy/` | SaaS PHP original — solo como referencia funcional (Art. IX de la constitución), no se porta código de acá |
 
 ## Cómo correr el pipeline localmente
@@ -49,11 +53,13 @@ demo (ver credenciales impresas en `docker compose logs seed`), y dejás listo e
 
 ## Stack
 
-**Desplegado hoy:** .NET 8 · Python/FastAPI · React/Vite · Azure PostgreSQL Flexible Server ·
-Terraform · Azure Container Apps.
+**Desplegado hoy:** ningún ambiente en la nube activo — el proyecto corre local (Docker
+Compose). Componentes: .NET 8 · Python/FastAPI · React/Vite · PostgreSQL.
 
 **Objetivo (migración en curso, Enmienda 2.2.0):** .NET 10 LTS unificado (API + IA) ·
-React/Vite · Supabase (PostgreSQL + RLS + Auth + Storage) · Terraform · Azure Container Apps.
+React/Vite · Supabase (PostgreSQL + RLS + Auth + Storage). Infraestructura/proveedor de
+deploy todavía sin decidir — se eliminó Azure (Terraform, Container Apps); contenedores
+Docker siguen siendo el empaquetado, pero el destino se define aparte.
 Justificación de cada elección, y de la transición, en el Art. V de
 [`docs/constitution.md`](docs/constitution.md) y en
 [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md).

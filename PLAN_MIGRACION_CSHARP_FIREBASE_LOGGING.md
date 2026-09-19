@@ -5,6 +5,15 @@
 **Fecha:** Septiembre 2026  
 **Documento:** `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` (Revisión 3.0: .NET 10 LTS & Cronograma de Desconexión de Python)  
 
+> **⚠️ Se retiró Azure como proveedor de infraestructura (Enmienda 2.3.0 de
+> `docs/constitution.md`):** este documento se escribió asumiendo Azure (Container Apps,
+> Terraform, ACR) como destino de deploy — eso ya no es así. `infra/terraform/` y los
+> workflows que desplegaban ahí se eliminaron del repositorio. Las secciones de abajo que
+> mencionan Azure/Terraform (sobre todo la Fase 5.3) describen el plan **tal como se escribió
+> originalmente**; el "destino" real de cada paso de infraestructura queda pendiente de
+> redefinir cuando se elija el proveedor nuevo. El resto del plan (unificación a .NET 10,
+> adopción de Supabase, Fases 1-4) no depende del proveedor de nube y sigue vigente.
+
 ---
 
 ## 1. Preguntas Frecuentes y Clarificaciones Arquitectónicas Clave

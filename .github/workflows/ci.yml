@@ -5,7 +5,7 @@ name: CI
 on:
   pull_request:
     # "main" debe existir como rama en GitHub (creada manualmente) para que esto dispare —
-    # el repo arranco con "master" como default, ver docs/plan-publish-azure.md.
+    # el repo arranco con "master" como default.
     branches: [main]
 
 jobs:

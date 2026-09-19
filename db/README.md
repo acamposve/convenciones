@@ -53,7 +53,7 @@ Herramienta: Flyway, Liquibase, o o managed en Django/EF si pasan a ORM.
 ## Backup y datos sensibles
 
 - **Datos de prueba en `fixtures/`:** NO se comitean a git (o solo en `.gitignore`)
-- **Credenciales en `docker-compose.yml`:** Reemplazar en producción con secrets de Azure Key Vault
+- **Credenciales en `docker-compose.yml`:** Reemplazar en producción con el gestor de secrets del proveedor de deploy que se elija
 - **Documentos legados:** Privados (Art. VI de constitution.md), bajo `db/fixtures/` con acceso restringido
 
 ---

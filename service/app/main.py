@@ -6,11 +6,11 @@ sin cola de revision, sin publicacion (spec-mvp-demo.md).
 POST /documentos responde 201 apenas persiste el documento y corre el pipeline en una
 tarea en segundo plano (BackgroundTasks), NO dentro de la request: la clasificacion hace
 una llamada al modelo por clausula, y en un documento real eso excede el timeout del
-ingress de Container Apps — la request moria y el navegador lo reportaba como un error de
-CORS (la respuesta de error del proxy no lleva cabeceras CORS). El avance se sigue por la
-columna `estado` (pendiente -> extraido -> segmentado -> clasificado | error), que ya
-existia para eso. Sigue sin haber cola de tareas (Azure Service Bus, Art V) — sigue siendo
-la simplificacion de demo señalada explicitamente.
+ingress/proxy reverso que este servicio corra detras — la request moria y el navegador lo
+reportaba como un error de CORS (la respuesta de error del proxy no lleva cabeceras CORS).
+El avance se sigue por la columna `estado` (pendiente -> extraido -> segmentado ->
+clasificado | error), que ya existia para eso. Sigue sin haber cola de tareas real (Art V)
+— sigue siendo la simplificacion de demo señalada explicitamente.
 """
 import json
 import logging
@@ -40,8 +40,9 @@ _STANDARD_LOG_RECORD_ATTRS = frozenset(logging.LogRecord("", 0, "", 0, "", (), N
 
 class _JsonLogFormatter(logging.Formatter):
     """Logging estructurado en JSON hacia stdout (Fase 1, PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
-    — Azure Log Analytics/Container Apps parsea stdout como JSON cuando el log ya viene en
-    ese formato, permitiendo filtrar/consultar por campo (no solo por texto libre)."""
+    — la mayoria de los backends de logs centralizados (Log Analytics, Cloud Logging,
+    Datadog, etc.) parsean stdout como JSON cuando el log ya viene en ese formato,
+    permitiendo filtrar/consultar por campo (no solo por texto libre)."""
 
     def format(self, record: logging.LogRecord) -> str:
         payload = {
