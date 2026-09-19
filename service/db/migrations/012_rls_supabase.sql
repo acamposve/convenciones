@@ -17,13 +17,6 @@
 -- A proposito NO se usa `FORCE ROW LEVEL SECURITY`: eso si aplicaria RLS incluso al dueno de
 -- la tabla, y romperia las conexiones actuales antes de tener la propagacion de claims
 -- resuelta -- no es un olvido, es deliberado hasta que ese riesgo este cerrado.
---
--- Alcance: las 4 tablas que lista el plan (empresas, documentos, clausulas, negociaciones).
--- OJO: peticiones/ofertas/reuniones/acuerdos/bitacora_negociacion (hijas de negociaciones,
--- spec-negociacion.md) NO tienen su propia columna tenant_id -- solo negociacion_id -- asi
--- que quedan FUERA de esta migracion. Si se quiere RLS ahi tambien hace falta una politica
--- con subquery contra negociaciones (o agregarles tenant_id directo) -- decision que no se
--- toma en este archivo, requiere su propia revision.
 
 BEGIN;
 
@@ -44,15 +37,78 @@ CREATE POLICY tenant_isolation_clausulas ON clausulas
 CREATE POLICY tenant_isolation_negociaciones ON negociaciones
     USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);
 
--- Biblioteca publica (Art VI.7, spec-biblioteca-publica.md): unica excepcion explicita al
--- aislamiento por tenant, y solo sobre `documentos` -- nunca clausulas ni datos de empresa
--- mas alla del nombre (spec-biblioteca-publica.md: "No se toca clausulas en absoluto").
--- Politica adicional PERMISSIVE (default): se combina con OR junto a
--- tenant_isolation_documentos, asi que un SELECT ve "mis documentos" O "los publicos";
--- INSERT/UPDATE/DELETE siguen regidos solo por tenant_isolation_documentos (FOR ALL),
--- porque esta es FOR SELECT unicamente.
-CREATE POLICY biblioteca_publica_documentos ON documentos
-    FOR SELECT
-    USING (es_publico = true);
+-- Hijas de negociaciones (spec-negociacion.md): peticiones/reuniones/acuerdos/
+-- bitacora_negociacion no tienen tenant_id propio, solo negociacion_id -- sin politica
+-- propia quedarian sin RLS (legibles/escribibles por cualquier rol no-bypass con acceso a
+-- la tabla, filtrando solo por FK, no por tenant). Se resuelven con una subquery contra
+-- negociaciones.tenant_id. ofertas es un nivel mas profundo (peticion_id -> negociacion_id),
+-- asi que su subquery encadena un JOIN mas.
+CREATE POLICY tenant_isolation_peticiones ON peticiones
+    USING (negociacion_id IN (
+        SELECT id FROM negociaciones WHERE tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+    ));
+
+CREATE POLICY tenant_isolation_ofertas ON ofertas
+    USING (peticion_id IN (
+        SELECT p.id
+        FROM peticiones p
+        JOIN negociaciones n ON n.id = p.negociacion_id
+        WHERE n.tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+    ));
+
+CREATE POLICY tenant_isolation_reuniones ON reuniones
+    USING (negociacion_id IN (
+        SELECT id FROM negociaciones WHERE tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+    ));
+
+CREATE POLICY tenant_isolation_acuerdos ON acuerdos
+    USING (negociacion_id IN (
+        SELECT id FROM negociaciones WHERE tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+    ));
+
+CREATE POLICY tenant_isolation_bitacora_negociacion ON bitacora_negociacion
+    USING (negociacion_id IN (
+        SELECT id FROM negociaciones WHERE tenant_id = (auth.jwt() ->> 'tenant_id')::uuid
+    ));
+
+ALTER TABLE peticiones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ofertas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reuniones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE acuerdos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bitacora_negociacion ENABLE ROW LEVEL SECURITY;
+
+-- Biblioteca publica (Art VI.7, spec-biblioteca-publica.md): la unica excepcion al
+-- aislamiento por tenant NO se implementa como politica publica sobre `documentos` -- RLS
+-- filtra FILAS, no columnas: una politica "es_publico = true" sobre la tabla completa le
+-- regalaria a cualquier rol con SELECT el tenant_id, el id interno, ruta_archivo, estado y
+-- metadata de negociacion de cada documento publico, cuando VI.7 solo permite exponer
+-- nombre de empresa, URL de origen y fecha de creacion. En cambio, se expone una vista de
+-- solo lectura con exactamente esa proyeccion -- la misma que ya usa GET /biblioteca en
+-- service/app/main.py (listar_biblioteca_publica), asi que esto formaliza a nivel de base
+-- lo que el endpoint ya hace a nivel de aplicacion.
+--
+-- Por que no hace falta una politica publica sobre `empresas` para que el JOIN funcione:
+-- una vista corre con los privilegios de su dueno por default en Postgres (no se declara
+-- `security_invoker`), y esta se crea con un rol BYPASSRLS -- el JOIN interno ignora las
+-- politicas de `documentos`/`empresas` sin importar que rol externo consulte la vista. El
+-- filtro real (que documento es publico) lo hace el WHERE de la vista, no RLS -- por eso es
+-- seguro exponerla incluso a un rol anonimo sin JWT.
+CREATE VIEW biblioteca_publica AS
+SELECT
+    e.nombre AS empresa_nombre,
+    d.url_origen,
+    d.created_at
+FROM documentos d
+JOIN empresas e ON e.id = d.empresa_id
+WHERE d.es_publico = true;
+
+-- anon/authenticated son los roles estandar que Supabase crea en todo proyecto nuevo, y por
+-- default les otorga privilegios amplios (INSERT/UPDATE/DELETE/...) sobre objetos nuevos del
+-- schema public via ALTER DEFAULT PRIVILEGES -- el REVOKE explicito no es defensivo de mas:
+-- esta vista no es "auto-updatable" para Postgres (tiene un JOIN, no una sola tabla en el
+-- FROM), asi que un INSERT/UPDATE/DELETE fallaria igual hoy, pero no hay que depender de esa
+-- casualidad de forma -- se deja solo el SELECT que efectivamente se necesita.
+REVOKE ALL ON biblioteca_publica FROM anon, authenticated;
+GRANT SELECT ON biblioteca_publica TO anon, authenticated;
 
 COMMIT;
