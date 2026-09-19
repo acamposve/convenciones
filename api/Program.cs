@@ -13,9 +13,9 @@ using Serilog.Formatting.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración de Serilog: logging estructurado JSON a consola (Container Apps captura
-// stdout; JSON permite que Azure Log Analytics filtre/consulte por campo — TenantId,
-// UserId, CorrelationId — en vez de por texto libre, criterio de éxito de Fase 1).
+// Configuración de Serilog: logging estructurado JSON a consola (la plataforma de deploy
+// captura stdout; JSON permite filtrar/consultar por campo — TenantId, UserId,
+// CorrelationId — en vez de por texto libre, criterio de éxito de Fase 1).
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)
@@ -66,9 +66,9 @@ builder.Services.AddAuthorization(AuthorizationPolicies.Configurar);
 // login con "No 'Access-Control-Allow-Origin' header" aunque la API funcione perfecto por
 // curl/Postman. Origen configurable (Cors__WebOrigin) para no hardcodear localhost cuando
 // esto corra en docker-compose bajo otro host/puerto.
-// Lista separada por coma, no un origen único: el frontend en Azure quedó accesible tanto
-// por el FQDN largo de Container Apps como por un dominio propio (presenciavirtual.com.uy),
-// y ambos necesitan poder loguearse desde el navegador.
+// Lista separada por coma, no un origen único: el frontend puede quedar accesible tanto
+// por la URL que genere la plataforma de deploy como por un dominio propio
+// (presenciavirtual.com.uy), y ambos necesitan poder loguearse desde el navegador.
 const string CorsPolicyWeb = "web";
 var webOrigins = (builder.Configuration["Cors:WebOrigin"] ?? "http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

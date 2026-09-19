@@ -5,8 +5,13 @@
 > **Migración de stack en curso (Enmienda 2.2.0):** este documento describe el stack
 > **objetivo** tras adoptar [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
 > (C#/.NET 10 unificado + Supabase). El stack **desplegado hoy** sigue siendo .NET 8 +
-> Python/FastAPI + Azure PostgreSQL — Python sigue atendiendo tráfico real hasta el cutover
+> Python/FastAPI + PostgreSQL — Python sigue atendiendo tráfico real hasta el cutover
 > (Fase 5.2 del plan). Nada de esto se ha portado a código todavía.
+>
+> **Sin infraestructura en la nube (Enmienda 2.3.0):** se retiró Azure (Terraform, Container
+> Apps) — hoy no hay ningún ambiente desplegado, el proyecto corre solo local. El proveedor
+> de deploy nuevo todavía no está decidido; las referencias a "Azure" que quedan abajo son
+> **históricas** (documentan la decisión anterior), no el estado actual.
 
 ## Principios
 
@@ -118,7 +123,7 @@ Stack objetivo (Enmienda 2.2.0); el desplegado hoy sigue el diseño anterior (co
 | Cola | `System.Threading.Channels` en proceso | Service Bus / RabbitMQ | Suficiente para el volumen actual; ya no hay dos procesos que desacoplar |
 | Frontend | React + Vite | React + Vite | Sin cambio |
 | Auth | Supabase Auth + SSO (Fase 2) | OIDC + SSO (Fase 2) | Autenticación y base de datos bajo el mismo proveedor |
-| Infra | Contenedores + Azure Container Apps (1 app de API) | Contenedores + Azure Container Apps (`api` + `ai-service`) | Menos Container Apps y sin Postgres administrado que mantener |
+| Infra | Contenedores (Docker) — proveedor sin decidir (Enmienda 2.3.0, se retiró Azure) | Contenedores + Azure Container Apps (`api` + `ai-service`) | Azure Container Apps ya no es la decisión vigente; una vez elegido el proveedor nuevo, sigue aplicando el motivo original (menos superficie de infra que mantener, sin Postgres administrado) |
 
 ## Seguridad (Art. VI)
 
@@ -130,24 +135,21 @@ Stack objetivo (Enmienda 2.2.0); el desplegado hoy sigue el diseño anterior (co
 - **Roles y permisos** por tenant (no cross-tenant)
 - **Tokens JWT** con expiración, emitidos por Supabase Auth (SSO en Fase 2)
 
-## Evolución hacia Kubernetes
+## Evolución de infraestructura
 
-Hoy: Azure Container Apps (simple)  
-Futuro: Migracion a AKS (Kubernetes) cuando:
-- Múltiples tenants en producción
-- Necesidad de autoscaling fino
-- Integración con sistemas complejos
+**[Enmienda 2.3.0]** Se retiró Azure Container Apps (y Terraform) del repositorio — hoy no
+hay ningún ambiente desplegado en la nube, solo desarrollo local. El proveedor de deploy
+nuevo todavía no está decidido; cuando se elija, esta sección se vuelve a escribir con el
+camino real de escalado (contenedores simples → orquestador tipo Kubernetes si hace falta
+autoscaling fino o multi-tenant a gran escala).
 
-(Los Dockerfiles y docker-compose ya permiten esta migración sin reescritura)
-
-Con el stack objetivo, esto aplica solo al Container App de la API (.NET 10) — Supabase es
-BaaS y no se gestiona en AKS; el ahorro de infraestructura propia es justamente parte del
-motivo del cambio (Enmienda 2.2.0).
+(Los Dockerfiles y docker-compose siguen siendo el empaquetado — no dependen de Azure — así
+que no hace falta reescribirlos para el proveedor nuevo, solo definir dónde correrlos)
 
 ---
 
-**Stack objetivo: .NET 10 LTS (unificado) · React/Vite · Supabase (PostgreSQL + RLS) · Terraform · Azure**
-**Stack desplegado hoy: .NET 8 · Python/FastAPI · React/Vite · Azure PostgreSQL · Terraform · Azure**
+**Stack objetivo: .NET 10 LTS (unificado) · React/Vite · Supabase (PostgreSQL + RLS) · proveedor de deploy sin decidir**
+**Stack desplegado hoy: .NET 8 · Python/FastAPI · React/Vite · PostgreSQL — sin ambiente en la nube (solo local)**
 
 Justificación detallada de cada decisión y del plan de transición en
 [`constitution.md`](constitution.md) Art. V y en

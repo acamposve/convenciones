@@ -1,6 +1,6 @@
 # Constitución del Proyecto — Comparador de Documentos Legales
 
-> **Versión:** 2.2.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-19
+> **Versión:** 2.3.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-19
 > **Origen:** `documento_arquitectura_comparador_convenciones.docx` (preparado para Alex Campos, 8 de agosto de 2026)
 > **Enmienda 2.0.0:** redefine el modelo de tenant (Art. I.3) tras revisar el código legado
 > completo (`legacy/`). El valor original del producto era la comparación cross-empresa
@@ -30,6 +30,20 @@
 > plan complete su Fase 5.2; hasta entonces, este documento describe el **stack objetivo**,
 > no el desplegado. Migración de código y de infraestructura pendientes — ver el plan para
 > el detalle fase por fase.
+> **Enmienda 2.3.0:** se retira **Azure como proveedor de infraestructura**. Se eliminó del
+> repositorio todo lo relacionado a Azure: `infra/terraform/` completo (Container Apps,
+> PostgreSQL Flexible Server, ACR, Storage Account), los workflows de GitHub Actions que
+> desplegaban ahí (`terraform.yml`, `deploy-apps.yml`), y el soporte a Azure Blob Storage en
+> `service/app/storage.py` (queda solo el fallback a disco local que ya existía). Redefine
+> Art. V — fila "Infraestructura": ya no es "Azure Container Apps", queda **sin decidir**;
+> el deploy a un proveedor nuevo es trabajo futuro, fuera del alcance de esta enmienda.
+> Motivo: el ACR del demo (`comparadordemoacr`) quedó en un estado `REGISTRY_NOT_READY` no
+> atribuible a permisos, red ni configuración (confirmado contra la API de Azure) — en vez
+> de seguir apostando por Azure para el demo, se decide cambiar de proveedor. **Efecto
+> práctico inmediato: no hay ningún ambiente desplegado en la nube** — el proyecto corre
+> solo local (`docs/bootstrap-demo.md`) hasta que se elija y configure el proveedor nuevo.
+> Igual que la Enmienda 2.2.0, esto es una decisión de infraestructura, no de producto o
+> alcance — no toca Art. I, IV ni VI.
 
 Este documento fija los principios y decisiones de arquitectura que gobiernan el diseño e implementación del nuevo Comparador de Documentos Legales. Cualquier decisión técnica o de producto que lo contradiga debe justificarse explícitamente y, si se acepta, disparar una enmienda a esta constitución.
 
@@ -120,7 +134,7 @@ producción hasta el cutover (Fase 5.2 del plan) — ver nota de Enmienda 2.2.0 
 | Cola de tareas | `System.Threading.Channels` en proceso + `BackgroundService` (.NET) | Azure Service Bus / RabbitMQ | Suficiente mientras el volumen no exija cola distribuida; revisar bajo Art. VIII si el volumen crece — no es una regresión de desacople, es in-process dentro del mismo servicio unificado |
 | Frontend | SPA (React) | SPA (React) | Sin cambio |
 | Autenticación | Supabase Auth (GoTrue, JWT) como base; SSO/SAML vía proveedor (WorkOS o Auth0) sobre Supabase Auth cuando se active (Art. VII.2) | OIDC estándar + SSO/SAML vía proveedor (WorkOS o Auth0) | Autenticación y base de datos bajo el mismo proveedor simplifica RLS (`auth.jwt()` nativo); SSO/SAML enterprise se mantiene como capa adicional, sin cambio de plan |
-| Infraestructura | Contenedores (Docker) en Azure Container Apps — **un único Container App de API** (antes dos: `api` + `ai-service`), con ruta a Kubernetes | Contenedores (Docker) en Azure Container Apps (`api` + `ai-service` separados), con ruta a Kubernetes | Menos superficie de infraestructura a mantener y desplegar; ya no hay Postgres autoadministrado que operar (Supabase es BaaS) |
+| Infraestructura | **Contenedores (Docker) — proveedor de nube sin decidir.** `[Enmienda 2.3.0]` Se retiró Azure (Terraform, Container Apps); el objetivo de "un único contenedor de API" (antes dos: `api` + `ai-service`) se mantiene, pero sobre qué proveedor todavía es una decisión pendiente, fuera del alcance de esta constitución hasta que se tome | Contenedores (Docker) en Azure Container Apps (`api` + `ai-service` separados), con ruta a Kubernetes | Azure Container Apps ya no es la decisión vigente (Enmienda 2.3.0); el resto de motivos (menos superficie de infraestructura, sin Postgres autoadministrado) sigue aplicando una vez que se elija el proveedor nuevo |
 
 ## Artículo VI — Seguridad y privacidad (no negociables)
 

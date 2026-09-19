@@ -29,7 +29,6 @@
 - [`spec-negociacion.md`](spec-negociacion.md) — Negociación colectiva (Fase 2, Art. IV bis)
 - [`spec-empresas-comparacion.md`](spec-empresas-comparacion.md) — Comparador multi-empresa (Fase 2+)
 - [`auth-spec.md`](auth-spec.md) — Autenticación, SSO/SAML, roles (Fase 2)
-- [`plan-publish-azure.md`](plan-publish-azure.md) — Despliegue a Azure (cuando sea necesario)
 
 ## Cómo navegar
 

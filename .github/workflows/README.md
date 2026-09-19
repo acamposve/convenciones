@@ -1,80 +1,26 @@
 # CI/CD Workflows
 
-> **Migración de stack en curso (Enmienda 2.2.0 de `constitution.md`):** estos workflows
-> automatizan el stack **desplegado hoy** (build de `service/` en Python incluido). El plan
-> [`../../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
-> prevé eliminar esos steps en su Fase 5.3 — no se ha tocado ningún workflow todavía.
+> **Se eliminó el deploy a Azure** (Terraform y los workflows que empujaban a Azure Container
+> Registry/Container Apps) — el proyecto va a desplegar a otro proveedor, todavía sin decidir.
+> Mientras tanto solo queda el workflow de build+test, que no depende de ningún proveedor de
+> nube. Cuando se elija el proveedor nuevo, este documento y los workflows de deploy se
+> vuelven a escribir desde cero — lo de abajo no es un plan a futuro, es lo que existe hoy.
 
 ## Overview
 
-Workflows de GitHub Actions automatizados para build, test, y deploy. Ubicados en `.github/workflows/`.
+Workflows de GitHub Actions ubicados en `.github/workflows/`.
 
 ## Workflows
 
-### `build-and-test.yml` (en construcción)
+### `ci.yml`
 
-Ejecuta en cada push a rama `main`:
-1. Build de API (.NET)
-2. Tests de API (xUnit)
-3. Build de service (Python)
-4. Tests de service (pytest)
-5. Build de frontend (Vite)
+Corre en cada PR contra `main` (no en push directo):
+1. Build + test de la API (.NET 8, `dotnet test`)
+2. Build + test del servicio de IA (Python, `pytest`)
+3. Build del frontend (React/Vite, `npm run build`)
 
-**Disparadores:** Push a `main`, PR a `main`  
-**Artifacts:** Imágenes Docker (enviadas a ACR cuando esté listo)
-
-### `terraform-plan.yml` (en construcción)
-
-Ejecuta en PR que toque `infra/terraform/`:
-1. `terraform fmt -check` — verificar formato
-2. `terraform validate` — validar sintaxis
-3. `terraform plan` — mostrar cambios propuestos
-
-**Disparadores:** PR con cambios en `infra/`  
-**Output:** Plan en comentario de PR (solo lectura)
-
-### `terraform-apply.yml` (en construcción)
-
-Ejecuta en merge a `main` que toque `infra/terraform/`:
-1. Plan completo
-2. Apply automático a Azure Dev
-3. Update outputs (URLs, IPs, etc.)
-
-**Disparadores:** Merge a `main` con cambios en `infra/`  
-**Requisitos:** Credenciales de Azure en GitHub Secrets
-
-### `deploy.yml` (en construcción)
-
-Ejecuta en release (tag `v*`):
-1. Build final de todas las imágenes
-2. Push a Azure Container Registry
-3. Deploy a Azure Container Apps (prod)
-
-**Disparadores:** Tag `v1.0.0`, `v1.0.1`, etc.  
-**Requisitos:** Credenciales de Azure + production secrets
-
----
-
-## Secrets necesarios en GitHub
-
-```
-# Azure
-AZURE_TENANT_ID
-AZURE_SUBSCRIPTION_ID
-AZURE_CLIENT_ID
-AZURE_CLIENT_SECRET
-
-# Database
-DATABASE_PASSWORD
-
-# AI
-ANTHROPIC_API_KEY
-
-# Registry
-ACR_REGISTRY
-ACR_USERNAME
-ACR_PASSWORD
-```
+No construye ni publica imágenes Docker, y no requiere ningún secret — solo compila y corre
+los tests de cada componente.
 
 ## Cómo agregar un workflow nuevo
 
@@ -85,12 +31,3 @@ ACR_PASSWORD
 5. Enviar en PR para revisión
 
 **Referencia:** [GitHub Actions Documentation](https://docs.github.com/actions)
-
----
-
-## Status badges (agregar a README.md cuando haya workflows reales)
-
-```markdown
-![Build](https://github.com/[org]/[repo]/actions/workflows/build-and-test.yml/badge.svg)
-![Terraform](https://github.com/[org]/[repo]/actions/workflows/terraform-plan.yml/badge.svg)
-```

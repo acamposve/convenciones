@@ -11,13 +11,6 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 STORAGE_DIR = SERVICE_DIR / "storage"
 STORAGE_DIR.mkdir(exist_ok=True)
 
-# Art V / VI.3: los documentos no deben vivir en el filesystem de la app. Si esta seteada
-# (Azure Container Apps la inyecta via Terraform), app/storage.py sube a Blob Storage en vez
-# de escribir a STORAGE_DIR. Sin ella (docker-compose / uvicorn local, sin Azurite), cae al
-# disco local de siempre — ningun cambio para el flujo de desarrollo existente.
-STORAGE_CONNECTION_STRING = os.environ.get("STORAGE_CONNECTION_STRING")
-STORAGE_CONTAINER = os.environ.get("STORAGE_CONTAINER", "documentos")
-
 # Modelo por defecto para clasificacion (Art IV.5): claude-opus-5, salvo que se pida otro explicitamente.
 CLASSIFICATION_MODEL = os.environ.get("CLASSIFICATION_MODEL", "claude-opus-5")
 
@@ -30,6 +23,6 @@ JWT_AUDIENCE = "comparador-web"
 # CORS: la app de React (web/) llama a este servicio directo desde el navegador para
 # /tenants y /documentos, en un origen distinto (5173 vs 8000) — mismo motivo que
 # api/Program.cs necesita su propio Cors:WebOrigin. Lista separada por coma, no un origen
-# único: en Azure el frontend quedó accesible tanto por el FQDN largo de Container Apps
-# como por un dominio propio (presenciavirtual.com.uy).
+# único: el frontend puede quedar accesible tanto por la URL que genere la plataforma de
+# deploy como por un dominio propio.
 WEB_ORIGINS = [o.strip() for o in os.environ.get("WEB_ORIGIN", "http://localhost:5173").split(",") if o.strip()]

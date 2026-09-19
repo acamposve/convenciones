@@ -11,7 +11,9 @@
 > en Python y en la API .NET (Serilog), `try/except` global en `_procesar_pipeline()`, y
 > `ErrorBoundary` en el frontend. No se actualizó el puntaje retroactivamente porque este
 > documento es un diagnóstico fechado, no una spec viva — ver `docs/CHANGELOG.md` para el
-> estado actual.
+> estado actual. **Además, se escribió asumiendo Azure como proveedor de nube** (varias
+> secciones lo dan por hecho) — eso también cambió: se retiró Azure del proyecto (Enmienda
+> 2.3.0 de `constitution.md`), sin proveedor nuevo decidido todavía.
 
 ---
 
