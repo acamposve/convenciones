@@ -132,23 +132,33 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 ---
 
-### FASE 2: Aprovisionamiento y Configuración de Supabase
+### FASE 2: Aprovisionamiento y Configuración de Supabase — 🟡 **Parcial: preparado, no ejecutado**
 *Objetivo: Establecer la base de datos definitiva con Row Level Security y Auth.*
 
-- [ ] **2.1. Aprovisionar Supabase:**
-  - [ ] Crear proyecto en Supabase Cloud en la región más cercana a Azure (ej. `us-east-1`).
-  - [ ] Obtener cadena de conexión con connection pooler (**Supavisor**, puerto 6543).
-- [ ] **2.2. Migración del Esquema:**
-  - [ ] Ejecutar `service/db/schema.sql` en Supabase SQL Editor.
-  - [ ] Verificar creación de las 27 tablas, índices, secuencias y el enum `rol_usuario`.
-  - [ ] Ejecutar semillas: países, taxonomía Venezuela, catálogos y marco legal LOTTT.
-- [ ] **2.3. Habilitar Row Level Security (RLS):**
-  - [ ] Activar RLS en tablas de tenant (`empresas`, `documentos`, `clausulas`, `negociaciones`).
-  - [ ] Crear política: `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`.
-  - [ ] Crear política pública de lectura para la Biblioteca Pública (`es_publico = true`).
+> **Bloqueo real:** 2.1 requiere crear/usar un proyecto en una cuenta de Supabase — un signup
+> o una acción dentro de una cuenta en la nube que Claude no puede hacer por su cuenta (no hay
+> token de acceso de Supabase disponible en este entorno, y crear cuentas está fuera de lo que
+> se automatiza sin permiso explícito). Sin un proyecto real, 2.2 y 2.3 tampoco se pueden
+> **ejecutar** contra una base viva — lo que sí se dejó listo es el trabajo de preparación
+> (ver detalle en cada punto). Falta que decidas cómo seguir con 2.1 — ver nota al final del
+> checklist.
 
-> **⚠️ Riesgo abierto, a resolver ANTES de ejecutar 2.3 (no solo diseñarlo):** `auth.jwt()`
-> en una política RLS de Supabase depende de que la sesión de Postgres tenga poblado
+- [ ] **2.1. Aprovisionar Supabase** — 🔴 pendiente, requiere acción tuya (no automatizable sin credenciales):
+  - [ ] Crear proyecto en Supabase Cloud, en una región cercana a los usuarios finales (Venezuela → `sa-east-1`, no hay ya una referencia a "cerca de Azure" porque Azure se retiró, Enmienda 2.3.0).
+  - [ ] Obtener cadena de conexión con connection pooler (**Supavisor**, puerto 6543).
+- [ ] **2.2. Migración del Esquema** — 🟡 preparado, pendiente de ejecutar contra un proyecto real:
+  - [ ] Ejecutar `service/db/schema.sql` en Supabase SQL Editor (o `psql`) — **verificado que es fresh-install-ready tal cual está**: define las 27 tablas, índices, secuencias y el enum `rol_usuario` en un solo archivo (no hace falta aplicar las migraciones 002-011 aparte, ya están incorporadas).
+  - [ ] Verificar creación de las 27 tablas, índices, secuencias y el enum `rol_usuario`.
+  - [ ] Ejecutar semillas: `service/db/seed_taxonomia.py` (países + taxonomía Venezuela), `service/db/seed_catalogos_empresa.py`, `service/db/seed_marco_legal.py` (LOTTT) — ya existen y funcionan contra cualquier Postgres vía `DATABASE_URL`, no específicos de Azure ni de Supabase.
+- [x] **2.3. Habilitar Row Level Security (RLS)** — SQL escrita y lista en [`service/db/migrations/012_rls_supabase.sql`](service/db/migrations/012_rls_supabase.sql), **no ejecutada** (no hay proyecto contra el cual correrla):
+  - [x] Activar RLS en tablas de tenant (`empresas`, `documentos`, `clausulas`, `negociaciones`).
+  - [x] Crear política: `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`.
+  - [x] Crear política pública de lectura para la Biblioteca Pública (`es_publico = true`), solo sobre `documentos` (nunca `clausulas`, spec-biblioteca-publica.md).
+  - [ ] **Nuevo hallazgo, sin resolver:** `peticiones`, `ofertas`, `reuniones`, `acuerdos` y `bitacora_negociacion` (hijas de `negociaciones`, spec-negociacion.md) no tienen columna `tenant_id` propia — quedan fuera de esta migración. Si hace falta RLS ahí también, es una política con subquery contra `negociaciones` (o agregarles `tenant_id`), decisión pendiente.
+
+> **⚠️ Riesgo abierto, a resolver ANTES de que la RLS de 2.3 sea el mecanismo real de
+> aislamiento (la SQL ya está escrita, ver arriba, pero eso no cierra este riesgo):**
+> `auth.jwt()` en una política RLS de Supabase depende de que la sesión de Postgres tenga poblado
 > `request.jwt.claims` — eso lo hace automáticamente PostgREST/el Data API de Supabase, pero
 > **no** una conexión directa de Npgsql/EF Core como la que usa la API en C# (Art. V). Dos
 > problemas concretos a resolver, no solo declarar:

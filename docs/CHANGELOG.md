@@ -14,6 +14,10 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Frontend React: login, carga de documentos (en construcción)
 - Taxonomía real de Venezuela: 5 categorías, ~60 títulos
 - Estructura multi-tenant: 1 tenant = 1 operador
+- `service/db/migrations/012_rls_supabase.sql`: políticas de Row Level Security para Supabase
+  (Fase 2.3 de `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`) — escritas y listas, **no
+  ejecutadas todavía** contra ningún proyecto real (Fase 2.1, aprovisionar el proyecto, sigue
+  pendiente de una acción manual/credenciales que no están disponibles en este entorno)
 
 ### Changed
 - Constitution.md v2.0.0: redefinición de modelo tenant (ahora operador, no empresa única)
