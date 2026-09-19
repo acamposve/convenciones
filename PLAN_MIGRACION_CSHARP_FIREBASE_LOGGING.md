@@ -138,6 +138,24 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
   - [ ] Crear política: `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`.
   - [ ] Crear política pública de lectura para la Biblioteca Pública (`es_publico = true`).
 
+> **⚠️ Riesgo abierto, a resolver ANTES de ejecutar 2.3 (no solo diseñarlo):** `auth.jwt()`
+> en una política RLS de Supabase depende de que la sesión de Postgres tenga poblado
+> `request.jwt.claims` — eso lo hace automáticamente PostgREST/el Data API de Supabase, pero
+> **no** una conexión directa de Npgsql/EF Core como la que usa la API en C# (Art. V). Dos
+> problemas concretos a resolver, no solo declarar:
+> 1. Si la API se conecta con un rol privilegiado (el que suele usarse con un connection
+>    pooler para EF Core), ese rol puede **saltarse RLS por completo** — la política
+>    quedaría configurada pero sin efecto real, dando una falsa sensación de aislamiento.
+> 2. Si se usa un rol no privilegiado, hay que definir explícitamente **cómo** cada
+>    conexión/transacción propaga el `tenant_id` del JWT ya validado por la API hacia la
+>    sesión de Postgres (ej. `SET LOCAL request.jwt.claims = '...'` por transacción, o un rol
+>    de Postgres separado que reciba el tenant como parámetro) — EF Core no lo hace solo.
+>
+> Mientras esto no esté definido y probado con un test de aislamiento real (un tenant
+> autenticado no puede leer filas de otro), el filtro por `tenant_id` en código (Art. VI.2,
+> ya vigente) sigue siendo el mecanismo de aislamiento real — RLS es un refuerzo, no algo que
+> se pueda asumir como respaldo automático solo por estar "activado".
+
 ---
 
 ### FASE 3: Upgrade a .NET 10 LTS y Consolidación de CRUDs de Negocio

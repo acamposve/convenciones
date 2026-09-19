@@ -1,7 +1,12 @@
 # Plan — Cobertura de logging (post-auditoría)
 
-> **Estado:** borrador, no iniciado — documento de planificación interna, no una spec cerrada
-> con decisiones del cliente (a diferencia de los demás `docs/spec-*.md`).
+> **Estado:** **Bloque A completado** (ver abajo); B y E sin empezar; C y D parcialmente
+> cubiertos como efecto colateral de la Fase 1 del plan de migración (no porque este
+> documento en sí se haya ejecutado como plan — ver detalle en cada bloque). Documento de
+> planificación interna, no una spec cerrada con decisiones del cliente (a diferencia de los
+> demás `docs/spec-*.md`); la sección "Contexto" de abajo queda como el diagnóstico
+> **original** de la auditoría (2026-09-05), no como estado actual — el estado actual está en
+> el checklist de la sección "Checklist resumido".
 > **Relación con la migración de stack:** el Bloque A de este plan es exactamente la Fase 1.1
 > de [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
 > (blindaje temporal del pipeline Python mientras se construye la versión .NET 10) — es un
@@ -39,7 +44,7 @@ mitad de camino, o `segment_clauses()` lanza algo no previsto — el documento q
 para siempre en estado `extraido`/`segmentado`, nunca pasa a `error`, y no queda ningún
 rastro server-side de qué pasó ni con qué `documento_id`. Nadie se entera.
 
-## Bloque A — Blindar `_procesar_pipeline()` y adoptar `logging` en el servicio Python
+## Bloque A — Blindar `_procesar_pipeline()` y adoptar `logging` en el servicio Python — ✅ **Completado**
 
 **Problema:** el pipeline completo corre en background sin un `try/except` global; un fallo
 de infraestructura deja el documento atascado sin pasar a `estado='error'` y sin ningún log.
@@ -83,7 +88,12 @@ o de una respuesta malformada del SDK.
   generados durante la demo en vivo con el cliente (ya planeada) muestren mensajes
   diferenciados si algo falla, en vez de un traceback genérico sin contexto.
 
-## Bloque C — Logging básico en la API .NET
+## Bloque C — Logging básico en la API .NET — 🟡 **Parcial**
+
+**Ya cubierto por Fase 1.2 del plan de migración:** Serilog configurado en `Program.cs` (con
+salida JSON), `ILogger<T>` inyectado en `AuthController` (login exitoso/fallido, tenant
+suspendido). **Pendiente:** `PlataformaController` y `TokenService` todavía no tienen
+`ILogger` inyectado — ver "Trabajo estimado" abajo, que sigue vigente para esa parte.
 
 **Problema:** no existe ningún `ILogger<T>` ni framework de logging configurado; tampoco hay
 un solo `try/catch` en todo `api/`. Cualquier excepción no controlada (JWT mal configurado,
@@ -103,7 +113,13 @@ Core imprime por default, sin ningún dato de negocio (qué tenant, qué usuario
 - Verificación: provocar un login fallido y una excepción no controlada (ej. token JWT mal
   formado) contra un ambiente local, confirmar que aparecen en los logs con contexto útil.
 
-## Bloque D — `console.error` y manejo de errores visible en el frontend
+## Bloque D — `console.error` y manejo de errores visible en el frontend — 🟡 **Parcial**
+
+**Ya cubierto por Fase 1.3 del plan de migración:** `ErrorBoundary` global agregado en
+`web/src/main.jsx` (con `console.error` en `componentDidCatch`) — captura errores de
+**render** no manejados. **Pendiente:** el `console.error` en los 26 `.catch(` de fetch
+(errores de **red/API**, un problema distinto al que resuelve un Error Boundary) sigue sin
+hacerse — ver "Trabajo estimado" abajo.
 
 **Problema:** cero `console.error` en las 26 rutas `.catch(` de `web/src/**/*.jsx`. Cuando un
 usuario reporta un bug, no hay ningún rastro en la consola del navegador para diagnosticarlo
@@ -138,10 +154,12 @@ diferirlo hasta que haya un consumidor real de esas alertas (Azure Monitor, etc.
 
 ## Checklist resumido
 
-- [ ] A. Blindar `_procesar_pipeline()` completo + adoptar `logging` en el servicio Python
+- [x] A. Blindar `_procesar_pipeline()` completo + adoptar `logging` en el servicio Python
 - [ ] B. Logging de fallos en Blob Storage, Anthropic API y conexión a Postgres
 - [ ] C. Logging básico (`ILogger`) en la API .NET — Controllers y `TokenService`
+      (🟡 `AuthController` y `Program.cs`/Serilog hechos; falta `PlataformaController` y `TokenService`)
 - [ ] D. `console.error` en los 26 `.catch(` del frontend + evaluar Error Boundary
+      (🟡 Error Boundary hecho; falta `console.error` en los `.catch(` de fetch)
 - [ ] E. Nivel de severidad para fallos de autenticación (depende de A/C, decisión más que
       trabajo)
 
