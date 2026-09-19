@@ -33,6 +33,7 @@ public class ComparadorController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetTitulos()
     {
+        if (!User.HasClaim(c => c.Type == "tenant_id")) return Forbid();
         var tenantId = RequireTenantId();
 
         var titulos = await _db.Clausulas
@@ -64,6 +65,7 @@ public class ComparadorController : ControllerBase
         [FromQuery] int? actividad_id,
         [FromQuery] int? estado_id)
     {
+        if (!User.HasClaim(c => c.Type == "tenant_id")) return Forbid();
         var tenantId = RequireTenantId();
 
         var clausulas = await _db.Clausulas
@@ -111,7 +113,7 @@ public class ComparadorController : ControllerBase
                         id = c.Id,
                         texto = c.Texto,
                         campo_comparativo = c.CampoComparativo,
-                        resumen_ejecutivo = c.ResumenEjecutivo,
+                        resumen_ejecutivo = c.EstadoRevisionResumen == "aprobado" ? c.ResumenEjecutivo : null,
                         estado_revision = c.EstadoRevision,
                         estado_revision_resumen = c.EstadoRevisionResumen,
                         confianza = c.Confianza,

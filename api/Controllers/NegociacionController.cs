@@ -1,5 +1,9 @@
 using Comparador.Api.Data;
 using Comparador.Api.Models;
+using Comparador.Api.Services;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,29 +12,34 @@ namespace Comparador.Api.Controllers;
 
 public class NegociacionCreateRequest
 {
-    public Guid EmpresaId { get; set; }
+    [FromForm(Name = "empresa_id")] public Guid EmpresaId { get; set; }
 }
 
 public class PeticionCreateRequest
 {
-    public int? TituloId { get; set; }
-    public int? NroPeticion { get; set; }
-    public string Texto { get; set; } = string.Empty;
+    [FromForm(Name = "titulo_id")] public int? TituloId { get; set; }
+    [FromForm(Name = "nro_peticion")] public int? NroPeticion { get; set; }
+    [FromForm(Name = "texto")] public string Texto { get; set; } = string.Empty;
+}
+
+public class OfertaCreateRequest
+{
+    [FromForm(Name = "texto")] public string Texto { get; set; } = string.Empty;
 }
 
 public class ReunionCreateRequest
 {
-    public DateOnly Fecha { get; set; }
-    public string? Asistentes { get; set; }
-    public string? Resumen { get; set; }
+    [FromForm(Name = "fecha")] public DateOnly Fecha { get; set; }
+    [FromForm(Name = "asistentes")] public string? Asistentes { get; set; }
+    [FromForm(Name = "resumen")] public string? Resumen { get; set; }
 }
 
 public class AcuerdoCreateRequest
 {
-    public int TituloId { get; set; }
-    public string TextoAcordado { get; set; } = string.Empty;
-    public int? PeticionId { get; set; }
-    public int? OfertaId { get; set; }
+    [FromForm(Name = "titulo_id")] public int TituloId { get; set; }
+    [FromForm(Name = "texto_acordado")] public string TextoAcordado { get; set; } = string.Empty;
+    [FromForm(Name = "peticion_id")] public int? PeticionId { get; set; }
+    [FromForm(Name = "oferta_id")] public int? OfertaId { get; set; }
 }
 
 [ApiController]
@@ -56,8 +65,25 @@ public class NegociacionController : ControllerBase
         return parsed;
     }
 
+    private Guid? CurrentUserId()
+    {
+        return Guid.TryParse(User.FindFirst("user_id")?.Value, out var userId) ? userId : null;
+    }
+
+    private void AddAudit(Guid negociacionId, string evento, string? detalle = null)
+    {
+        _db.BitacoraNegociaciones.Add(new BitacoraNegociacion
+        {
+            NegociacionId = negociacionId,
+            Evento = evento,
+            UsuarioId = CurrentUserId(),
+            Detalle = detalle,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+    }
+
     [HttpGet("negociaciones")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeVerNegociacion)]
     public async Task<IActionResult> GetNegociaciones([FromQuery] Guid? empresa_id)
     {
         var tenantId = RequireTenantId();
@@ -90,7 +116,7 @@ public class NegociacionController : ControllerBase
     }
 
     [HttpPost("negociaciones")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeEditarNegociacion)]
     public async Task<IActionResult> CrearNegociacion([FromForm] NegociacionCreateRequest req)
     {
         var tenantId = RequireTenantId();
@@ -112,13 +138,14 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Negociaciones.Add(negociacion);
+        AddAudit(negociacion.Id, "negociacion_creada");
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetNegociaciones), new { id = negociacion.Id }, new { id = negociacion.Id });
     }
 
     [HttpGet("negociaciones/{id:guid}")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeVerNegociacion)]
     public async Task<IActionResult> GetNegociacion(Guid id)
     {
         var tenantId = RequireTenantId();
@@ -222,7 +249,7 @@ public class NegociacionController : ControllerBase
     }
 
     [HttpPost("negociaciones/{id:guid}/peticiones")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeEditarNegociacion)]
     public async Task<IActionResult> CrearPeticion(Guid id, [FromForm] PeticionCreateRequest req)
     {
         var tenantId = RequireTenantId();
@@ -251,13 +278,44 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Peticiones.Add(peticion);
+        AddAudit(id, "peticion_creada", $"peticion_id={peticion.Id}");
         await _db.SaveChangesAsync();
 
         return Ok(new { id = peticion.Id, nro_peticion = peticion.NroPeticion });
     }
 
+    [HttpPost("peticiones/{peticionId:int}/ofertas")]
+    [Authorize(Policy = AuthorizationPolicies.PuedeEditarNegociacion)]
+    public async Task<IActionResult> CrearOferta(int peticionId, [FromForm] OfertaCreateRequest req)
+    {
+        var tenantId = RequireTenantId();
+        if (string.IsNullOrWhiteSpace(req.Texto))
+        {
+            return BadRequest(new { detail = "La oferta requiere texto." });
+        }
+
+        var peticion = await _db.Peticiones
+            .Include(p => p.Negociacion)
+            .FirstOrDefaultAsync(p => p.Id == peticionId && p.Negociacion!.TenantId == tenantId);
+        if (peticion?.Negociacion == null)
+        {
+            return NotFound();
+        }
+
+        if (peticion.Negociacion.Estado != "abierta")
+        {
+            return Conflict(new { detail = "No se pueden agregar ofertas a una negociación cerrada." });
+        }
+
+        var oferta = new Oferta { PeticionId = peticionId, Texto = req.Texto.Trim(), CreatedAt = DateTimeOffset.UtcNow };
+        _db.Ofertas.Add(oferta);
+        AddAudit(peticion.NegociacionId, "oferta_creada", $"oferta_id={oferta.Id};peticion_id={peticionId}");
+        await _db.SaveChangesAsync();
+        return Ok(new { id = oferta.Id });
+    }
+
     [HttpPost("negociaciones/{id:guid}/reuniones")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeEditarNegociacion)]
     public async Task<IActionResult> CrearReunion(Guid id, [FromForm] ReunionCreateRequest req)
     {
         var tenantId = RequireTenantId();
@@ -277,13 +335,14 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Reuniones.Add(reunion);
+        AddAudit(id, "reunion_creada", $"reunion_id={reunion.Id}");
         await _db.SaveChangesAsync();
 
         return Ok(new { id = reunion.Id });
     }
 
     [HttpPost("negociaciones/{id:guid}/acuerdos")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeEditarNegociacion)]
     public async Task<IActionResult> CrearAcuerdo(Guid id, [FromForm] AcuerdoCreateRequest req)
     {
         var tenantId = RequireTenantId();
@@ -298,6 +357,17 @@ public class NegociacionController : ControllerBase
             return BadRequest(new { detail = "El texto acordado es obligatorio." });
         }
 
+        if (req.PeticionId.HasValue && !await _db.Peticiones.AnyAsync(p => p.Id == req.PeticionId && p.NegociacionId == id))
+        {
+            return BadRequest(new { detail = "La petición no pertenece a esta negociación." });
+        }
+
+        if (req.OfertaId.HasValue && !await _db.Ofertas
+            .AnyAsync(o => o.Id == req.OfertaId && o.Peticion!.NegociacionId == id))
+        {
+            return BadRequest(new { detail = "La oferta no pertenece a esta negociación." });
+        }
+
         var acuerdo = new Acuerdo
         {
             NegociacionId = id,
@@ -309,13 +379,14 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Acuerdos.Add(acuerdo);
+        AddAudit(id, "acuerdo_creado", $"acuerdo_id={acuerdo.Id}");
         await _db.SaveChangesAsync();
 
         return Ok(new { id = acuerdo.Id });
     }
 
     [HttpPost("negociaciones/{id:guid}/cerrar")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeCerrarNegociacion)]
     public async Task<IActionResult> CerrarNegociacion(Guid id)
     {
         var tenantId = RequireTenantId();
@@ -325,15 +396,65 @@ public class NegociacionController : ControllerBase
             return NotFound();
         }
 
+        if (negociacion.Estado != "abierta")
+        {
+            return Conflict(new { detail = "La negociación ya está cerrada." });
+        }
+
+        var acuerdos = await _db.Acuerdos
+            .Where(a => a.NegociacionId == id)
+            .Include(a => a.Titulo)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+        if (acuerdos.Count == 0)
+        {
+            return BadRequest(new { detail = "La negociación requiere al menos un acuerdo para cerrarse." });
+        }
+
+        var acuerdosVigentes = acuerdos
+            .GroupBy(a => a.TituloId)
+            .Select(g => g.First())
+            .OrderBy(a => a.TituloId)
+            .ToList();
+        var version = (await _db.Documentos
+            .Where(d => d.NegociacionId == id)
+            .MaxAsync(d => (int?)d.VersionNegociacion) ?? 0) + 1;
+        var storageRoot = Path.Combine(AppContext.BaseDirectory, "storage", "negociaciones");
+        Directory.CreateDirectory(storageRoot);
+        var filePath = Path.Combine(storageRoot, $"{id}-v{version}.docx");
+        using (var document = WordprocessingDocument.Create(filePath, WordprocessingDocumentType.Document))
+        {
+            var mainPart = document.AddMainDocumentPart();
+            mainPart.Document = new Document(new Body(
+                acuerdosVigentes.Select(a => new Paragraph(
+                    new Run(
+                        new Text($"CLAUSULA -- {a.Titulo?.Nombre ?? $"Título {a.TituloId}"}{Environment.NewLine}{a.TextoAcordado}")))).ToArray()));
+            mainPart.Document.Save();
+        }
+
+        var documento = new Documento
+        {
+            TenantId = tenantId,
+            EmpresaId = negociacion.EmpresaId,
+            NegociacionId = id,
+            VersionNegociacion = version,
+            Origen = "negociacion",
+            RutaArchivo = filePath,
+            EsPublico = false,
+            Estado = "pendiente",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _db.Documentos.Add(documento);
         negociacion.Estado = "cerrada";
         negociacion.FechaCierre = DateTimeOffset.UtcNow;
+        AddAudit(id, "negociacion_cerrada", $"documento_version={version}");
         await _db.SaveChangesAsync();
 
         return Ok();
     }
 
     [HttpPost("negociaciones/{id:guid}/reabrir")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeCerrarNegociacion)]
     public async Task<IActionResult> ReabrirNegociacion(Guid id)
     {
         var tenantId = RequireTenantId();
@@ -343,8 +464,14 @@ public class NegociacionController : ControllerBase
             return NotFound();
         }
 
+        if (negociacion.Estado != "cerrada")
+        {
+            return Conflict(new { detail = "Solo se puede reabrir una negociación cerrada." });
+        }
+
         negociacion.Estado = "abierta";
         negociacion.FechaCierre = null;
+        AddAudit(id, "negociacion_reabierta");
         await _db.SaveChangesAsync();
 
         return Ok();

@@ -34,6 +34,7 @@ public class ComparadorDbContext : DbContext
     public DbSet<BitacoraNegociacion> BitacoraNegociaciones => Set<BitacoraNegociacion>();
     public DbSet<Documento> Documentos => Set<Documento>();
     public DbSet<Clausula> Clausulas => Set<Clausula>();
+    public DbSet<BibliotecaPublicaEntry> BibliotecaPublica => Set<BibliotecaPublicaEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,6 +67,7 @@ public class ComparadorDbContext : DbContext
         modelBuilder.Entity<BitacoraNegociacion>().ToTable("bitacora_negociacion");
         modelBuilder.Entity<Documento>().ToTable("documentos");
         modelBuilder.Entity<Clausula>().ToTable("clausulas");
+        modelBuilder.Entity<BibliotecaPublicaEntry>().HasNoKey().ToView("biblioteca_publica");
 
         modelBuilder.Entity<TenantPaisHabilitado>()
             .HasKey(tph => new { tph.TenantId, tph.PaisId });

@@ -9,6 +9,10 @@ public static class AuthorizationPolicies
 {
     public const string PuedeAprobarClausula = "PuedeAprobarClausula";
     public const string PuedeCargarDocumento = "PuedeCargarDocumento";
+    public const string PuedeGestionarEmpresas = "PuedeGestionarEmpresas";
+    public const string PuedeVerNegociacion = "PuedeVerNegociacion";
+    public const string PuedeEditarNegociacion = "PuedeEditarNegociacion";
+    public const string PuedeCerrarNegociacion = "PuedeCerrarNegociacion";
     public const string PuedeGestionarUsuarios = "PuedeGestionarUsuarios";
     public const string PuedeExportarPdf = "PuedeExportarPdf";
 
@@ -27,6 +31,15 @@ public static class AuthorizationPolicies
 
         options.AddPolicy(PuedeCargarDocumento, p =>
             p.RequireRole("AdminTenant", "Editor"));
+
+        options.AddPolicy(PuedeGestionarEmpresas, p =>
+            p.RequireRole("AdminTenant", "Editor"));
+        options.AddPolicy(PuedeVerNegociacion, p =>
+            p.RequireRole("AdminTenant", "Revisor", "Editor"));
+        options.AddPolicy(PuedeEditarNegociacion, p =>
+            p.RequireRole("AdminTenant", "Editor"));
+        options.AddPolicy(PuedeCerrarNegociacion, p =>
+            p.RequireRole("AdminTenant"));
 
         options.AddPolicy(PuedeGestionarUsuarios, p =>
             p.RequireRole("AdminTenant"));

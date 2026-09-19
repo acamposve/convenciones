@@ -1,5 +1,6 @@
 using Comparador.Api.Data;
 using Comparador.Api.Models;
+using Comparador.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,12 @@ namespace Comparador.Api.Controllers;
 public class DocumentosController : ControllerBase
 {
     private readonly ComparadorDbContext _db;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public DocumentosController(ComparadorDbContext db)
+    public DocumentosController(ComparadorDbContext db, IHttpClientFactory httpClientFactory)
     {
         _db = db;
+        _httpClientFactory = httpClientFactory;
     }
 
     private Guid RequireTenantId()
@@ -77,7 +80,7 @@ public class DocumentosController : ControllerBase
                 es_publico = d.EsPublico,
                 estado = d.Estado,
                 estado_detalle = d.EstadoDetalle,
-                negotiacion_id = d.NegociacionId,
+                negociacion_id = d.NegociacionId,
                 version_negociacion = d.VersionNegociacion,
                 created_at = d.CreatedAt
             })
@@ -92,7 +95,7 @@ public class DocumentosController : ControllerBase
     }
 
     [HttpPost("documentos")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeCargarDocumento)]
     public async Task<IActionResult> CrearDocumento([FromForm] IFormFile? archivo, [FromForm] string? origen, [FromForm] string? url_origen, [FromForm] Guid? empresa_id, [FromForm] bool es_publico = false)
     {
         var tenantId = RequireTenantId();
@@ -101,28 +104,70 @@ public class DocumentosController : ControllerBase
             return BadRequest(new { detail = "Debe indicar una empresa válida del tenant." });
         }
 
-        var origenFinal = string.IsNullOrWhiteSpace(origen) ? "archivo" : origen;
+        var origenFinal = origen?.Trim().ToLowerInvariant();
+        if (origenFinal is not ("archivo" or "url"))
+        {
+            return BadRequest(new { detail = "El origen debe ser 'archivo' o 'url'." });
+        }
+
+        if (origenFinal == "archivo")
+        {
+            return StatusCode(StatusCodes.Status501NotImplemented,
+                new { detail = "La carga binaria quedará disponible cuando se habilite el almacenamiento de documentos en .NET." });
+        }
+
+        if (string.IsNullOrWhiteSpace(url_origen) || !Uri.TryCreate(url_origen, UriKind.Absolute, out var url) || url.Scheme is not ("http" or "https"))
+        {
+            return BadRequest(new { detail = "Debe indicar una URL HTTP o HTTPS válida." });
+        }
+
+        if (!await EsUrlPublicaAsync(url))
+        {
+            return BadRequest(new { detail = "La URL no responde públicamente sin autenticación." });
+        }
+
         var documento = new Documento
         {
             TenantId = tenantId,
             EmpresaId = empresa_id.Value,
             Origen = origenFinal,
             UrlOrigen = string.IsNullOrWhiteSpace(url_origen) ? null : url_origen,
-            RutaArchivo = archivo is null ? null : archivo.FileName,
+            RutaArchivo = null,
             EsPublico = es_publico,
             Estado = "pendiente",
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        if (origenFinal == "url")
-        {
-            documento.RutaArchivo = null;
-            documento.EsPublico = es_publico && !string.IsNullOrWhiteSpace(url_origen);
-        }
-
         _db.Documentos.Add(documento);
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetDocumento), new { id = documento.Id }, new { id = documento.Id, estado = documento.Estado });
+    }
+
+    private async Task<bool> EsUrlPublicaAsync(Uri url)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+            using var head = new HttpRequestMessage(HttpMethod.Head, url);
+            using var headResponse = await client.SendAsync(head, HttpCompletionOption.ResponseHeadersRead);
+            if (headResponse.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            using var get = new HttpRequestMessage(HttpMethod.Get, url);
+            using var getResponse = await client.SendAsync(get, HttpCompletionOption.ResponseHeadersRead);
+            return getResponse.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException)
+        {
+            return false;
+        }
     }
 }

@@ -20,26 +20,19 @@ public class BibliotecaPublicaController : ControllerBase
     [HttpGet("biblioteca")]
     public async Task<IActionResult> GetBiblioteca([FromQuery] string? empresa)
     {
-        var query = _db.Documentos
-            .Where(d => d.EsPublico && d.Origen == "url")
-            .Include(d => d.Empresa)
-            .AsQueryable();
+        var query = _db.BibliotecaPublica.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(empresa))
         {
-            query = query.Where(d => d.Empresa!.Nombre.Contains(empresa));
+            query = query.Where(d => EF.Functions.ILike(d.EmpresaNombre, $"%{empresa}%"));
         }
 
         var documentos = await query
             .OrderByDescending(d => d.CreatedAt)
             .Select(d => new
             {
-                id = d.Id,
-                empresa_id = d.EmpresaId,
-                empresa_nombre = d.Empresa != null ? d.Empresa.Nombre : null,
-                origen = d.Origen,
+                empresa_nombre = d.EmpresaNombre,
                 url_origen = d.UrlOrigen,
-                es_publico = d.EsPublico,
                 created_at = d.CreatedAt
             })
             .ToListAsync();

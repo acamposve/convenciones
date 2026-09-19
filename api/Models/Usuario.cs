@@ -333,6 +333,13 @@ public class Documento
     public Negociacion? Negociacion { get; set; }
 }
 
+public class BibliotecaPublicaEntry
+{
+    public string EmpresaNombre { get; set; } = default!;
+    public string? UrlOrigen { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 public class Clausula
 {
     public int Id { get; set; }

@@ -1,5 +1,6 @@
 using Comparador.Api.Data;
 using Comparador.Api.Models;
+using Comparador.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -41,13 +42,13 @@ public class RevisionController : ControllerBase
     }
 
     [HttpGet("revision")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeAprobarClausula)]
     public async Task<IActionResult> GetColaRevision()
     {
         var tenantId = RequireTenantId();
 
         var clausulas = await _db.Clausulas
-            .Where(c => c.TenantId == tenantId && c.EstadoRevision == "pendiente")
+            .Where(c => c.TenantId == tenantId && (c.EstadoRevision == "pendiente" || c.EstadoRevisionResumen == "pendiente"))
             .Include(c => c.Documento)
             .ThenInclude(d => d!.Empresa)
             .Include(c => c.Titulo)
@@ -65,6 +66,7 @@ public class RevisionController : ControllerBase
                 empresa_pais_id = c.Documento != null && c.Documento.Empresa != null ? (int?)c.Documento.Empresa.PaisId : null,
                 confianza = c.Confianza,
                 cumplimiento_legal = c.CumplimientoLegal,
+                cumplimiento_justificacion = c.CumplimientoJustificacion,
                 campo_comparativo = c.CampoComparativo,
                 resumen_ejecutivo = c.ResumenEjecutivo,
                 estado_revision = c.EstadoRevision,
@@ -78,7 +80,7 @@ public class RevisionController : ControllerBase
     }
 
     [HttpPost("revision/{id:int}/aprobar")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeAprobarClausula)]
     public async Task<IActionResult> Aprobar(int id, [FromForm] int? titulo_id, [FromForm] string? campo_comparativo)
     {
         var tenantId = RequireTenantId();
@@ -122,7 +124,7 @@ public class RevisionController : ControllerBase
     }
 
     [HttpPost("revision/{id:int}/rechazar")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeAprobarClausula)]
     public async Task<IActionResult> Rechazar(int id)
     {
         var tenantId = RequireTenantId();
@@ -141,7 +143,7 @@ public class RevisionController : ControllerBase
     }
 
     [HttpPost("revision/{id:int}/aprobar-resumen")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeAprobarClausula)]
     public async Task<IActionResult> AprobarResumen(int id, [FromForm] string? resumen_ejecutivo)
     {
         var tenantId = RequireTenantId();
@@ -165,7 +167,7 @@ public class RevisionController : ControllerBase
     }
 
     [HttpPost("revision/{id:int}/rechazar-resumen")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeAprobarClausula)]
     public async Task<IActionResult> RechazarResumen(int id)
     {
         var tenantId = RequireTenantId();

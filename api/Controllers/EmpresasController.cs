@@ -1,5 +1,6 @@
 using Comparador.Api.Data;
 using Comparador.Api.Models;
+using Comparador.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,17 +9,17 @@ namespace Comparador.Api.Controllers;
 
 public class EmpresaCreateRequest
 {
-    public string Nombre { get; set; } = string.Empty;
-    public int PaisId { get; set; }
-    public string? Rif { get; set; }
-    public int? SectorId { get; set; }
-    public int? TipoId { get; set; }
-    public int? CategoriaId { get; set; }
-    public int? ActividadId { get; set; }
-    public int? EstadoId { get; set; }
-    public int? LocalidadId { get; set; }
-    public string? ContactoNombre { get; set; }
-    public string? ContactoEmail { get; set; }
+    [FromForm(Name = "nombre")] public string Nombre { get; set; } = string.Empty;
+    [FromForm(Name = "pais_id")] public int PaisId { get; set; }
+    [FromForm(Name = "rif")] public string? Rif { get; set; }
+    [FromForm(Name = "sector_id")] public int? SectorId { get; set; }
+    [FromForm(Name = "tipo_id")] public int? TipoId { get; set; }
+    [FromForm(Name = "categoria_id")] public int? CategoriaId { get; set; }
+    [FromForm(Name = "actividad_id")] public int? ActividadId { get; set; }
+    [FromForm(Name = "estado_id")] public int? EstadoId { get; set; }
+    [FromForm(Name = "localidad_id")] public int? LocalidadId { get; set; }
+    [FromForm(Name = "contacto_nombre")] public string? ContactoNombre { get; set; }
+    [FromForm(Name = "contacto_email")] public string? ContactoEmail { get; set; }
 }
 
 [ApiController]
@@ -135,7 +136,7 @@ public class EmpresasController : ControllerBase
     }
 
     [HttpPost("empresas")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeGestionarEmpresas)]
     public async Task<IActionResult> CrearEmpresa([FromForm] EmpresaCreateRequest req)
     {
         var tenantId = RequireTenantId();
@@ -154,6 +155,13 @@ public class EmpresasController : ControllerBase
         if (!existePais)
         {
             return BadRequest(new { detail = "El país indicado no existe." });
+        }
+
+        var paisHabilitado = await _db.TenantPaisesHabilitados
+            .AnyAsync(t => t.TenantId == tenantId && t.PaisId == req.PaisId);
+        if (!paisHabilitado)
+        {
+            return BadRequest(new { detail = "El país indicado no está habilitado para este tenant." });
         }
 
         var empresa = new Empresa

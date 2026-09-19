@@ -3,6 +3,7 @@ using Comparador.Api.Data;
 using Comparador.Api.Models;
 using Comparador.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -36,6 +37,7 @@ var connectionString = new[]
         builder.Configuration.GetConnectionString("Default")
     }
     .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+var usesSupabaseUrl = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SUPABASE_DB_URL"));
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
@@ -50,6 +52,10 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 connectionString ??= "Host=localhost;Port=5433;Database=convenciones;Username=convenciones;Password=convenciones";
+if (usesSupabaseUrl && !connectionString.Contains("Pooling=", StringComparison.OrdinalIgnoreCase))
+{
+    connectionString += ";Pooling=false";
+}
 
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
 dataSourceBuilder.MapEnum<RolUsuario>("rol_usuario", nameTranslator: new NpgsqlNullNameTranslator());
@@ -64,6 +70,7 @@ builder.Services.AddDbContext<ComparadorDbContext>(opt =>
        .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddHttpClient();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
