@@ -1,6 +1,8 @@
 using Comparador.Api.Data;
 using Comparador.Api.Models;
 using Comparador.Api.Services;
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,11 +16,13 @@ public class DocumentosController : ControllerBase
 {
     private readonly ComparadorDbContext _db;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _configuration;
 
-    public DocumentosController(ComparadorDbContext db, IHttpClientFactory httpClientFactory)
+    public DocumentosController(ComparadorDbContext db, IHttpClientFactory httpClientFactory, IConfiguration configuration)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
     }
 
     private Guid RequireTenantId()
@@ -112,8 +116,41 @@ public class DocumentosController : ControllerBase
 
         if (origenFinal == "archivo")
         {
-            return StatusCode(StatusCodes.Status501NotImplemented,
-                new { detail = "La carga binaria quedará disponible cuando se habilite el almacenamiento de documentos en .NET." });
+            if (archivo is null || archivo.Length == 0)
+            {
+                return BadRequest(new { detail = "Debe adjuntar un archivo no vacío." });
+            }
+
+            if (es_publico)
+            {
+                return BadRequest(new { detail = "Los archivos cargados no pueden publicarse; use una URL pública." });
+            }
+
+            var storageRoot = Environment.GetEnvironmentVariable("STORAGE_DIR")
+                ?? _configuration["Storage:Root"]
+                ?? Path.Combine(AppContext.BaseDirectory, "storage");
+            var storagePath = Path.Combine(storageRoot, "documentos");
+            Directory.CreateDirectory(storagePath);
+            var storedName = $"{Guid.NewGuid():N}{Path.GetExtension(archivo.FileName)}";
+            var filePath = Path.Combine(storagePath, storedName);
+            await using (var output = System.IO.File.Create(filePath))
+            {
+                await archivo.CopyToAsync(output);
+            }
+
+            var fileDocument = new Documento
+            {
+                TenantId = tenantId,
+                EmpresaId = empresa_id.Value,
+                Origen = "archivo",
+                RutaArchivo = filePath,
+                EsPublico = false,
+                Estado = "pendiente",
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            _db.Documentos.Add(fileDocument);
+            await _db.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetDocumento), new { id = fileDocument.Id }, new { id = fileDocument.Id, estado = fileDocument.Estado });
         }
 
         if (string.IsNullOrWhiteSpace(url_origen) || !Uri.TryCreate(url_origen, UriKind.Absolute, out var url) || url.Scheme is not ("http" or "https"))
@@ -121,7 +158,7 @@ public class DocumentosController : ControllerBase
             return BadRequest(new { detail = "Debe indicar una URL HTTP o HTTPS válida." });
         }
 
-        if (!await EsUrlPublicaAsync(url))
+        if (es_publico && !await EsUrlPublicaAsync(url))
         {
             return BadRequest(new { detail = "La URL no responde públicamente sin autenticación." });
         }
@@ -148,7 +185,12 @@ public class DocumentosController : ControllerBase
     {
         try
         {
-            var client = _httpClientFactory.CreateClient();
+            if (await EsDestinoPrivadoAsync(url))
+            {
+                return false;
+            }
+
+            var client = _httpClientFactory.CreateClient("public-url");
             client.Timeout = TimeSpan.FromSeconds(10);
             using var head = new HttpRequestMessage(HttpMethod.Head, url);
             using var headResponse = await client.SendAsync(head, HttpCompletionOption.ResponseHeadersRead);
@@ -169,5 +211,18 @@ public class DocumentosController : ControllerBase
         {
             return false;
         }
+    }
+
+    private static async Task<bool> EsDestinoPrivadoAsync(Uri url)
+    {
+        var addresses = await Dns.GetHostAddressesAsync(url.Host);
+        return addresses.Any(address => IPAddress.IsLoopback(address) ||
+            address.IsIPv6LinkLocal ||
+            address.IsIPv6SiteLocal ||
+            (address.AddressFamily == AddressFamily.InterNetwork &&
+             (address.GetAddressBytes()[0] == 10 ||
+              (address.GetAddressBytes()[0] == 172 && address.GetAddressBytes()[1] is >= 16 and <= 31) ||
+              (address.GetAddressBytes()[0] == 192 && address.GetAddressBytes()[1] == 168) ||
+              address.GetAddressBytes()[0] == 127)));
     }
 }

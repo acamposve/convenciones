@@ -101,7 +101,7 @@ public class EmpresasController : ControllerBase
     }
 
     [HttpGet("empresas")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationPolicies.PuedeGestionarEmpresas)]
     public async Task<IActionResult> GetEmpresas()
     {
         var tenantId = RequireTenantId();

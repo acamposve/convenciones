@@ -140,7 +140,7 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Negociaciones.Add(negociacion);
-        AddAudit(negociacion.Id, "negociacion_creada");
+        AddAudit(negociacion.Id, "creacion");
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetNegociaciones), new { id = negociacion.Id }, new { id = negociacion.Id });
@@ -280,7 +280,7 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Peticiones.Add(peticion);
-        AddAudit(id, "peticion_creada", $"peticion_id={peticion.Id}");
+        AddAudit(id, "peticion");
         await _db.SaveChangesAsync();
 
         return Ok(new { id = peticion.Id, nro_peticion = peticion.NroPeticion });
@@ -311,7 +311,7 @@ public class NegociacionController : ControllerBase
 
         var oferta = new Oferta { PeticionId = peticionId, Texto = req.Texto.Trim(), CreatedAt = DateTimeOffset.UtcNow };
         _db.Ofertas.Add(oferta);
-        AddAudit(peticion.NegociacionId, "oferta_creada", $"oferta_id={oferta.Id};peticion_id={peticionId}");
+        AddAudit(peticion.NegociacionId, "oferta", $"peticion_id={peticionId}");
         await _db.SaveChangesAsync();
         return Ok(new { id = oferta.Id });
     }
@@ -337,7 +337,7 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Reuniones.Add(reunion);
-        AddAudit(id, "reunion_creada", $"reunion_id={reunion.Id}");
+        AddAudit(id, "reunion");
         await _db.SaveChangesAsync();
 
         return Ok(new { id = reunion.Id });
@@ -381,7 +381,7 @@ public class NegociacionController : ControllerBase
         };
 
         _db.Acuerdos.Add(acuerdo);
-        AddAudit(id, "acuerdo_creado", $"acuerdo_id={acuerdo.Id}");
+        AddAudit(id, "acuerdo");
         await _db.SaveChangesAsync();
 
         return Ok(new { id = acuerdo.Id });
@@ -452,7 +452,7 @@ public class NegociacionController : ControllerBase
         _db.Documentos.Add(documento);
         negociacion.Estado = "cerrada";
         negociacion.FechaCierre = DateTimeOffset.UtcNow;
-        AddAudit(id, "negociacion_cerrada", $"documento_version={version}");
+        AddAudit(id, "cierre", $"documento_version={version}");
         await _db.SaveChangesAsync();
 
         return Ok();
@@ -476,7 +476,7 @@ public class NegociacionController : ControllerBase
 
         negociacion.Estado = "abierta";
         negociacion.FechaCierre = null;
-        AddAudit(id, "negociacion_reabierta");
+        AddAudit(id, "reapertura");
         await _db.SaveChangesAsync();
 
         return Ok();

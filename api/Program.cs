@@ -70,7 +70,11 @@ builder.Services.AddDbContext<ComparadorDbContext>(opt =>
        .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<TokenService>();
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("public-url")
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false
+    });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
