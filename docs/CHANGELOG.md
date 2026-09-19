@@ -18,6 +18,17 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 - Constitution.md v2.0.0: redefinición de modelo tenant (ahora operador, no empresa única)
 - Incorporación de negociación colectiva (Art. IV bis, pendiente Fase 1)
+- Constitution.md v2.2.0: se adopta el plan de migración de stack descrito en
+  `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` — Art. V pasa de (API .NET + microservicio
+  Python/FastAPI + Azure PostgreSQL Flexible Server) a (C#/.NET 10 LTS unificado + Supabase
+  con Row Level Security). Decisión de documentación únicamente por ahora — el código y la
+  infraestructura desplegada siguen siendo los anteriores hasta el cutover (Fase 5 del plan).
+
+### Deprecated
+- Microservicio Python/FastAPI (`service/`) y Azure PostgreSQL Flexible Server autoadministrado:
+  reemplazados en el stack objetivo por .NET 10 unificado y Supabase respectivamente (Enmienda
+  2.2.0). Siguen en producción hasta el cutover; su eliminación real está planeada para la
+  Fase 5.3-5.4 del plan de migración.
 
 ### Removed
 - No hay versión anterior en git — este repo comienza con MVP

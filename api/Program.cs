@@ -7,8 +7,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Npgsql.NameTranslation;
+using Serilog;
+using Serilog.Context;
+using Serilog.Formatting.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configuración de Serilog: logging estructurado JSON a consola (Container Apps captura
+// stdout; JSON permite que Azure Log Analytics filtre/consulte por campo — TenantId,
+// UserId, CorrelationId — en vez de por texto libre, criterio de éxito de Fase 1).
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(new JsonFormatter()));
 
 // El tipo `rol_usuario` es un ENUM nativo de Postgres (creado por SQL plano, no por EF).
 // Npgsql 8 ya no lo mapea a RolUsuario automaticamente ("unmapped enums requiere opt-in") —
@@ -77,16 +89,63 @@ app.UseAuthentication();
 
 // Middleware de aislamiento por tenant (Art. VI.2): expone tenant_id del JWT
 // como HttpContext.Items["tenant_id"] para que cada repositorio lo use como filtro
-// obligatorio. Ningún endpoint debe leer tenant_id de la URL o del body.
+// obligatorio y enriquece el LogContext de Serilog. Va ANTES del exception handler y de
+// UseSerilogRequestLogging (más abajo) a propósito: LogContext.PushProperty usa un
+// AsyncLocal que se desapila al salir del `using`, así que si el exception handler o el
+// request logging estuvieran registrados antes (más "afuera") que este middleware,
+// emitirían su log de excepción/finalización de request DESPUÉS de que este `using` ya
+// se desapiló — y quedarían sin TenantId/UserId/CorrelationId. Para que los reciban,
+// tienen que estar anidados DENTRO de este scope, es decir, registrados después.
 app.Use(async (context, next) =>
 {
     var tenantClaim = context.User?.FindFirst("tenant_id")?.Value;
-    if (tenantClaim != null)
+    // TokenService.GenerarAccessToken emite el claim custom "user_id" (no el estándar
+    // ClaimTypes.NameIdentifier/"sub") — ver api/Services/TokenService.cs.
+    var userClaim = context.User?.FindFirst("user_id")?.Value;
+    var correlationId = context.TraceIdentifier;
+
+    using (LogContext.PushProperty("TenantId", tenantClaim ?? "Anonymous"))
+    using (LogContext.PushProperty("UserId", userClaim ?? "Anonymous"))
+    using (LogContext.PushProperty("CorrelationId", correlationId))
     {
-        context.Items["tenant_id"] = tenantClaim;
+        if (tenantClaim != null)
+        {
+            context.Items["tenant_id"] = tenantClaim;
+        }
+        await next();
     }
-    await next();
 });
+
+// Middleware global de manejo de excepciones no controladas (RFC 7807 ProblemDetails + Log
+// estructurado). Registrado después del middleware de arriba para que Log.Error() incluya
+// TenantId/UserId/CorrelationId.
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/problem+json";
+
+        var exceptionHandlerPathFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+        var ex = exceptionHandlerPathFeature?.Error;
+
+        Log.Error(ex, "Excepción no controlada procesando solicitud en {Path}", context.Request.Path);
+
+        var problem = new Microsoft.AspNetCore.Mvc.ProblemDetails
+        {
+            Status = StatusCodes.Status500InternalServerError,
+            Title = "Error interno del servidor",
+            Detail = app.Environment.IsDevelopment() ? ex?.Message : "Ocurrió un error inesperado al procesar la solicitud.",
+            Instance = context.Request.Path
+        };
+
+        await context.Response.WriteAsJsonAsync(problem);
+    });
+});
+
+// También después del middleware de contexto, por el mismo motivo: para que el log de
+// "Request completed" incluya TenantId/UserId/CorrelationId.
+app.UseSerilogRequestLogging();
 
 app.UseAuthorization();
 app.MapControllers();

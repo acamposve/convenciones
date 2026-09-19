@@ -1,6 +1,11 @@
 # Bootstrap del demo (Venezuela)
 
-> Depende de: `constitution.md` (Art. V — dos servicios separados), `auth-spec.md` §4.
+> Depende de: `constitution.md` (Art. V — stack **desplegado hoy**: dos servicios
+> separados; el Art. V objetivo tras la Enmienda 2.2.0 los unifica en un único servicio
+> .NET 10 — ver [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)),
+> `auth-spec.md` §4. Los pasos de este documento siguen siendo los correctos para correr el
+> demo localmente **hasta que el código migre** (Fase 3-4 del plan); no se ha tocado nada
+> de esto todavía.
 > Objetivo: dejar documentado y automatizado el orden real que hoy hace falta para poder
 > loguearse por primera vez. Antes era tribal knowledge (tres comandos manuales, sin
 > documentar, en un orden que si se rompe da `Unauthorized` sin explicación).

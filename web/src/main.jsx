@@ -17,6 +17,7 @@ import { NegociacionesPage } from "./negociacion/NegociacionesPage";
 import { NegociacionDetailPage } from "./negociacion/NegociacionDetailPage";
 import { PlataformaPage } from "./plataforma/PlataformaPage";
 import { BibliotecaPage } from "./biblioteca/BibliotecaPage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Fase 2 (constitution.md v2.0.0): Empresa + cola de revisión (Art IV.8) + comparador
 // intra-tenant (Art IV.9) ya conviven con el pipeline de ingesta/clasificación de la
@@ -60,80 +61,82 @@ function NoAutorizado() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/registro" element={<RegisterPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/no-autorizado" element={<NoAutorizado />} />
-          <Route path="/biblioteca" element={<BibliotecaPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <DocumentosPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/documentos/:id"
-            element={
-              <ProtectedRoute>
-                <DocumentDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/empresas"
-            element={
-              <ProtectedRoute>
-                <EmpresasPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/revision"
-            element={
-              <ProtectedRoute>
-                <RevisionPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/comparador"
-            element={
-              <ProtectedRoute>
-                <ComparadorPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/empresas/:empresaId/negociaciones"
-            element={
-              <ProtectedRoute>
-                <NegociacionesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/negociaciones/:id"
-            element={
-              <ProtectedRoute>
-                <NegociacionDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/plataforma"
-            element={
-              <ProtectedRoute>
-                <PlataformaPage />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/registro" element={<RegisterPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/no-autorizado" element={<NoAutorizado />} />
+            <Route path="/biblioteca" element={<BibliotecaPage />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <DocumentosPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/documentos/:id"
+              element={
+                <ProtectedRoute>
+                  <DocumentDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/empresas"
+              element={
+                <ProtectedRoute>
+                  <EmpresasPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/revision"
+              element={
+                <ProtectedRoute>
+                  <RevisionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/comparador"
+              element={
+                <ProtectedRoute>
+                  <ComparadorPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/empresas/:empresaId/negociaciones"
+              element={
+                <ProtectedRoute>
+                  <NegociacionesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/negociaciones/:id"
+              element={
+                <ProtectedRoute>
+                  <NegociacionDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plataforma"
+              element={
+                <ProtectedRoute>
+                  <PlataformaPage />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 );

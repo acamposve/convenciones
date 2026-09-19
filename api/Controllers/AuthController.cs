@@ -17,17 +17,21 @@ public class AuthController : ControllerBase
 {
     private readonly ComparadorDbContext _db;
     private readonly TokenService _tokens;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(ComparadorDbContext db, TokenService tokens)
+    public AuthController(ComparadorDbContext db, TokenService tokens, ILogger<AuthController> logger)
     {
         _db = db;
         _tokens = tokens;
+        _logger = logger;
     }
 
     // Flujo completo en auth-spec.md §4.
     [HttpPost("login")]
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest req)
     {
+        _logger.LogInformation("Intento de inicio de sesión para el email: {Email}", req.Email);
+
         var usuario = await _db.Usuarios
             .Include(u => u.Tenant)
             .ThenInclude(t => t!.Pais)
@@ -38,15 +42,14 @@ public class AuthController : ControllerBase
 
         if (usuario == null || !BCrypt.Net.BCrypt.Verify(req.Password, usuario.PasswordHash))
         {
+            _logger.LogWarning("Intento de inicio de sesión fallido para el email: {Email} desde IP: {IP}", req.Email, ip);
             await Bitacora(null, null, "login_fail", ip, userAgent);
             return Unauthorized(new { message = "Credenciales inválidas." });
         }
 
-        // Fase 5 (spec-plataforma.md): un tenant suspendido no puede iniciar sesion nueva
-        // -- no revoca sesiones ya emitidas (el access token expira solo, Art VII), mismo
-        // criterio de granularidad que ya usa el check de usuario.Activo mas abajo.
         if (usuario.Tenant?.Suspendido == true)
         {
+            _logger.LogWarning("Intento de inicio de sesión bloqueado por tenant suspendido: {TenantId}, Email: {Email}", usuario.TenantId, req.Email);
             await Bitacora(usuario.Id, usuario.TenantId, "login_fail", ip, userAgent);
             return Unauthorized(new { message = "Este operador está suspendido. Contactá a soporte." });
         }
@@ -66,6 +69,7 @@ public class AuthController : ControllerBase
             });
             await _db.SaveChangesAsync();
             await Bitacora(usuario.Id, usuario.TenantId, "login_ok_reset_pending", ip, userAgent);
+            _logger.LogInformation("Inicio de sesión exitoso (reset pendiente) para el email: {Email}, TenantId: {TenantId}", req.Email, usuario.TenantId);
             return Ok(new LoginResponse(null, null, true, resetRaw));
         }
 
@@ -83,6 +87,7 @@ public class AuthController : ControllerBase
         usuario.UltimoLoginAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
         await Bitacora(usuario.Id, usuario.TenantId, "login_ok", ip, userAgent);
+        _logger.LogInformation("Inicio de sesión exitoso para el email: {Email}, TenantId: {TenantId}", req.Email, usuario.TenantId);
 
         return Ok(new LoginResponse(access, refreshRaw, false, null));
     }

@@ -9,14 +9,22 @@ colectivas de trabajo mediante IA — reemplaza un SaaS PHP legado que hacía es
 > [`docs/constitution.md`](docs/constitution.md) — es la fuente de verdad.** Si algo en este
 > README contradice la constitución, la constitución gana.
 
+> **Migración de stack en curso (Enmienda 2.2.0 de la constitución):** el proyecto está
+> migrando a **C#/.NET 10 LTS unificado + Supabase**, según
+> [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+> (el nombre del archivo es heredado — el destino es Supabase, no Firebase). La tabla de
+> abajo describe el stack **desplegado hoy** (Python sigue atendiendo tráfico real); el
+> Art. V de la constitución describe el stack **objetivo**. Nada de esto se ha portado a
+> código todavía.
+
 ## Estructura del repo
 
 | Carpeta | Qué es |
 |---|---|
-| `api/` | API de autenticación y datos, .NET 8 (tenants, usuarios, roles, JWT) |
-| `service/` | Microservicio Python (FastAPI) — ingesta, extracción, segmentación y clasificación de cláusulas por IA |
+| `api/` | API de autenticación y datos, .NET 8 (tenants, usuarios, roles, JWT) — destino final del microservicio Python según el plan de migración |
+| `service/` | Microservicio Python (FastAPI) — ingesta, extracción, segmentación y clasificación de cláusulas por IA. **Plan de migración prevé eliminarlo** (Fase 5.4) una vez completado el cutover a `api/` en .NET 10 |
 | `web/` | Frontend, React + Vite |
-| `infra/terraform/` | Infraestructura como código (Azure: Container Apps, Postgres, ACR, Storage) |
+| `infra/terraform/` | Infraestructura como código (Azure: Container Apps, Postgres, ACR, Storage). **Plan de migración prevé eliminar** el Postgres Flexible Server administrado (Fase 5.3) al pasar a Supabase |
 | `.github/workflows/` | CI/CD (build+test, plan/apply de Terraform, deploy a Azure) |
 | `docs/` | Constitución, specs (auth, MVP demo, plan de publicación), taxonomía de Venezuela |
 | `legacy/` | SaaS PHP original — solo como referencia funcional (Art. IX de la constitución), no se porta código de acá |
@@ -41,5 +49,11 @@ demo (ver credenciales impresas en `docker compose logs seed`), y dejás listo e
 
 ## Stack
 
-.NET 8 · Python/FastAPI · React/Vite · PostgreSQL · Terraform · Azure Container Apps —
-justificación de cada elección en el Art. V de [`docs/constitution.md`](docs/constitution.md).
+**Desplegado hoy:** .NET 8 · Python/FastAPI · React/Vite · Azure PostgreSQL Flexible Server ·
+Terraform · Azure Container Apps.
+
+**Objetivo (migración en curso, Enmienda 2.2.0):** .NET 10 LTS unificado (API + IA) ·
+React/Vite · Supabase (PostgreSQL + RLS + Auth + Storage) · Terraform · Azure Container Apps.
+Justificación de cada elección, y de la transición, en el Art. V de
+[`docs/constitution.md`](docs/constitution.md) y en
+[`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md).

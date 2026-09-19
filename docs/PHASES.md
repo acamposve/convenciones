@@ -1,5 +1,11 @@
 # Fases del proyecto
 
+> **Nota:** las fases de este documento son de **producto/alcance** (qué hace el sistema).
+> Son un eje independiente de la **migración de stack** (Enmienda 2.2.0 de la constitución,
+> [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)),
+> que reemplaza .NET 8 + Python/FastAPI + Azure PostgreSQL por .NET 10 unificado + Supabase
+> sin cambiar el alcance funcional de ninguna fase de abajo.
+
 ## Resumen ejecutivo
 
 | Fase | Nombre | Alcance | Estado |
@@ -102,7 +108,7 @@
 ### MVP
 - [ ] Pipeline completo: ingesta → clasificación, sin errores bloqueantes
 - [ ] Validación de precisión: LLM coincide razonablemente con clasificación legada (subconjunto de datos)
-- [ ] Documentación de arquitectura (constitution.md v2.0.0)
+- [ ] Documentación de arquitectura (constitution.md, versión vigente — v2.2.0 al momento de escribir esto)
 - [ ] Demo interna funcional
 
 ### Fase 1
