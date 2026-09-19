@@ -1,5 +1,10 @@
 # CI/CD Workflows
 
+> **Migración de stack en curso (Enmienda 2.2.0 de `constitution.md`):** estos workflows
+> automatizan el stack **desplegado hoy** (build de `service/` en Python incluido). El plan
+> [`../../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+> prevé eliminar esos steps en su Fase 5.3 — no se ha tocado ningún workflow todavía.
+
 ## Overview
 
 Workflows de GitHub Actions automatizados para build, test, y deploy. Ubicados en `.github/workflows/`.

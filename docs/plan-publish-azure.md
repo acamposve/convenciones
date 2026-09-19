@@ -1,9 +1,20 @@
 # Plan de Publicación — Azure (Demo Fase 1, Venezuela)
 
+> **⚠️ Estado (Enmienda 2.2.0 de `constitution.md`):** este documento describe la
+> infraestructura **desplegada hoy** — Azure PostgreSQL Flexible Server y el Container App
+> `ai-service` (Python) siguen activos y atendiendo el demo. El plan
+> [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+> prevé eliminar ambos en su Fase 5.3 (`azurerm_postgresql_flexible_server` y
+> `azurerm_container_app.service`, reemplazados por Supabase y el Container App único de
+> `api`). Hasta que ese cutover ocurra, este runbook sigue siendo la referencia operativa
+> correcta — no se ha tocado Terraform ni código todavía. Cuando se ejecute la Fase 5.3,
+> este documento debe actualizarse (o reemplazarse) para reflejar la infraestructura nueva.
+
 > Alcance: pipeline de pasos 1–5 (ingesta → extracción → segmentación → clasificación) +
 > auth mínima (tenant demo + AdminTenant sembrado). Alineado con Art. V de `constitution.md`
-> (Azure Container Apps, PostgreSQL, blob storage cifrado). No incluye SSO/SAML (Fase 3)
-> ni licenciamiento (Fase 2).
+> (Azure Container Apps, PostgreSQL, blob storage cifrado — stack **desplegado hoy**; ver
+> nota de arriba para el stack objetivo). No incluye SSO/SAML (Fase 3) ni licenciamiento
+> (Fase 2).
 >
 > Convención de este documento: cada paso marcado **🔴 MANUAL** lo haces tú, fuera de
 > Terraform y GitHub Actions. Todo lo demás lo automatizan los archivos de este mismo commit.

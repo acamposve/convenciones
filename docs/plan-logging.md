@@ -2,6 +2,10 @@
 
 > **Estado:** borrador, no iniciado — documento de planificación interna, no una spec cerrada
 > con decisiones del cliente (a diferencia de los demás `docs/spec-*.md`).
+> **Relación con la migración de stack:** el Bloque A de este plan es exactamente la Fase 1.1
+> de [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+> (blindaje temporal del pipeline Python mientras se construye la versión .NET 10) — es un
+> parche operativo, no trabajo que sobreviva al cutover de Fase 5.
 > **Origen:** auditoría de cobertura de logging en los tres componentes (`api/`, `service/`,
 > `web/`), hecha en sesión del 2026-09-05, a pedido explícito de validar que "todo el código
 > tiene logs".

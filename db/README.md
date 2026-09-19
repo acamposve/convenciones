@@ -1,5 +1,11 @@
 # Database — Schema, Seeds, Fixtures
 
+> **Migración de stack en curso (Enmienda 2.2.0 de `constitution.md`):** `schema.sql` sigue
+> siendo la fuente del esquema también bajo Supabase (importación directa, sin reescritura —
+> ver `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` §Fase 2.2). El seed en Python
+> (`seed_admin_user.py`) es del stack desplegado hoy; se porta a .NET junto con el resto del
+> servicio (Fase 3-4 del plan). Nada de esto se ha tocado todavía.
+
 ## Estructura
 
 | Archivo | Propósito |

@@ -2,10 +2,16 @@
 
 **Referencia:** Esta es una síntesis ejecutiva. Para detalles, ver [`constitution.md`](constitution.md) Art. III–V.
 
+> **Migración de stack en curso (Enmienda 2.2.0):** este documento describe el stack
+> **objetivo** tras adoptar [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+> (C#/.NET 10 unificado + Supabase). El stack **desplegado hoy** sigue siendo .NET 8 +
+> Python/FastAPI + Azure PostgreSQL — Python sigue atendiendo tráfico real hasta el cutover
+> (Fase 5.2 del plan). Nada de esto se ha portado a código todavía.
+
 ## Principios
 
-1. **Multi-tenancy por columna** (`tenant_id` en todas las tablas públicas)
-2. **Separación clara API ↔ IA:** .NET (lógica) + Python (procesamiento de IA)
+1. **Multi-tenancy por columna** (`tenant_id` en todas las tablas públicas) + **Row Level Security nativo** en Supabase como segunda capa de aislamiento (Art. VI.2)
+2. **Backend unificado en .NET 10** (API + procesamiento de IA vía `Microsoft.Extensions.AI`) — sustituye la separación anterior .NET (lógica) / Python (IA); ver migración arriba
 3. **Documentos privados por defecto** — solo públicos si se declara explícitamente
 4. **Revisión humana obligatoria antes de publicar** — nunca automatizado
 
@@ -21,52 +27,56 @@
                      │ HTTP/REST
                      ▼
 ┌─────────────────────────────────────────────────────┐
-│  API (.NET 8)                                       │
-│  - Autenticación (JWT, SSO/SAML en Fase 2)         │
-│  - Gestión de tenants, usuarios, roles              │
-│  - CRUD de documentos, cláusulas                    │
-│  - Orquestación de publicación                      │
-└────────┬──────────────────────────┬─────────────────┘
+│  API (.NET 10 LTS) — servicio único                  │
+│  - Autenticación vía Supabase Auth (SSO/SAML Fase 2) │
+│  - Gestión de tenants, usuarios, roles               │
+│  - CRUD de documentos, cláusulas                     │
+│  - Orquestación de publicación                       │
+│  - Worker en proceso (Channel + BackgroundService):  │
+│    OCR, extracción, segmentación,                    │
+│    clasificación (Claude vía Microsoft.Extensions.AI)│
+│    verificación legal                                │
+└────────┬──────────────────────────┬──────────────────┘
          │                          │
-         │ Blob Storage             │ Service Bus/Queue
+         │ Supabase Storage         │ Npgsql / EF Core
          ▼                          ▼
     ┌──────────────┐        ┌──────────────────────────┐
-    │  Docs PDF    │        │  AI Service (Python)     │
-    │  (Encrypted) │        │  - OCR                   │
-    │              │        │  - Extracción            │
-    └──────────────┘        │  - Segmentación          │
-                            │  - Clasificación (Claude)│
-                            │  - Verificación legal    │
-                            └──────────┬───────────────┘
-                                       │
-                                       ▼
-                            ┌──────────────────────────┐
-                            │  Base de datos           │
-                            │  PostgreSQL              │
-                            │  (multi-tenant)          │
-                            └──────────────────────────┘
+    │  Docs PDF    │        │  Supabase                │
+    │  (Encrypted, │        │  PostgreSQL 16            │
+    │   RLS)       │        │  (multi-tenant + RLS)     │
+    └──────────────┘        └──────────────────────────┘
 ```
+
+> Diagrama del stack **objetivo**. Hoy en producción, "AI Service" sigue siendo un
+> microservicio Python (FastAPI) separado consumiendo de una cola (Service Bus/RabbitMQ) y
+> la base de datos es un Azure PostgreSQL Flexible Server autoadministrado — ver nota de
+> migración arriba.
 
 ## Flujo de procesamiento (MVP Demo)
 
 ```
 1. Usuario carga PDF
    ↓
-2. API recibe, guarda en Blob Storage
+2. API recibe, guarda en Supabase Storage
    ↓
-3. API envía task a Service Bus
+3. API encola el documento en el Channel en proceso
    ↓
-4. AI Service consume task
-   ├─ Extrae texto (PDFPlumber + Tesseract)
-   ├─ Segmenta en cláusulas (heurística)
-   ├─ Clasifica c/ LLM → titulo de taxonomía
+4. DocumentProcessingWorker (BackgroundService) toma el item
+   ├─ Extrae texto (UglyToad.PdfPig + OCR)
+   ├─ Segmenta en cláusulas (heurística, [GeneratedRegex])
+   ├─ Clasifica c/ LLM (Claude vía Microsoft.Extensions.AI) → titulo de taxonomía
    └─ Devuelve resultados
    ↓
-5. API guarda cláusulas en DB
+5. API guarda cláusulas en Supabase (Postgres)
    ↓
 6. Usuario ve lista de cláusulas + títulos asignados
    (FIN en MVP; Fase 1 agrega revisión + publicación)
 ```
+
+> Flujo **objetivo** (stack unificado en .NET 10). El pipeline desplegado hoy usa
+> PDFPlumber + Tesseract en el microservicio Python, comunicado por Service Bus/RabbitMQ —
+> los pasos conceptuales (extracción → segmentación → clasificación) no cambian, solo el
+> runtime y el transporte entre pasos.
 
 ## Entidades de datos (simplificado)
 
@@ -93,27 +103,29 @@ Bitácora (log_id, tenant_id, usuario_id, acción, recurso, timestamp)
 
 ## Decisiones técnicas (Art. V)
 
-| Componente | Decisión | Razón |
-|---|---|---|
-| API | C# / .NET 8 LTS | Preferencia del equipo; multi-tenancy nativa, auth, licensing |
-| AI Service | Python / FastAPI | Ecosistema de IA/OCR; desacoplado de API |
-| LLM | Claude (API) | Salida estructurada; evita entrenar modelos propios |
-| Base de datos | PostgreSQL | JSON nativo, multi-tenant simple, migrables a Azure SQL |
-| Storage | Azure Blob | Documentos encriptados en reposo, no en filesystem |
-| Cola | Service Bus / RabbitMQ | Desacopla ingesta de procesamiento |
-| Frontend | React + Vite | SPA, build rápido, ecosistema maduro |
-| Auth | OIDC + SSO (Fase 2) | Estándar; WorkOS o Auth0 para SAML |
-| Infra | Contenedores + Azure Container Apps | Simple para demo, escalable a Kubernetes |
+Stack objetivo (Enmienda 2.2.0); el desplegado hoy sigue el diseño anterior (columna
+"Antes", vigente hasta el cutover — Fase 5.2 del plan de migración).
+
+| Componente | Decisión | Antes (hasta cutover) | Razón del cambio |
+|---|---|---|---|
+| API + AI Service | C# / .NET 10 LTS, servicio único | API en .NET 8 + AI Service en Python/FastAPI separado | Un solo runtime que mantener y desplegar; `Microsoft.Extensions.AI` cubre lo que antes requería Python |
+| LLM | Claude (API) vía `IChatClient` | Claude (API) directo desde Python | Mismo proveedor; cambia el cliente |
+| Base de datos | Supabase (PostgreSQL 16 + RLS) | PostgreSQL (Azure Flexible Server autoadministrado) | RLS nativo refuerza aislamiento por tenant; Auth/Storage integrados; menos infraestructura propia que operar |
+| Storage | Supabase Storage | Azure Blob | Documentos encriptados en reposo, con RLS unificado a la política de datos |
+| Cola | `System.Threading.Channels` en proceso | Service Bus / RabbitMQ | Suficiente para el volumen actual; ya no hay dos procesos que desacoplar |
+| Frontend | React + Vite | React + Vite | Sin cambio |
+| Auth | Supabase Auth + SSO (Fase 2) | OIDC + SSO (Fase 2) | Autenticación y base de datos bajo el mismo proveedor |
+| Infra | Contenedores + Azure Container Apps (1 app de API) | Contenedores + Azure Container Apps (`api` + `ai-service`) | Menos Container Apps y sin Postgres administrado que mantener |
 
 ## Seguridad (Art. VI)
 
 - **Documentos privados por defecto**
 - **Encriptación en reposo** (storage + DB)
 - **Encriptación en tránsito** (HTTPS)
-- **Aislamiento de datos** por `tenant_id` en todas las queries
+- **Aislamiento de datos** por `tenant_id` en todas las queries, reforzado por **Row Level Security nativo** en Supabase (política `tenant_id = (auth.jwt() ->> 'tenant_id')::uuid`)
 - **Auditoría obligatoria** de cambios y accesos sensibles
 - **Roles y permisos** por tenant (no cross-tenant)
-- **Tokens JWT** con expiración (SSO en Fase 2)
+- **Tokens JWT** con expiración, emitidos por Supabase Auth (SSO en Fase 2)
 
 ## Evolución hacia Kubernetes
 
@@ -125,8 +137,15 @@ Futuro: Migracion a AKS (Kubernetes) cuando:
 
 (Los Dockerfiles y docker-compose ya permiten esta migración sin reescritura)
 
+Con el stack objetivo, esto aplica solo al Container App de la API (.NET 10) — Supabase es
+BaaS y no se gestiona en AKS; el ahorro de infraestructura propia es justamente parte del
+motivo del cambio (Enmienda 2.2.0).
+
 ---
 
-**Stack completo: .NET 8 · Python/FastAPI · React/Vite · PostgreSQL · Terraform · Azure**
+**Stack objetivo: .NET 10 LTS (unificado) · React/Vite · Supabase (PostgreSQL + RLS) · Terraform · Azure**
+**Stack desplegado hoy: .NET 8 · Python/FastAPI · React/Vite · Azure PostgreSQL · Terraform · Azure**
 
-Justificación detallada de cada decisión en [`constitution.md`](constitution.md) Art. V.
+Justificación detallada de cada decisión y del plan de transición en
+[`constitution.md`](constitution.md) Art. V y en
+[`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md).
