@@ -26,7 +26,7 @@ colectivas de trabajo mediante IA — reemplaza un SaaS PHP legado que hacía es
 
 | Carpeta | Qué es |
 |---|---|
-| `api/` | API de autenticación y datos, .NET 8 (tenants, usuarios, roles, JWT) — destino final del microservicio Python según el plan de migración |
+| `api/` | API de autenticación y datos, .NET 10 LTS (tenants, usuarios, roles, JWT) — destino final del microservicio Python según el plan de migración (Fase 3.1 ya hecha; el resto de la lógica de negocio sigue en Python hasta Fase 3.3) |
 | `service/` | Microservicio Python (FastAPI) — ingesta, extracción, segmentación y clasificación de cláusulas por IA. **Plan de migración prevé eliminarlo** (Fase 5.4) una vez completado el cutover a `api/` en .NET 10 |
 | `web/` | Frontend, React + Vite |
 | `.github/workflows/` | CI: build + test de los tres componentes (`ci.yml`). Sin deploy — ver nota de arriba |
@@ -54,7 +54,9 @@ demo (ver credenciales impresas en `docker compose logs seed`), y dejás listo e
 ## Stack
 
 **Desplegado hoy:** ningún ambiente en la nube activo — el proyecto corre local (Docker
-Compose). Componentes: .NET 8 · Python/FastAPI · React/Vite · PostgreSQL.
+Compose). Componentes: .NET 10 LTS (Fase 3.1 del plan de migración ya aplicada) ·
+Python/FastAPI (sigue con la mayoría de la lógica de negocio, Fase 3.3 pendiente) ·
+React/Vite · PostgreSQL.
 
 **Objetivo (migración en curso, Enmienda 2.2.0):** .NET 10 LTS unificado (API + IA) ·
 React/Vite · Supabase (PostgreSQL + RLS + Auth + Storage). Infraestructura/proveedor de

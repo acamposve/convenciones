@@ -15,7 +15,7 @@ Workflows de GitHub Actions ubicados en `.github/workflows/`.
 ### `ci.yml`
 
 Corre en cada PR contra `main` (no en push directo):
-1. Build + test de la API (.NET 8, `dotnet test`)
+1. Build + test de la API (.NET 10 LTS, `dotnet test`)
 2. Build + test del servicio de IA (Python, `pytest`)
 3. Build del frontend (React/Vite, `npm run build`)
 

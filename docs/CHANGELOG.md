@@ -25,6 +25,17 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   política sobre `documentos`; `GET /biblioteca` en `main.py` ya la consulta a ella en vez de
   las tablas directo), confirmado con un test de aislamiento real (`SET ROLE anon`) y que no
   rompe las conexiones actuales (el rol de conexión tiene `rolbypassrls`)
+- Fase 3.1 del plan de migración: `api/` corre sobre **.NET 10 LTS** — `TargetFramework`,
+  paquetes NuGet (`Microsoft.AspNetCore.Authentication.JwtBearer`, `Npgsql.EntityFrameworkCore.PostgreSQL`,
+  `Microsoft.EntityFrameworkCore.Design`, `EFCore.NamingConventions`) a la última versión 10.x
+  publicada, `Microsoft.Extensions.AI` 10.10.0 instalado (sin conectar, Fase 4), `Dockerfile`
+  actualizado a las imágenes base `:10.0`. Verificado con `dotnet build`/`dotnet test` (7/7)
+  y con un smoke test en vivo (`dotnet run` apuntando a la base Supabase real vía variables de
+  entorno, sin tocar `appsettings.json`) — encontró un hallazgo real para Fase 3.2 (diagnosticado
+  y con fix probado, pero no aplicado a código todavía — ver el checklist de Fase 3.2 en
+  `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`): doble pooling (Npgsql + Supavisor) cuelga el
+  segundo comando de una misma request contra Supabase; `Pooling=false` en la cadena de
+  conexión lo resuelve.
 
 ### Fixed
 - `service/app/db.py` y los 4 scripts de `service/db/seed_*.py`: conectar contra Supabase vía
