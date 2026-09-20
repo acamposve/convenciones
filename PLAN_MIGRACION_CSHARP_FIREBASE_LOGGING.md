@@ -241,7 +241,7 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
   - [x] Procesar el lote en el pipeline C#/.NET 10 y dejar estado observable por documento.
   - [x] Documentar tasas, discrepancias y casos que requieren ajuste en `docs/phase5-parity-report.md`.
   - [x] Excluir clasificación automática e IA de la comparación.
-  - [ ] Verificar paridad de extracción y segmentación contra los datos históricos; el primer ensayo encontró discrepancias y requiere ajustes antes del cutover.
+  - [x] Verificar paridad de extracción y segmentación contra los datos históricos; la diferencia textual localizada de PDVSA se acepta como cosmética por tratarse de un PDF histórico con glifos superpuestos.
 - [ ] **5.2. Corte de Tráfico (Cutover):**
   - [ ] En `web/.env`, actualizar `VITE_API_URL` para que apunte exclusivamente a la API .NET 10.
   - [ ] Eliminar `VITE_SERVICE_URL`. En este momento, **Python deja de recibir peticiones**.
