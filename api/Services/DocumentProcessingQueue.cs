@@ -4,12 +4,24 @@ namespace Comparador.Api.Services;
 
 public sealed class DocumentProcessingQueue
 {
-    private readonly Channel<int> _channel = Channel.CreateUnbounded<int>(new UnboundedChannelOptions
+    private readonly Channel<int> _channel;
+
+    public DocumentProcessingQueue(IConfiguration configuration)
     {
-        SingleReader = true,
-        SingleWriter = false,
-        AllowSynchronousContinuations = false
-    });
+        var capacity = configuration.GetValue<int?>("DocumentProcessing:QueueCapacity") ?? 100;
+        if (capacity < 1)
+        {
+            throw new InvalidOperationException("DocumentProcessing:QueueCapacity debe ser mayor que cero.");
+        }
+
+        _channel = Channel.CreateBounded<int>(new BoundedChannelOptions(capacity)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.Wait,
+            AllowSynchronousContinuations = false
+        });
+    }
 
     public ValueTask EnqueueAsync(int documentId, CancellationToken cancellationToken = default)
     {

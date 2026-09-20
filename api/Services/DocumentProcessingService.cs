@@ -86,8 +86,18 @@ public sealed class DocumentProcessingService
         {
             document.Estado = "error";
             document.EstadoDetalle = "No se pudo procesar el documento. Revisa los logs del servicio o contacta a soporte.";
-            await _db.SaveChangesAsync(CancellationToken.None);
             _logger.LogError(exception, "Error procesando documento {DocumentId}", documentId);
+            try
+            {
+                await _db.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (Exception persistenceException)
+            {
+                _logger.LogError(
+                    persistenceException,
+                    "No se pudo persistir el estado de error del documento {DocumentId}",
+                    documentId);
+            }
         }
     }
 }

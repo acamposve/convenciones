@@ -14,6 +14,7 @@ namespace Comparador.Api.Controllers;
 [Route("")]
 public class DocumentosController : ControllerBase
 {
+    private const long DefaultMaxDownloadBytes = 50 * 1024 * 1024;
     private readonly ComparadorDbContext _db;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
@@ -106,7 +107,7 @@ public class DocumentosController : ControllerBase
 
     [HttpPost("documentos")]
     [Authorize(Policy = AuthorizationPolicies.PuedeCargarDocumento)]
-    public async Task<IActionResult> CrearDocumento([FromForm] IFormFile? archivo, [FromForm] string? origen, [FromForm] string? url_origen, [FromForm] Guid? empresa_id, [FromForm] bool es_publico = false)
+    public async Task<IActionResult> CrearDocumento([FromForm] IFormFile? archivo, [FromForm] string? origen, [FromForm] string? url_origen, [FromForm] Guid? empresa_id, [FromForm] bool es_publico = false, CancellationToken cancellationToken = default)
     {
         var tenantId = RequireTenantId();
         if (empresa_id is null || !await _db.Empresas.AnyAsync(e => e.Id == empresa_id && e.TenantId == tenantId))
@@ -175,7 +176,7 @@ public class DocumentosController : ControllerBase
             return BadRequest(new { detail = "La URL no responde públicamente sin autenticación." });
         }
 
-        var (urlContent, urlFileName) = await DescargarUrlAsync(url);
+        var (urlContent, urlFileName) = await DescargarUrlAsync(url, cancellationToken);
         var urlStorageRoot = Environment.GetEnvironmentVariable("STORAGE_DIR")
             ?? _configuration["Storage:Root"]
             ?? Path.Combine(AppContext.BaseDirectory, "storage");
@@ -183,7 +184,7 @@ public class DocumentosController : ControllerBase
         Directory.CreateDirectory(urlStoragePath);
         var urlStoredName = $"{Guid.NewGuid():N}{Path.GetExtension(urlFileName)}";
         var urlFilePath = Path.Combine(urlStoragePath, urlStoredName);
-        await System.IO.File.WriteAllBytesAsync(urlFilePath, urlContent);
+        await System.IO.File.WriteAllBytesAsync(urlFilePath, urlContent, cancellationToken);
 
         var documento = new Documento
         {
@@ -204,15 +205,38 @@ public class DocumentosController : ControllerBase
         return CreatedAtAction(nameof(GetDocumento), new { id = documento.Id }, new { id = documento.Id, estado = documento.Estado });
     }
 
-    private async Task<(byte[] Content, string FileName)> DescargarUrlAsync(Uri url)
+    private async Task<(byte[] Content, string FileName)> DescargarUrlAsync(Uri url, CancellationToken cancellationToken)
     {
         try
         {
             var client = _httpClientFactory.CreateClient("public-url");
             client.Timeout = TimeSpan.FromSeconds(30);
-            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsByteArrayAsync();
+            var maxDownloadBytes = _configuration.GetValue<long?>("Documents:MaxDownloadBytes")
+                ?? DefaultMaxDownloadBytes;
+            if (response.Content.Headers.ContentLength > maxDownloadBytes)
+            {
+                throw new InvalidOperationException("El documento excede el tamaño máximo permitido.");
+            }
+
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var contentStream = new MemoryStream();
+            var buffer = new byte[81920];
+            var totalBytes = 0L;
+            int bytesRead;
+            while ((bytesRead = await responseStream.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                totalBytes += bytesRead;
+                if (totalBytes > maxDownloadBytes)
+                {
+                    throw new InvalidOperationException("El documento excede el tamaño máximo permitido.");
+                }
+
+                await contentStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+            }
+
+            var content = contentStream.ToArray();
             var fileName = Path.GetFileName(url.AbsolutePath);
 
             if (string.IsNullOrWhiteSpace(Path.GetExtension(fileName)))
@@ -231,7 +255,7 @@ public class DocumentosController : ControllerBase
         {
             throw new InvalidOperationException("No se pudo descargar el documento desde la URL.", exception);
         }
-        catch (TaskCanceledException exception)
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
             throw new InvalidOperationException("La descarga del documento excedió el tiempo permitido.", exception);
         }
@@ -275,10 +299,16 @@ public class DocumentosController : ControllerBase
         return addresses.Any(address => IPAddress.IsLoopback(address) ||
             address.IsIPv6LinkLocal ||
             address.IsIPv6SiteLocal ||
-            (address.AddressFamily == AddressFamily.InterNetwork &&
-             (address.GetAddressBytes()[0] == 10 ||
-              (address.GetAddressBytes()[0] == 172 && address.GetAddressBytes()[1] is >= 16 and <= 31) ||
-              (address.GetAddressBytes()[0] == 192 && address.GetAddressBytes()[1] == 168) ||
-              address.GetAddressBytes()[0] == 127)));
+            (address.AddressFamily == AddressFamily.InterNetwork && IsPrivateIpv4(address.GetAddressBytes())) ||
+            (address.AddressFamily == AddressFamily.InterNetworkV6 && IsUniqueLocalIpv6(address.GetAddressBytes())));
     }
+
+    private static bool IsPrivateIpv4(byte[] bytes) =>
+        bytes[0] == 10 ||
+        (bytes[0] == 172 && bytes[1] is >= 16 and <= 31) ||
+        (bytes[0] == 192 && bytes[1] == 168) ||
+        bytes[0] == 127 ||
+        (bytes[0] == 169 && bytes[1] == 254);
+
+    private static bool IsUniqueLocalIpv6(byte[] bytes) => (bytes[0] & 0xFE) == 0xFC;
 }
