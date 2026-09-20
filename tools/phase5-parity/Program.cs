@@ -1,8 +1,11 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Comparador.Api.Services;
 using Microsoft.Extensions.Configuration;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 var manifestPath = Path.Combine(root, "tools", "phase5-parity", "manifest.json");
@@ -37,6 +40,7 @@ foreach (var relativePath in manifest.Documents)
         result.Status = "processed";
         result.ExtractedCharacters = text.Length;
         result.ClauseCount = clauses.Length;
+        result.Candidates = GetPdfCandidates(path);
         var detectedHeaders = ClauseSegmenterDiagnostics.FindHeaders(text);
         result.DetectedHeaders = detectedHeaders.Count;
         result.HeaderSamples = detectedHeaders.Take(10).ToArray();
@@ -44,6 +48,10 @@ foreach (var relativePath in manifest.Documents)
         result.ReferenceClauseCount = referenceDocument.Clauses.Length;
         result.ExtractionParity = Normalize(text) == referenceDocument.NormalizedText;
         result.SegmentationParity = clauses.Select(Normalize).SequenceEqual(referenceDocument.NormalizedClauses);
+        result.FirstExtractionDifference = DescribeDifference(Normalize(text), referenceDocument.NormalizedText);
+        result.FirstSegmentationDifference = DescribeDifference(
+            string.Join("\n", clauses.Select(Normalize)),
+            string.Join("\n", referenceDocument.NormalizedClauses));
         if (result.ExtractionParity != true)
         {
             result.Discrepancies.Add("extraccion_normalizada");
@@ -88,8 +96,74 @@ Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 await File.WriteAllTextAsync(outputPath, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
 Console.WriteLine(JsonSerializer.Serialize(report.Summary));
 
-static string Normalize(string value) => string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+static string Normalize(string value) => string.Join(
+    ' ',
+    value.Normalize(NormalizationForm.FormKC)
+        .Replace("\u00ad", string.Empty)
+        .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 static double Rate(int numerator, int denominator) => denominator == 0 ? 0 : Math.Round((double)numerator / denominator, 4);
+
+static string? DescribeDifference(string actual, string expected)
+{
+    var index = 0;
+    while (index < actual.Length && index < expected.Length && actual[index] == expected[index])
+    {
+        index++;
+    }
+
+    if (index == actual.Length && index == expected.Length)
+    {
+        return null;
+    }
+
+    var start = Math.Max(0, index - 40);
+    var actualContext = actual.Substring(start, Math.Min(80, actual.Length - start));
+    var expectedContext = expected.Substring(start, Math.Min(80, expected.Length - start));
+    return $"index={index}; actual='{actualContext}'; expected='{expectedContext}'";
+}
+
+static Dictionary<string, CandidateResult> GetPdfCandidates(string path)
+{
+    if (!string.Equals(Path.GetExtension(path), ".pdf", StringComparison.OrdinalIgnoreCase))
+    {
+        return [];
+    }
+
+    using var document = PdfDocument.Open(path);
+    var candidates = new Dictionary<string, CandidateResult>();
+    var pageText = string.Join("\n", document.GetPages().Select(page => page.Text));
+    var readingOrder = string.Join("\n", document.GetPages()
+        .Select(page => ContentOrderTextExtractor.GetText(page, true)));
+    var physicalOrder = string.Join("\n", document.GetPages()
+        .Select(page => ContentOrderTextExtractor.GetText(page, false)));
+
+    foreach (var candidate in new[]
+    {
+        (Name: "page_text", Text: pageText),
+        (Name: "reading_order", Text: readingOrder),
+        (Name: "physical_order", Text: physicalOrder)
+    })
+    {
+        candidates[candidate.Name] = new CandidateResult
+        {
+            Characters = candidate.Text.Length,
+            NormalizedCharacters = Normalize(candidate.Text).Length,
+            ClauseCount = ClauseSegmenter.Segment(candidate.Text).Count
+        };
+    }
+
+    return candidates;
+}
+
+static class ClauseSegmenterDiagnostics
+{
+    private static readonly System.Text.RegularExpressions.Regex HeaderRegex = new(
+        @"^\s*(CL[ÁA]USULA|ART[ÍI]CULO)\s+\S.*$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+    public static IReadOnlyList<string> FindHeaders(string text) =>
+        HeaderRegex.Matches(text).Select(match => match.Value.Trim()).ToArray();
+}
 
 record Manifest(string Dataset, string[] Documents);
 record ReferenceReport(string Dataset, string Runtime, DocumentReference[] Documents);
@@ -120,21 +194,15 @@ class DocumentResult
     public int ReferenceClauseCount { get; set; }
     public int DetectedHeaders { get; set; }
     public string[] HeaderSamples { get; set; } = [];
+    public Dictionary<string, CandidateResult> Candidates { get; set; } = [];
+    public string? FirstExtractionDifference { get; set; }
+    public string? FirstSegmentationDifference { get; set; }
     public bool? ExtractionParity { get; set; }
     public bool? SegmentationParity { get; set; }
     public List<string> Discrepancies { get; } = [];
     public string? Error { get; set; }
 }
 
-static class ClauseSegmenterDiagnostics
-{
-    private static readonly System.Text.RegularExpressions.Regex HeaderRegex = new(
-        @"^\s*(CL[ÁA]USULA|ART[ÍI]CULO)\s+\S.*$",
-        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
-
-    public static IReadOnlyList<string> FindHeaders(string text) =>
-        HeaderRegex.Matches(text).Select(match => match.Value.Trim()).ToArray();
-}
 class Summary
 {
     public int Total { get; init; }
@@ -146,4 +214,10 @@ class Summary
     public double ProcessingRate { get; init; }
     public double ExtractionParityRate { get; init; }
     public double SegmentationParityRate { get; init; }
+}
+class CandidateResult
+{
+    public int Characters { get; init; }
+    public int NormalizedCharacters { get; init; }
+    public int ClauseCount { get; init; }
 }

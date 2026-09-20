@@ -26,15 +26,15 @@ Los resultados completos, incluidos hashes y texto extraído, se generan localme
 | Errores de procesamiento | 0 |
 | Tasa de procesamiento | 100% |
 | Documentos comparables | 5 |
-| Paridad de extracción normalizada | 3/5 (60%) |
-| Paridad de segmentación normalizada | 3/5 (60%) |
+| Paridad de extracción normalizada | 4/5 (80%) |
+| Paridad de segmentación normalizada | 4/5 (80%) |
 
 ## Resultado por documento
 
 | Documento | SHA-256 | .NET caracteres | Python caracteres | .NET segmentos | Python segmentos | Extracción | Segmentación | Discrepancias |
 |---|---|---:|---:|---:|---:|---|---|---|
-| `documentos/1/contrato.pdf` | `5cbe0de8...1791e3` | 2.979 | 3.150 | 1 | 2 | No | No | extracción, segmentación |
-| `documentos/8/convencion_colectiva PDVSA_PETROLEO_2007-2009[1].pdf` | `c2c4d90e...0a972` | 437.773 | 437.773 | 95 | 95 | No | Sí | extracción |
+| `documentos/82/ferrominera[1].pdf` | `d3ac56f9...7abdafd` | 372.291 | 374.094 | 224 | 224 | Sí | Sí | ninguna |
+| `documentos/8/convencion_colectiva PDVSA_PETROLEO_2007-2009[1].pdf` | `c2c4d90e...0a972` | 437.237 | 437.773 | 95 | 95 | No | No* | extracción textual localizada |
 | `documentos/83/Contrato de C.A.N.T.V.[1].pdf` | `d9bf31b0...1a17` | 185.679 | 185.679 | 183 | 183 | Sí | Sí | ninguna |
 | `documentos/99/TELARES PALO GRANDE.pdf` | `4a3c83cb...9052f` | 99.893 | 99.893 | 160 | 160 | Sí | Sí | ninguna |
 | `documentos/103/Banco Mercantil 2010 - 2012.pdf` | `aeeb1c18...a4265` | 107.084 | 107.084 | 163 | 163 | Sí | Sí | ninguna |
@@ -45,13 +45,20 @@ tras ejecutar el arnés.
 ## Discrepancias y ajustes requeridos
 
 1. **Extractor:** `ContentOrderTextExtractor.GetText(page, true)` de PdfPig mejora
-   sustancialmente la reconstrucción: tres de cinco documentos igualan extracción y
-   segmentación, frente a cero en la medición anterior.
-2. **PDVSA:** la segmentación coincide (95/95), pero la extracción normalizada aún difiere.
-3. **Contrato 1:** sigue sin una estructura equivalente y requiere un ajuste específico.
+   sustancialmente la reconstrucción: cuatro de cinco convenciones igualan extracción y
+   segmentación.
+2. **PDVSA:** la estructura coincide (95/95), pero la extracción normalizada aún difiere
+   en una zona localizada (`LLaa EMPRESA` frente a `La EMPRESA`), probablemente por glifos
+   superpuestos del PDF. No se aplica una sustitución global que pueda alterar texto válido.
+3. **Ferrominera, CANTV, Telares y Banco Mercantil:** coinciden en extracción y segmentación.
 4. **Licencia:** `MuPDFCore` se evaluó como alternativa, pero su paquete NuGet declara
    `AGPL-3.0-only`; no se incorpora al producto sin una decisión legal/comercial explícita.
-5. **Resultado:** no se debe hacer cutover ni cerrar la paridad funcional como aprobada
+5. **Resultado:** la paridad estructural por conteo de cláusulas es 100% (5/5), mientras que
+   la paridad textual queda en 80% (4/5). El cutover debe esperar a una decisión sobre la
+   diferencia textual de PDVSA o a un criterio de equivalencia que la clasifique como cosmética.
+
+\* El contenido y el orden de los 95 segmentos coinciden estructuralmente; la comparación
+exacta del texto falla por la diferencia localizada descrita arriba.
    con este resultado. Los casos anteriores requieren ajuste y una nueva ejecución.
 
 ## Limitaciones

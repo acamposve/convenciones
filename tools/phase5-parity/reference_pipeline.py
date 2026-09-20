@@ -2,6 +2,7 @@
 import hashlib
 import json
 import sys
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,6 +13,7 @@ from app.segmentation import segment_clauses
 
 
 def normalize(value: str) -> str:
+    value = unicodedata.normalize("NFKC", value).replace("\u00ad", "")
     return " ".join(value.split())
 
 
