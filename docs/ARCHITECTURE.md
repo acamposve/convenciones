@@ -17,7 +17,7 @@
 ## Principios
 
 1. **Multi-tenancy por columna** (`tenant_id` en todas las tablas públicas) + **Row Level Security nativo** en Supabase como segunda capa de aislamiento (Art. VI.2)
-2. **Backend unificado en .NET 10** (API + procesamiento de IA vía `Microsoft.Extensions.AI`) — sustituye la separación anterior .NET (lógica) / Python (IA); ver migración arriba
+2. **Backend unificado en .NET 10** (API + procesamiento determinista de documentos) — sustituye la separación anterior .NET/Python para el MVP; la IA queda diferida
 3. **Documentos privados por defecto** — solo públicos si se declara explícitamente
 4. **Revisión humana obligatoria antes de publicar** — nunca automatizado
 
@@ -39,9 +39,8 @@
 │  - CRUD de documentos, cláusulas                     │
 │  - Orquestación de publicación                       │
 │  - Worker en proceso (Channel + BackgroundService):  │
-│    OCR, extracción, segmentación,                    │
-│    clasificación (Claude vía Microsoft.Extensions.AI)│
-│    verificación legal                                │
+│    OCR, extracción y segmentación deterministas      │
+│  - Clasificación automática y análisis IA: diferidos │
 └────────┬──────────────────────────┬──────────────────┘
          │                          │
          │ Supabase Storage         │ Npgsql / EF Core
@@ -60,7 +59,7 @@
 > implementó (`EVALUACION_MADUREZ_MIGRACION.md` §4.3) — hoy el pipeline corre con
 > `BackgroundTasks` de FastAPI, en memoria dentro del mismo contenedor Python.
 
-## Flujo de procesamiento (MVP Demo)
+## Flujo de procesamiento (MVP Demo sin IA)
 
 ```
 1. Usuario carga PDF
@@ -70,10 +69,9 @@
 3. API encola el documento en el Channel en proceso
    ↓
 4. DocumentProcessingWorker (BackgroundService) toma el item
-   ├─ Extrae texto (UglyToad.PdfPig + OCR)
+   ├─ Extrae texto (UglyToad.PdfPig + Tesseract OCR)
    ├─ Segmenta en cláusulas (heurística, [GeneratedRegex])
-   ├─ Clasifica c/ LLM (Claude vía Microsoft.Extensions.AI) → titulo de taxonomía
-   └─ Devuelve resultados
+   └─ Devuelve cláusulas sin título automático
    ↓
 5. API guarda cláusulas en Supabase (Postgres)
    ↓
@@ -117,8 +115,8 @@ Stack objetivo (Enmienda 2.2.0); el desplegado hoy sigue el diseño anterior (co
 
 | Componente | Decisión | Antes (hasta cutover) | Razón del cambio |
 |---|---|---|---|
-| API + AI Service | C# / .NET 10 LTS, servicio único | API en .NET 8 + AI Service en Python/FastAPI separado | Un solo runtime que mantener y desplegar; `Microsoft.Extensions.AI` cubre lo que antes requería Python |
-| LLM | Claude (API) vía `IChatClient` | Claude (API) directo desde Python | Mismo proveedor; cambia el cliente |
+| API + procesamiento | C# / .NET 10 LTS, servicio único | API en .NET 8 + servicio Python/FastAPI separado | Un solo runtime que mantener y desplegar; el MVP procesa documentos sin IA |
+| Clasificación IA | Fuera del MVP; queda diferida | Claude (API) directo desde Python | Se requiere una decisión posterior de alcance, proveedor y validación |
 | Base de datos | Supabase (PostgreSQL 16 + RLS) | PostgreSQL (Azure Flexible Server autoadministrado) | RLS nativo refuerza aislamiento por tenant; Auth/Storage integrados; menos infraestructura propia que operar |
 | Storage | Supabase Storage | Azure Blob | Documentos encriptados en reposo, con RLS unificado a la política de datos |
 | Cola | `System.Threading.Channels` en proceso | Service Bus / RabbitMQ | Suficiente para el volumen actual; ya no hay dos procesos que desacoplar |
@@ -149,8 +147,8 @@ que no hace falta reescribirlos para el proveedor nuevo, solo definir dónde cor
 
 ---
 
-**Stack objetivo: .NET 10 LTS (unificado, API + IA) · React/Vite · Supabase (PostgreSQL + RLS) · proveedor de deploy sin decidir**
-**Stack desplegado hoy: .NET 10 LTS (API, sin unificar todavía) · Python/FastAPI (IA + mayoría de la lógica de negocio) · React/Vite · PostgreSQL local — sin ambiente en la nube**
+**Stack objetivo MVP: .NET 10 LTS (API + procesamiento determinista) · React/Vite · Supabase (PostgreSQL + RLS) · proveedor de deploy sin decidir**
+**Stack desplegado hoy: .NET 10 LTS (API, sin unificar todavía) · Python/FastAPI (pipeline legado) · React/Vite · PostgreSQL local — sin ambiente en la nube**
 
 Justificación detallada de cada decisión y del plan de transición en
 [`constitution.md`](constitution.md) Art. V y en

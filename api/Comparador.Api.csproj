@@ -26,11 +26,8 @@
     </PackageReference>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
-    <!-- Fase 4 (PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md): abstraccion IChatClient para
-         Claude. El paquete se instala en esta fase (3.1), pero se conecta recien en la
-         Fase 4 (Microsoft.Extensions.AI/Anthropic). Sin uso todavia. -->
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
+    <PackageReference Include="PdfPig" Version="0.1.9" />
   </ItemGroup>
 
 </Project>

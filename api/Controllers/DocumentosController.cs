@@ -17,12 +17,18 @@ public class DocumentosController : ControllerBase
     private readonly ComparadorDbContext _db;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
+    private readonly DocumentProcessingQueue _processingQueue;
 
-    public DocumentosController(ComparadorDbContext db, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    public DocumentosController(
+        ComparadorDbContext db,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
+        DocumentProcessingQueue processingQueue)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
+        _processingQueue = processingQueue;
     }
 
     private Guid RequireTenantId()
@@ -150,6 +156,7 @@ public class DocumentosController : ControllerBase
             };
             _db.Documentos.Add(fileDocument);
             await _db.SaveChangesAsync();
+            await _processingQueue.EnqueueAsync(fileDocument.Id);
             return CreatedAtAction(nameof(GetDocumento), new { id = fileDocument.Id }, new { id = fileDocument.Id, estado = fileDocument.Estado });
         }
 
@@ -158,10 +165,25 @@ public class DocumentosController : ControllerBase
             return BadRequest(new { detail = "Debe indicar una URL HTTP o HTTPS válida." });
         }
 
+        if (await EsDestinoPrivadoAsync(url))
+        {
+            return BadRequest(new { detail = "La URL apunta a un destino privado no permitido." });
+        }
+
         if (es_publico && !await EsUrlPublicaAsync(url))
         {
             return BadRequest(new { detail = "La URL no responde públicamente sin autenticación." });
         }
+
+        var (urlContent, urlFileName) = await DescargarUrlAsync(url);
+        var urlStorageRoot = Environment.GetEnvironmentVariable("STORAGE_DIR")
+            ?? _configuration["Storage:Root"]
+            ?? Path.Combine(AppContext.BaseDirectory, "storage");
+        var urlStoragePath = Path.Combine(urlStorageRoot, "documentos");
+        Directory.CreateDirectory(urlStoragePath);
+        var urlStoredName = $"{Guid.NewGuid():N}{Path.GetExtension(urlFileName)}";
+        var urlFilePath = Path.Combine(urlStoragePath, urlStoredName);
+        await System.IO.File.WriteAllBytesAsync(urlFilePath, urlContent);
 
         var documento = new Documento
         {
@@ -169,7 +191,7 @@ public class DocumentosController : ControllerBase
             EmpresaId = empresa_id.Value,
             Origen = origenFinal,
             UrlOrigen = string.IsNullOrWhiteSpace(url_origen) ? null : url_origen,
-            RutaArchivo = null,
+            RutaArchivo = urlFilePath,
             EsPublico = es_publico,
             Estado = "pendiente",
             CreatedAt = DateTimeOffset.UtcNow
@@ -177,8 +199,42 @@ public class DocumentosController : ControllerBase
 
         _db.Documentos.Add(documento);
         await _db.SaveChangesAsync();
+        await _processingQueue.EnqueueAsync(documento.Id);
 
         return CreatedAtAction(nameof(GetDocumento), new { id = documento.Id }, new { id = documento.Id, estado = documento.Estado });
+    }
+
+    private async Task<(byte[] Content, string FileName)> DescargarUrlAsync(Uri url)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("public-url");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            var content = await response.Content.ReadAsByteArrayAsync();
+            var fileName = Path.GetFileName(url.AbsolutePath);
+
+            if (string.IsNullOrWhiteSpace(Path.GetExtension(fileName)))
+            {
+                var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+                fileName += contentType.Contains("pdf", StringComparison.OrdinalIgnoreCase)
+                    ? ".pdf"
+                    : contentType.Contains("word", StringComparison.OrdinalIgnoreCase)
+                        ? ".docx"
+                        : "";
+            }
+
+            return (content, string.IsNullOrWhiteSpace(fileName) ? "documento" : fileName);
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new InvalidOperationException("No se pudo descargar el documento desde la URL.", exception);
+        }
+        catch (TaskCanceledException exception)
+        {
+            throw new InvalidOperationException("La descarga del documento excedió el tiempo permitido.", exception);
+        }
     }
 
     private async Task<bool> EsUrlPublicaAsync(Uri url)

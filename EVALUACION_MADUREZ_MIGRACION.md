@@ -14,6 +14,9 @@
 > estado actual. **Además, se escribió asumiendo Azure como proveedor de nube** (varias
 > secciones lo dan por hecho) — eso también cambió: se retiró Azure del proyecto (Enmienda
 > 2.3.0 de `constitution.md`), sin proveedor nuevo decidido todavía.
+> **Además, desde la enmienda 2.4.0 el MVP interno excluye IA:** la fila "Pipeline de
+> Ingesta e IA" y las referencias a Claude describen el estado histórico del servicio Python,
+> no el alcance vigente del MVP .NET, que termina en extracción/OCR y segmentación.
 
 ---
 
@@ -27,7 +30,7 @@ El proyecto **Comparador de Convenciones Colectivas de Trabajo** se encuentra en
 |---|:---:|:---:|---|
 | **Gobierno y Constitución Arquitectónica** | **4.8 / 5** | 🟢 Ejemplar | Claridad absoluta de reglas de negocio, límites del sistema y decisiones no negociables (`docs/constitution.md`). |
 | **Arquitectura de Dominio y Datos (Nuevo)** | **4.2 / 5** | 🟢 Maduro | Modelo relacional PostgreSQL sólido, normalizado, con multi-tenancy estricto (`tenant_id`) y auditoría. |
-| **Pipeline de Ingesta e IA (Nuevo)** | **3.8 / 5** | 🟡 Funcional | Ingesta PDF/Word, fallback OCR y extracción estructurada con LLM (Claude) operativa. |
+| **Pipeline de Ingesta (Nuevo)** | **3.0 / 5** | 🟡 En migración | Ingesta PDF/Word, extracción y segmentación en .NET; OCR nativo y validación de paridad aún pendientes. |
 | **Infraestructura como Código y CI/CD** | **3.7 / 5** | 🟡 Bien encaminado | Terraform completo para Azure (Container Apps, PostgreSQL, ACR, Storage) y workflows en GitHub Actions. |
 | **Seguridad de la Plataforma Nueva** | **3.5 / 5** | 🟡 Aceptable | BCrypt, JWT/Refresh tokens, aislamiento por tenant. Pendiente gestión granular de usuarios y SSO. |
 | **Higiene y Coherencia Arquitectónica** | **2.5 / 5** | 🟠 En Riesgo | Desviación del diseño original: `service/app/main.py` se convirtió en un monolito de ~1.500 líneas absorbiendo CRUDs de .NET. |

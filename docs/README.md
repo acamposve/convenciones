@@ -17,7 +17,7 @@
 - [`CHANGELOG.md`](CHANGELOG.md) — Historial de cambios de alcance/arquitectura
 
 ### MVP Demo actual (Venezuela)
-- [`spec-mvp-demo.md`](spec-mvp-demo.md) — Alcance exacto: ingesta → clasificación
+- [`spec-mvp-demo.md`](spec-mvp-demo.md) — Alcance exacto del MVP sin IA: ingesta → extracción/OCR → segmentación
 - [`bootstrap-demo.md`](bootstrap-demo.md) — Cómo correr la demo localmente
 
 ### Especificaciones de dominio

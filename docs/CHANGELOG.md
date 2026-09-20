@@ -7,6 +7,12 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+- Enmienda 2.4.0: el MVP interno no usa LLMs, Claude, `Microsoft.Extensions.AI` ni servicios
+  externos de IA. El pipeline termina en extracción/OCR y segmentación; las cláusulas quedan
+  sin clasificación automática. La clasificación, resumen y cumplimiento legal se difieren
+  a una fase posterior.
+
 ### Added
 - MVP Demo: pipeline ingesta → extracción → segmentación → clasificación (Venezuela)
 - API .NET: autenticación JWT, modelo de tenants, usuario demo
