@@ -22,9 +22,20 @@ public sealed class DocumentProcessingWorker : BackgroundService
     {
         await foreach (var documentId in _queue.ReadAllAsync(stoppingToken))
         {
-            using var scope = _scopeFactory.CreateScope();
-            var processor = scope.ServiceProvider.GetRequiredService<DocumentProcessingService>();
-            await processor.ProcessAsync(documentId, stoppingToken);
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var processor = scope.ServiceProvider.GetRequiredService<DocumentProcessingService>();
+                await processor.ProcessAsync(documentId, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Excepción no controlada en el worker para el documento {DocumentId}", documentId);
+            }
         }
     }
 }

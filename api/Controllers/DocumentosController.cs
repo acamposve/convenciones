@@ -125,6 +125,20 @@ public class DocumentosController : ControllerBase
                 return BadRequest(new { detail = "Debe adjuntar un archivo no vacío." });
             }
 
+            var extension = Path.GetExtension(archivo.FileName);
+            var maxUploadBytes = _configuration.GetValue<long?>("Documents:MaxDownloadBytes")
+                ?? DefaultMaxDownloadBytes;
+            if (!string.Equals(extension, ".pdf", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { detail = "El archivo debe ser PDF o DOCX." });
+            }
+
+            if (archivo.Length > maxUploadBytes)
+            {
+                return BadRequest(new { detail = "El archivo excede el tamaño máximo permitido." });
+            }
+
             if (es_publico)
             {
                 return BadRequest(new { detail = "Los archivos cargados no pueden publicarse; use una URL pública." });
@@ -163,7 +177,20 @@ public class DocumentosController : ControllerBase
             return BadRequest(new { detail = "Debe indicar una URL HTTP o HTTPS válida." });
         }
 
-        var allowedAddress = await ResolveAllowedAddressAsync(url);
+        IPAddress? allowedAddress;
+        try
+        {
+            allowedAddress = await ResolveAllowedAddressAsync(url);
+        }
+        catch (SocketException)
+        {
+            return BadRequest(new { detail = "No se pudo resolver una dirección pública para la URL." });
+        }
+        catch (ArgumentException)
+        {
+            return BadRequest(new { detail = "La URL no contiene un host válido." });
+        }
+
         if (allowedAddress is null)
         {
             return BadRequest(new { detail = "La URL apunta a un destino privado no permitido." });
