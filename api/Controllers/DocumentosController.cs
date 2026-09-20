@@ -16,18 +16,15 @@ public class DocumentosController : ControllerBase
 {
     private const long DefaultMaxDownloadBytes = 50 * 1024 * 1024;
     private readonly ComparadorDbContext _db;
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly DocumentProcessingQueue _processingQueue;
 
     public DocumentosController(
         ComparadorDbContext db,
-        IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         DocumentProcessingQueue processingQueue)
     {
         _db = db;
-        _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _processingQueue = processingQueue;
     }
@@ -142,7 +139,7 @@ public class DocumentosController : ControllerBase
             var filePath = Path.Combine(storagePath, storedName);
             await using (var output = System.IO.File.Create(filePath))
             {
-                await archivo.CopyToAsync(output);
+                await archivo.CopyToAsync(output, cancellationToken);
             }
 
             var fileDocument = new Documento
@@ -156,8 +153,8 @@ public class DocumentosController : ControllerBase
                 CreatedAt = DateTimeOffset.UtcNow
             };
             _db.Documentos.Add(fileDocument);
-            await _db.SaveChangesAsync();
-            await _processingQueue.EnqueueAsync(fileDocument.Id);
+            await _db.SaveChangesAsync(cancellationToken);
+            await _processingQueue.EnqueueAsync(fileDocument.Id, cancellationToken);
             return CreatedAtAction(nameof(GetDocumento), new { id = fileDocument.Id }, new { id = fileDocument.Id, estado = fileDocument.Estado });
         }
 
@@ -166,17 +163,18 @@ public class DocumentosController : ControllerBase
             return BadRequest(new { detail = "Debe indicar una URL HTTP o HTTPS válida." });
         }
 
-        if (await EsDestinoPrivadoAsync(url))
+        var allowedAddress = await ResolveAllowedAddressAsync(url);
+        if (allowedAddress is null)
         {
             return BadRequest(new { detail = "La URL apunta a un destino privado no permitido." });
         }
 
-        if (es_publico && !await EsUrlPublicaAsync(url))
+        if (es_publico && !await EsUrlPublicaAsync(url, allowedAddress, cancellationToken))
         {
             return BadRequest(new { detail = "La URL no responde públicamente sin autenticación." });
         }
 
-        var (urlContent, urlFileName) = await DescargarUrlAsync(url, cancellationToken);
+        var (urlContent, urlFileName) = await DescargarUrlAsync(url, allowedAddress, cancellationToken);
         var urlStorageRoot = Environment.GetEnvironmentVariable("STORAGE_DIR")
             ?? _configuration["Storage:Root"]
             ?? Path.Combine(AppContext.BaseDirectory, "storage");
@@ -199,17 +197,20 @@ public class DocumentosController : ControllerBase
         };
 
         _db.Documentos.Add(documento);
-        await _db.SaveChangesAsync();
-        await _processingQueue.EnqueueAsync(documento.Id);
+        await _db.SaveChangesAsync(cancellationToken);
+        await _processingQueue.EnqueueAsync(documento.Id, cancellationToken);
 
         return CreatedAtAction(nameof(GetDocumento), new { id = documento.Id }, new { id = documento.Id, estado = documento.Estado });
     }
 
-    private async Task<(byte[] Content, string FileName)> DescargarUrlAsync(Uri url, CancellationToken cancellationToken)
+    private async Task<(byte[] Content, string FileName)> DescargarUrlAsync(
+        Uri url,
+        IPAddress allowedAddress,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var client = _httpClientFactory.CreateClient("public-url");
+            using var client = CreatePinnedHttpClient(url, allowedAddress);
             client.Timeout = TimeSpan.FromSeconds(30);
             using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -261,26 +262,21 @@ public class DocumentosController : ControllerBase
         }
     }
 
-    private async Task<bool> EsUrlPublicaAsync(Uri url)
+    private async Task<bool> EsUrlPublicaAsync(Uri url, IPAddress allowedAddress, CancellationToken cancellationToken)
     {
         try
         {
-            if (await EsDestinoPrivadoAsync(url))
-            {
-                return false;
-            }
-
-            var client = _httpClientFactory.CreateClient("public-url");
+            using var client = CreatePinnedHttpClient(url, allowedAddress);
             client.Timeout = TimeSpan.FromSeconds(10);
             using var head = new HttpRequestMessage(HttpMethod.Head, url);
-            using var headResponse = await client.SendAsync(head, HttpCompletionOption.ResponseHeadersRead);
+            using var headResponse = await client.SendAsync(head, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (headResponse.IsSuccessStatusCode)
             {
                 return true;
             }
 
             using var get = new HttpRequestMessage(HttpMethod.Get, url);
-            using var getResponse = await client.SendAsync(get, HttpCompletionOption.ResponseHeadersRead);
+            using var getResponse = await client.SendAsync(get, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             return getResponse.IsSuccessStatusCode;
         }
         catch (HttpRequestException)
@@ -293,15 +289,45 @@ public class DocumentosController : ControllerBase
         }
     }
 
-    private static async Task<bool> EsDestinoPrivadoAsync(Uri url)
+    private static async Task<IPAddress?> ResolveAllowedAddressAsync(Uri url)
     {
         var addresses = await Dns.GetHostAddressesAsync(url.Host);
-        return addresses.Any(address => IPAddress.IsLoopback(address) ||
-            address.IsIPv6LinkLocal ||
-            address.IsIPv6SiteLocal ||
-            (address.AddressFamily == AddressFamily.InterNetwork && IsPrivateIpv4(address.GetAddressBytes())) ||
-            (address.AddressFamily == AddressFamily.InterNetworkV6 && IsUniqueLocalIpv6(address.GetAddressBytes())));
+        return addresses.FirstOrDefault(address => !IsPrivateAddress(address));
     }
+
+    private HttpClient CreatePinnedHttpClient(Uri url, IPAddress allowedAddress)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                var socket = new Socket(allowedAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                try
+                {
+                    await socket.ConnectAsync(allowedAddress, context.DnsEndPoint.Port, cancellationToken);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            }
+        };
+
+        return new HttpClient(handler, disposeHandler: true)
+        {
+            BaseAddress = new Uri($"{url.Scheme}://{url.Host}")
+        };
+    }
+
+    private static bool IsPrivateAddress(IPAddress address) =>
+        IPAddress.IsLoopback(address) ||
+        address.IsIPv6LinkLocal ||
+        address.IsIPv6SiteLocal ||
+        (address.AddressFamily == AddressFamily.InterNetwork && IsPrivateIpv4(address.GetAddressBytes())) ||
+        (address.AddressFamily == AddressFamily.InterNetworkV6 && IsUniqueLocalIpv6(address.GetAddressBytes()));
 
     private static bool IsPrivateIpv4(byte[] bytes) =>
         bytes[0] == 10 ||

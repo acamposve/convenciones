@@ -62,7 +62,7 @@ public sealed class TesseractOcr
             {
                 Directory.Delete(workDirectory, recursive: true);
             }
-            catch (IOException)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 // El texto ya fue obtenido; un temporal huérfano no debe ocultar el resultado.
             }
