@@ -26,34 +26,32 @@ Los resultados completos, incluidos hashes y texto extraído, se generan localme
 | Errores de procesamiento | 0 |
 | Tasa de procesamiento | 100% |
 | Documentos comparables | 5 |
-| Paridad de extracción normalizada | 0/5 (0%) |
-| Paridad de segmentación normalizada | 0/5 (0%) |
+| Paridad de extracción normalizada | 3/5 (60%) |
+| Paridad de segmentación normalizada | 3/5 (60%) |
 
 ## Resultado por documento
 
 | Documento | SHA-256 | .NET caracteres | Python caracteres | .NET segmentos | Python segmentos | Extracción | Segmentación | Discrepancias |
 |---|---|---:|---:|---:|---:|---|---|---|
 | `documentos/1/contrato.pdf` | `5cbe0de8...1791e3` | 2.979 | 3.150 | 1 | 2 | No | No | extracción, segmentación |
-| `documentos/8/convencion_colectiva PDVSA_PETROLEO_2007-2009[1].pdf` | `c2c4d90e...0a972` | 430.080 | 437.773 | 139 | 95 | No | No | extracción, segmentación |
-| `documentos/83/Contrato de C.A.N.T.V.[1].pdf` | `d9bf31b0...1a17` | 182.315 | 185.679 | 102 | 183 | No | No | extracción, segmentación |
-| `documentos/99/TELARES PALO GRANDE.pdf` | `4a3c83cb...9052f` | 97.852 | 99.893 | 103 | 160 | No | No | extracción, segmentación |
-| `documentos/103/Banco Mercantil 2010 - 2012.pdf` | `aeeb1c18...a4265` | 105.011 | 107.084 | 158 | 163 | No | No | extracción, segmentación |
+| `documentos/8/convencion_colectiva PDVSA_PETROLEO_2007-2009[1].pdf` | `c2c4d90e...0a972` | 437.773 | 437.773 | 95 | 95 | No | Sí | extracción |
+| `documentos/83/Contrato de C.A.N.T.V.[1].pdf` | `d9bf31b0...1a17` | 185.679 | 185.679 | 183 | 183 | Sí | Sí | ninguna |
+| `documentos/99/TELARES PALO GRANDE.pdf` | `4a3c83cb...9052f` | 99.893 | 99.893 | 160 | 160 | Sí | Sí | ninguna |
+| `documentos/103/Banco Mercantil 2010 - 2012.pdf` | `aeeb1c18...a4265` | 107.084 | 107.084 | 163 | 163 | Sí | Sí | ninguna |
 
 Los hashes completos y las rutas exactas están en `artifacts/phase5/parity-report.json`
 tras ejecutar el arnés.
 
 ## Discrepancias y ajustes requeridos
 
-1. **Extracción:** PdfPig y PyMuPDF no producen texto normalizado idéntico en este lote.
-   La reconstrucción de líneas desde las coordenadas de palabras mejora la estructura
-   disponible para segmentación, pero no iguala todavía el texto histórico.
-2. **Segmentación:** el ajuste de reconstrucción de líneas redujo el error absoluto de
-   conteos del lote, de 572 a 392 segmentos, pero todavía hay diferencias importantes.
-   No se habilitó una regex tolerante global porque capturaba referencias internas como
-   `CLÁUSULA SEGURO` y sobresegmentaba el resultado.
-3. **Banco Mercantil:** el conteo C# quedó en 158 frente a 163 del Python legado; es el
-   caso más cercano y sirve como referencia para ajustar los restantes sin sobresegmentar.
-4. **Resultado:** no se deben hacer cutover ni cerrar la paridad funcional como aprobada
+1. **Extractor:** `ContentOrderTextExtractor.GetText(page, true)` de PdfPig mejora
+   sustancialmente la reconstrucción: tres de cinco documentos igualan extracción y
+   segmentación, frente a cero en la medición anterior.
+2. **PDVSA:** la segmentación coincide (95/95), pero la extracción normalizada aún difiere.
+3. **Contrato 1:** sigue sin una estructura equivalente y requiere un ajuste específico.
+4. **Licencia:** `MuPDFCore` se evaluó como alternativa, pero su paquete NuGet declara
+   `AGPL-3.0-only`; no se incorpora al producto sin una decisión legal/comercial explícita.
+5. **Resultado:** no se debe hacer cutover ni cerrar la paridad funcional como aprobada
    con este resultado. Los casos anteriores requieren ajuste y una nueva ejecución.
 
 ## Limitaciones
