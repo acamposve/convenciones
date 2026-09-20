@@ -36,7 +36,7 @@ public sealed class DocumentTextExtractor
     {
         using var stream = new MemoryStream(content);
         using var document = PdfDocument.Open(stream);
-        var text = string.Join("\n", document.GetPages().Select(page => page.Text));
+        var text = string.Join("\n", document.GetPages().Select(ExtractPageText));
 
         if (text.Trim().Length < document.NumberOfPages * 20)
         {
@@ -44,6 +44,27 @@ public sealed class DocumentTextExtractor
         }
 
         return text;
+    }
+
+    private static string ExtractPageText(UglyToad.PdfPig.Content.Page page)
+    {
+        var lines = new List<(double Top, List<string> Words)>();
+        foreach (var word in page.GetWords()
+                     .OrderByDescending(item => item.BoundingBox.Top)
+                     .ThenBy(item => item.BoundingBox.Left))
+        {
+            var lineIndex = lines.FindIndex(line => Math.Abs(line.Top - word.BoundingBox.Top) <= 3);
+            if (lineIndex < 0)
+            {
+                lines.Add((word.BoundingBox.Top, [word.Text]));
+            }
+            else
+            {
+                lines[lineIndex].Words.Add(word.Text);
+            }
+        }
+
+        return string.Join("\n", lines.Select(line => string.Join(" ", line.Words)));
     }
 
     private static string ExtractDocx(byte[] content)

@@ -37,6 +37,9 @@ foreach (var relativePath in manifest.Documents)
         result.Status = "processed";
         result.ExtractedCharacters = text.Length;
         result.ClauseCount = clauses.Length;
+        var detectedHeaders = ClauseSegmenterDiagnostics.FindHeaders(text);
+        result.DetectedHeaders = detectedHeaders.Count;
+        result.HeaderSamples = detectedHeaders.Take(10).ToArray();
         result.ReferenceExtractedCharacters = referenceDocument.Text.Length;
         result.ReferenceClauseCount = referenceDocument.Clauses.Length;
         result.ExtractionParity = Normalize(text) == referenceDocument.NormalizedText;
@@ -115,10 +118,22 @@ class DocumentResult
     public int ClauseCount { get; set; }
     public int ReferenceExtractedCharacters { get; set; }
     public int ReferenceClauseCount { get; set; }
+    public int DetectedHeaders { get; set; }
+    public string[] HeaderSamples { get; set; } = [];
     public bool? ExtractionParity { get; set; }
     public bool? SegmentationParity { get; set; }
     public List<string> Discrepancies { get; } = [];
     public string? Error { get; set; }
+}
+
+static class ClauseSegmenterDiagnostics
+{
+    private static readonly System.Text.RegularExpressions.Regex HeaderRegex = new(
+        @"^\s*(CL[ÁA]USULA|ART[ÍI]CULO)\s+\S.*$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+    public static IReadOnlyList<string> FindHeaders(string text) =>
+        HeaderRegex.Matches(text).Select(match => match.Value.Trim()).ToArray();
 }
 class Summary
 {
