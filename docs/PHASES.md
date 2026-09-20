@@ -10,7 +10,7 @@
 
 | Fase | Nombre | Alcance | Estado |
 |---|---|---|---|
-| MVP | Demo Venezuela | Ingesta → Clasificación (Art. IV, pasos 1-5) | ✅ En curso |
+| MVP | Demo Venezuela sin IA | Ingesta → extracción/OCR → segmentación (Art. IV, pasos 1-4) | ✅ En curso |
 | 1 | Revisión + Publicación | Cola de revisión, score, campo comparativo, reporte web (Art. IV.6-9) | 📋 Planeada |
 | 2 | Multi-país + Autenticación | Selector de país, SSO/SAML, roles, licenciamiento | 📋 Planeada |
 | 3 | Negociación colectiva | Pre-firma: peticiones, ofertas, reuniones, acuerdos (Art. IV bis) | 📋 Planeada |
@@ -20,14 +20,14 @@
 
 ## MVP Demo (Fase actual)
 
-**Objetivo:** Mostrar el pipeline de IA funcionando end-to-end sobre datos reales.
+**Objetivo:** Mostrar el pipeline determinista funcionando end-to-end sobre datos reales, sin modelos ni servicios de IA.
 
 **Incluido:**
 - ✅ Alta de tenant (empresa) — Venezuela fijo
 - ✅ Ingesta: carga de archivo (PDF/Word) + URL
 - ✅ Extracción de texto (nativa + OCR)
 - ✅ Segmentación en cláusulas
-- ✅ Clasificación por IA (Claude) contra taxonomía real de Venezuela
+- ✅ Persistencia de cláusulas segmentadas, sin clasificación automática
 
 **Excluido (Fase 1):**
 - Score de confianza
@@ -106,8 +106,8 @@
 ## Criterios de salida por fase
 
 ### MVP
-- [ ] Pipeline completo: ingesta → clasificación, sin errores bloqueantes
-- [ ] Validación de precisión: LLM coincide razonablemente con clasificación legada (subconjunto de datos)
+- [ ] Pipeline completo: ingesta → extracción/OCR → segmentación, sin errores bloqueantes
+- [ ] Validación de extracción y segmentación contra un subconjunto de documentos legados
 - [ ] Documentación de arquitectura (constitution.md, versión vigente — v2.2.0 al momento de escribir esto)
 - [ ] Demo interna funcional
 

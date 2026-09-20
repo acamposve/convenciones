@@ -10,6 +10,11 @@ RUN dotnet publish Comparador.Api.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+# OCR local para PDFs escaneados: no usa LLM ni un servicio externo. `pdftoppm` rasteriza
+# las páginas y Tesseract reconoce español con los datos `spa`.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	tesseract-ocr tesseract-ocr-spa poppler-utils \
+	&& rm -rf /var/lib/apt/lists/*
 COPY --from=build /app .
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080

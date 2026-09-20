@@ -194,7 +194,7 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 - [x] **3.1. Upgrade del Proyecto C# a .NET 10:**
   - [x] En `api/Comparador.Api.csproj` y `api/Comparador.Api.Tests/Comparador.Api.Tests.csproj`, `<TargetFramework>net10.0</TargetFramework>`.
   - [x] Paquetes NuGet actualizados a la última versión 10.x publicada (verificado contra nuget.org, no asumido): `Microsoft.AspNetCore.Authentication.JwtBearer` 10.0.12, `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3, `Microsoft.EntityFrameworkCore.Design` 10.0.12, `EFCore.NamingConventions` 10.0.1 (no estaba en el checklist original pero es una dependencia directa que también fija major version con EF Core).
-  - [x] `Microsoft.Extensions.AI` 10.10.0 instalado — sin conectar todavía (eso es Fase 4).
+  - [x] No se mantiene dependencia de `Microsoft.Extensions.AI` en el MVP; la integración de IA queda diferida.
   - [x] `Dockerfile` actualizado a `mcr.microsoft.com/dotnet/sdk:10.0` / `aspnet:10.0` — **no verificado con un build real** (Docker Desktop no estaba corriendo en este entorno); son tags oficiales publicados, pero falta confirmarlo con `docker build` cuando haya Docker a mano.
   - [x] **Build y tests:** `dotnet build`/`dotnet test` — 0 errores, 7/7 tests OK sobre `net10.0`.
   - [x] **Smoke test real contra Supabase** (no solo compilar): se levantó la API completa (`dotnet run`) apuntando a la base de Supabase real (vía variables de entorno, sin tocar `appsettings.json` — eso es 3.2) y se probó `POST /api/auth/login` de punta a punta.
@@ -213,22 +213,23 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 ---
 
-### FASE 4: Portabilidad del Pipeline de Ingesta, OCR e IA a .NET 10
-*Objetivo: Reemplazar el procesamiento de documentos de Python con C# nativo.*
+### FASE 4: Portabilidad del Pipeline Determinista a .NET 10
+*Objetivo: Reemplazar la ingesta, extracción, OCR y segmentación de documentos de Python con C# nativo, sin modelos ni servicios de IA en el MVP.*
 
-- [ ] **4.1. Canal de Background Processing:**
-  - [ ] Crear cola en memoria con `System.Threading.Channels.Channel<int>`.
-  - [ ] Implementar worker desacoplado `DocumentProcessingWorker` (`BackgroundService`).
-- [ ] **4.2. Extracción de Texto y OCR:**
-  - [ ] Integrar `UglyToad.PdfPig` para PDFs digitales.
-  - [ ] Integrar `DocumentFormat.OpenXml` para archivos Word (.docx).
-  - [ ] Configurar OCR (Azure AI Document Intelligence o Tesseract nativo en Docker).
-- [ ] **4.3. Segmentación de Cláusulas:**
-  - [ ] Portar regex de segmentación a C# utilizando `[GeneratedRegex]` de C# 14.
-- [ ] **4.4. Clasificación de IA con Claude vía `Microsoft.Extensions.AI`:**
-  - [ ] Configurar cliente de Anthropic bajo la abstracción `IChatClient`.
-  - [ ] Portar generación de prompts estructurados (categorías, títulos, confianza).
-  - [ ] Implementar resumen ejecutivo y cálculo de cumplimiento legal.
+- [x] **4.1. Canal de Background Processing:**
+  - [x] Crear cola en memoria con `System.Threading.Channels.Channel<int>`.
+  - [x] Implementar worker desacoplado `DocumentProcessingWorker` (`BackgroundService`).
+- [x] **4.2. Extracción de Texto y OCR:**
+  - [x] Integrar `UglyToad.PdfPig` para PDFs digitales.
+  - [x] Integrar `DocumentFormat.OpenXml` para archivos Word (.docx).
+  - [x] Configurar Tesseract nativo en Docker con `tesseract-ocr-spa` y `poppler-utils`. No se usa Azure AI Document Intelligence en el MVP.
+  - [x] Validar `docker build` y la presencia de Tesseract, `pdftoppm` e idioma `spa` en la imagen runtime.
+- [x] **4.3. Segmentación de Cláusulas:**
+  - [x] Portar regex de segmentación a C# utilizando `[GeneratedRegex]` de C# 14.
+- [x] **4.4. IA, clasificación, resumen y cumplimiento legal — fuera del MVP:**
+  - [x] No configurar cliente de Anthropic ni `IChatClient`.
+  - [x] No portar prompts ni clasificación automática; las cláusulas quedan con `titulo_id` nulo.
+  - [x] Diferir resumen ejecutivo, campo comparativo y cumplimiento legal a una fase posterior con alcance y proveedor aprobados.
 
 ---
 
@@ -237,7 +238,7 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 - [ ] **5.1. Validación de Paridad Funcional:**
   - [ ] Procesar lote de PDFs de prueba en el nuevo pipeline C# .NET 10.
-  - [ ] Verificar coincidencia exacta de clasificación vs. los datos históricos.
+  - [ ] Verificar paridad de extracción y segmentación contra los datos históricos; no se compara clasificación automática en el MVP.
 - [ ] **5.2. Corte de Tráfico (Cutover):**
   - [ ] En `web/.env`, actualizar `VITE_API_URL` para que apunte exclusivamente a la API .NET 10.
   - [ ] Eliminar `VITE_SERVICE_URL`. En este momento, **Python deja de recibir peticiones**.
@@ -262,4 +263,4 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 2. **Cero Código Python:** El directorio `service/` y sus contenedores ya no existen en ningún entorno.
 3. **Cero Pérdida de Datos:** Base de datos PostgreSQL alojada en Supabase con RLS protegiendo el multi-tenancy.
 4. **Observabilidad Completa:** Logs estructurados JSON contextualizados en cada petición y tarea en segundo plano.
-5. **Costos Optimizados:** Reducción sustancial en la factura mensual de Azure al eliminar la base de datos administrada y el segundo contenedor.
+5. **MVP sin IA:** ingesta, extracción/OCR y segmentación funcionan sin llamadas a LLM ni servicios externos de IA; la clasificación automática queda fuera del MVP.

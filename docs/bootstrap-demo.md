@@ -12,8 +12,8 @@
 
 ## Por qué existe este documento
 
-El sistema son dos servicios separados (Art. V): la API de auth en **.NET** (`api/`) y el
-microservicio de ingesta/IA en **Python** (`service/`). El login (`POST /api/auth/login`)
+El sistema son dos servicios separados durante la migración: la API de auth en **.NET** (`api/`)
+y el pipeline legado en **Python** (`service/`). El login (`POST /api/auth/login`)
 solo funciona si ya existe un usuario `AdminTenant` sembrado para un tenant — sin eso,
 la API responde `Unauthorized` sin más contexto. Ese seed, a su vez, necesita que exista
 un tenant. Ninguno de los dos pasos ocurre solo.
@@ -62,8 +62,9 @@ predecibles sin pasar por el formulario cada vez que se levanta el compose desde
 
 ## Servicio Python
 
-El microservicio Python (`service/app/main.py` — ingesta, extracción, segmentación,
-clasificación, Art. IV pasos 1-5) **sí está containerizado** mediante
+El microservicio Python (`service/app/main.py`) es el pipeline legado durante la migración.
+El MVP objetivo en .NET cubre ingesta, extracción, OCR y segmentación, sin clasificación
+automática ni servicios de IA. El servicio Python **sí está containerizado** mediante
 [`service/Dockerfile`](../service/Dockerfile). Se eliminó el workflow que antes construía y
 publicaba esa imagen a Azure (`deploy-apps.yml`, Enmienda 2.3.0 de `constitution.md`) — hoy
 no hay ningún pipeline de publicación, solo el build local de abajo.
@@ -80,8 +81,11 @@ uvicorn app.main:app --reload --port 8000
 Necesita `service/.env` con `DATABASE_URL` apuntando al Postgres publicado. Usa el valor de
 `POSTGRES_PORT` definido en `service/.env` (en tu configuración actual es `5433`; si no lo
 defines, el compose usa `5432`). No uses `db:5432` desde un proceso local: ese hostname
-solo existe dentro de la red de Docker. También necesita `ANTHROPIC_API_KEY` para que la
-clasificación (Art. IV.5) funcione.
+solo existe dentro de la red de Docker. El MVP sin IA no necesita `ANTHROPIC_API_KEY`:
+la clasificación automática queda diferida y las cláusulas se conservan sin título asignado.
+Para PDFs escaneados, la API .NET usa Tesseract y `pdftoppm`; el `Dockerfile` instala ambos
+binarios y el paquete de idioma español. Si se ejecuta la API directamente fuera de Docker,
+esas herramientas deben estar disponibles en el `PATH`.
 
 Para ejecutarlo como contenedor de forma independiente:
 
@@ -111,5 +115,5 @@ ejecútala manualmente desde `service/`.
 El `Dockerfile` del servicio Python empaqueta `pymupdf`, `pytesseract` y Tesseract OCR —
 listo para correr en cualquier contenedor, sin nada específico de un proveedor de nube. La
 decisión pendiente para desarrollo local es agregarlo al mismo compose, porque eso requiere
-definir el uso de `db:5432` dentro de la red Docker y cómo se inyectará `ANTHROPIC_API_KEY`;
-por ahora se ejecuta como proceso local o como contenedor independiente.
+definir el uso de `db:5432` dentro de la red Docker; por ahora se ejecuta como proceso local o
+como contenedor independiente.

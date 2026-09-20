@@ -7,10 +7,15 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+- Enmienda 2.4.0: el MVP interno no usa LLMs, Claude, `Microsoft.Extensions.AI` ni servicios
+  externos de IA. El pipeline termina en extracción/OCR y segmentación; las cláusulas quedan
+  sin clasificación automática. La clasificación, resumen y cumplimiento legal se difieren
+  a una fase posterior.
+
 ### Added
-- MVP Demo: pipeline ingesta → extracción → segmentación → clasificación (Venezuela)
+- MVP Demo: pipeline determinista de ingesta → extracción/OCR → segmentación (Venezuela)
 - API .NET: autenticación JWT, modelo de tenants, usuario demo
-- Microservicio Python: OCR, extracción de texto, clasificación por IA (Claude)
 - Frontend React: login, carga de documentos (en construcción)
 - Taxonomía real de Venezuela: 5 categorías, ~60 títulos
 - Estructura multi-tenant: 1 tenant = 1 operador
@@ -28,7 +33,7 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Fase 3.1 del plan de migración: `api/` corre sobre **.NET 10 LTS** — `TargetFramework`,
   paquetes NuGet (`Microsoft.AspNetCore.Authentication.JwtBearer`, `Npgsql.EntityFrameworkCore.PostgreSQL`,
   `Microsoft.EntityFrameworkCore.Design`, `EFCore.NamingConventions`) a la última versión 10.x
-  publicada, `Microsoft.Extensions.AI` 10.10.0 instalado (sin conectar, Fase 4), `Dockerfile`
+  publicada, `Dockerfile`
   actualizado a las imágenes base `:10.0`. Verificado con `dotnet build`/`dotnet test` (7/7)
   y con un smoke test en vivo (`dotnet run` apuntando a la base Supabase real vía variables de
   entorno, sin tocar `appsettings.json`) — encontró un hallazgo real para Fase 3.2 (diagnosticado

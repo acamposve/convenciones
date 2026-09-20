@@ -1,8 +1,8 @@
-# Spec — MVP Demo (Venezuela, clasificación sin revisión)
+# Spec — MVP Demo (Venezuela, sin IA)
 
-> **Depende de:** `constitution.md` v1.0.0
+> **Depende de:** `constitution.md` v2.4.0
 > **Estado:** borrador de demo interna, no reemplaza los specs de fase completa (ingesta, análisis, categorización)
-> **Objetivo:** mostrar el pipeline de ingesta → extracción → segmentación → clasificación funcionando end-to-end sobre datos reales, en el menor tiempo posible, sin violar los artículos protegidos (I, IV, VI) de la constitución.
+> **Objetivo:** mostrar el pipeline determinista de ingesta → extracción/OCR → segmentación funcionando end-to-end sobre datos reales, sin llamadas a modelos ni servicios de IA.
 
 ## 1. Alcance de esta demo
 
@@ -14,12 +14,12 @@ Recorte deliberado de la Fase 1 (Art. X) para poder mostrar algo funcional hoy. 
 | Ingesta por carga de archivo **y** por URL | — |
 | Extracción de texto (PDF nativo, Word; OCR si escaneo) | — |
 | Segmentación en cláusulas/artículos | — |
-| Clasificación por título contra taxonomía **real** de Venezuela (5 categorías, ~60 títulos) | Score de confianza, cola de revisión (Art. IV.7-8) |
+| Persistencia de cláusulas segmentadas sin clasificación automática | Clasificación automática, score de confianza y cola de revisión |
 | — | Extracción de campo comparativo (Art. IV.6) → Fase 2 |
 | — | Publicación / vista web de reporte (Art. IV.9) |
 | — | SSO/SAML, licenciamiento, multi-tenant real más allá del filtro por `tenant_id` |
 
-**El pipeline se detiene explícitamente después de la clasificación (Art. IV, paso 5).** No hay paso 6, 7 u 8. Esto es intencional y no es una violación del Art. IV: la puerta de revisión humana obligatoria simplemente no se construye todavía, no se está saltando en un flujo que ya llega a publicación.
+**El pipeline se detiene explícitamente después de la segmentación (Art. IV, paso 4).** La excepción temporal está registrada en la enmienda 2.4.0 de `constitution.md`: no hay clasificación automática, score, revisión ni publicación en este MVP.
 
 ## 2. Regla de negocio confirmada (no tocar sin enmienda)
 
@@ -35,9 +35,9 @@ Confirmado contra Art. I.3 (1 tenant = 1 empresa/firma en 1 país): la activaci�
 2. **Check público/privado** (Art. IV.2, Art. VI.1) — privado por defecto; si se declara público vía URL, validar accesibilidad sin autenticación antes de tratarlo como tal.
 3. **Extracción de texto** (Art. IV.3) — parseo nativo o OCR según corresponda.
 4. **Segmentación** (Art. IV.4) — división en artículos/cláusulas individuales. Debe soportar fallback para documentos sin estructura clara (heurística mínima: numeración, encabezados en mayúsculas, o similar — a definir en implementación).
-5. **Clasificación** (Art. IV.5) — LLM (Claude vía API), salida estructurada, asigna cada cláusula a un título de la taxonomía real de Venezuela, usando las descripciones de los títulos como contexto del prompt.
+5. **Clasificación** — fuera del MVP. Las cláusulas se persisten con `titulo_id` nulo para revisión o clasificación en una fase posterior.
 
-**Salida esperada de la demo:** por cada documento cargado, una lista de cláusulas con su texto y el título de taxonomía asignado por el modelo. Sin score, sin estado de revisión, sin publicación.
+**Salida esperada de la demo:** por cada documento cargado, una lista de cláusulas con su texto, orden y estado pendiente. Sin llamadas a IA, sin título automático, sin score, sin revisión y sin publicación.
 
 ## 5. Corpus de prueba
 
@@ -45,8 +45,8 @@ Se usa el dataset del sistema legado según Art. IV (nota) y Art. IX.2 (403 PDFs
 
 ## 6. Criterio de éxito
 
-La demo es exitosa si, para un subconjunto de documentos del corpus legado, el título asignado por el LLM coincide razonablemente con la clasificación legada ya existente (esa clasificación legada sirve de referencia de comparación, no de verdad absoluta). No se define aquí un umbral numérico — eso es una decisión de producto para cuando haya resultados que evaluar.
+La demo es exitosa si extrae y segmenta correctamente un subconjunto de documentos del corpus legado, conserva el texto original de cada cláusula y deja el documento en un estado observable. La validación de clasificación queda fuera del MVP.
 
 ## 7. Fuera de alcance explícito (recordatorio)
 
-Score de confianza, cola de revisión, campo comparativo, publicación/reporte web, multi-país, licenciamiento, SSO, y todo lo demás de Fase 2/3 según Art. X.
+Clasificación automática, score de confianza, cola de revisión, campo comparativo, resumen, cumplimiento legal, publicación/reporte web, multi-país, licenciamiento, SSO y todo lo demás de Fase 2/3 según Art. X.

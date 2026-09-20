@@ -1,6 +1,6 @@
 # Constitución del Proyecto — Comparador de Documentos Legales
 
-> **Versión:** 2.3.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-19
+> **Versión:** 2.4.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-20
 > **Origen:** `documento_arquitectura_comparador_convenciones.docx` (preparado para Alex Campos, 8 de agosto de 2026)
 > **Enmienda 2.0.0:** redefine el modelo de tenant (Art. I.3) tras revisar el código legado
 > completo (`legacy/`). El valor original del producto era la comparación cross-empresa
@@ -44,12 +44,17 @@
 > solo local (`docs/bootstrap-demo.md`) hasta que se elija y configure el proveedor nuevo.
 > Igual que la Enmienda 2.2.0, esto es una decisión de infraestructura, no de producto o
 > alcance — no toca Art. I, IV ni VI.
+> **Enmienda 2.4.0:** el MVP interno se limita deliberadamente a ingesta, extracción/OCR y
+> segmentación determinista. No invoca LLMs, Claude, `Microsoft.Extensions.AI` ni servicios
+> externos de clasificación, resumen o cumplimiento legal. Las cláusulas quedan sin
+> clasificación automática hasta una fase posterior. Esta excepción aplica solo al MVP y
+> difiere temporalmente el paso 5 del Art. IV.
 
 Este documento fija los principios y decisiones de arquitectura que gobiernan el diseño e implementación del nuevo Comparador de Documentos Legales. Cualquier decisión técnica o de producto que lo contradiga debe justificarse explícitamente y, si se acepta, disparar una enmienda a esta constitución.
 
 ## Preámbulo
 
-El sistema reemplaza un SaaS PHP de ~20 años ("convenciones") que comparaba convenciones colectivas de trabajo mediante clasificación 100% manual. **El legado no era una herramienta de autoservicio para una sola empresa: era el catálogo propio de un operador (consultora de RRHH, cámara de comercio) que comparaba entre muchas empresas de su cartera.** El sistema nuevo preserva esa esencia — comparación dentro del catálogo de un operador — y automatiza la lectura, clasificación y extracción de cláusulas mediante IA, preservando un paso de revisión humana obligatorio antes de publicar cualquier contenido. Además cubre el proceso de negociación colectiva previo a la firma, que el legado también tenía (módulo de discusión) y que la versión 1.0 de esta constitución no contemplaba.
+El sistema reemplaza un SaaS PHP de ~20 años ("convenciones") que comparaba convenciones colectivas de trabajo mediante clasificación 100% manual. **El legado no era una herramienta de autoservicio para una sola empresa: era el catálogo propio de un operador (consultora de RRHH, cámara de comercio) que comparaba entre muchas empresas de su cartera.** El sistema nuevo preserva esa esencia — comparación dentro del catálogo de un operador — y automatiza progresivamente la lectura, clasificación y extracción de cláusulas, preservando un paso de revisión humana obligatorio antes de publicar cualquier contenido. El MVP interno no usa IA y termina después de segmentar las cláusulas; la automatización de clasificación queda para una fase posterior. Además cubre el proceso de negociación colectiva previo a la firma, que el legado también tenía (módulo de discusión) y que la versión 1.0 de esta constitución no contemplaba.
 
 ## Artículo I — Alcance y no-alcance
 
@@ -101,7 +106,7 @@ documentos que nunca pasaron por este flujo (convenciones históricas cargadas d
 4. **Acuerdo** — cuando petición y oferta convergen, se registra el acuerdo alcanzado para esa cláusula.
 5. **Cierre** — cuando los títulos relevantes tienen acuerdo, se cierra la negociación y se genera el Documento a partir de los acuerdos, listo para el pipeline del Art. IV.
 
-## Artículo IV — Pipeline de extracción y clasificación con IA
+## Artículo IV — Pipeline de extracción y clasificación
 
 Flujo obligatorio, en este orden, con revisión humana como puerta de publicación (no opcional):
 
@@ -109,7 +114,7 @@ Flujo obligatorio, en este orden, con revisión humana como puerta de publicaci�
 2. **Check público/privado** — el documento es privado por defecto; si se marca público vía URL, debe validarse que sea accesible sin autenticación antes de tratarlo como tal.
 3. **Extracción de texto** — parseo de PDF/Word; OCR automático si es un escaneo.
 4. **Segmentación** — división del texto en artículos/cláusulas individuales.
-5. **Clasificación** — un LLM (vía API, salida estructurada) asigna cada cláusula a un título de la taxonomía del país del tenant, usando las descripciones de cada título como contexto.
+5. **Clasificación** — en el producto completo puede realizarse mediante un LLM vía API y salida estructurada; en el MVP interno este paso queda diferido y las cláusulas permanecen sin título automático.
 5 bis. **Verificación de cumplimiento legal** *(nuevo)* — cruza cada cláusula clasificada contra los artículos de ley (Art. II.6) relacionados a su título, y marca una señal: por debajo / iguala / supera el mínimo legal. Es asistencia para el paso 8, nunca una determinación automática vinculante.
 6. **Extracción del campo comparativo** — normaliza el valor comparable (ej. "15 días", "30% del salario") cuando el título lo requiere.
 6 bis. **Resumen ejecutivo** *(nuevo)* — un LLM redacta una síntesis breve y fiel al texto original de la cláusula, sin interpretar ni agregar contenido que no esté en el original (pensada para lectura ejecutiva rápida: "15 días hábiles de vacaciones + 1 bono anual", no un análisis). Recibe su **propia** revisión humana, independiente de la de clasificación (paso 8) — puede estar aprobado uno y pendiente el otro, en cualquier combinación. **[Enmienda 2.1.0]**
@@ -127,7 +132,7 @@ producción hasta el cutover (Fase 5.2 del plan) — ver nota de Enmienda 2.2.0 
 
 | Componente | Decisión | Decisión anterior (hasta cutover) | Motivo del cambio |
 |---|---|---|---|
-| API principal + Servicio de IA | **C# / .NET 10 LTS, servicio único** — absorbe ingesta, OCR, segmentación, clasificación (vía `Microsoft.Extensions.AI` / `IChatClient`) y toda la lógica de negocio | API .NET (última LTS) + microservicio Python (FastAPI) separado, consumido async vía cola | Elimina la duplicación de stack y el costo operativo de mantener dos runtimes; `Microsoft.Extensions.AI` da abstracciones de observabilidad/costos/caching equivalentes a lo que Python aportaba |
+| API principal + procesamiento | **C# / .NET 10 LTS, servicio único** — absorbe ingesta, OCR, extracción y segmentación en el MVP; la clasificación IA queda diferida | API .NET (última LTS) + microservicio Python (FastAPI) separado, consumido async vía cola | Elimina la duplicación de stack y permite cerrar primero un pipeline determinista; cualquier IA futura requiere alcance y proveedor aprobados |
 | Motor de IA | LLM vía API (Claude), salida estructurada, vía `IChatClient` | LLM vía API (Claude), salida estructurada | Mismo proveedor y principio; cambia solo el cliente/SDK |
 | Base de datos | **Supabase** (PostgreSQL 16 gestionado) con **Row Level Security nativo**, multi-tenant por `tenant_id` | Azure PostgreSQL Flexible Server autoadministrado (o Azure SQL), multi-tenant por columna `tenant_id` | Mismo motor relacional (compatibilidad 100% con `schema.sql`); RLS nativo refuerza el aislamiento por tenant (Art. VI.2) a nivel de base de datos, no solo en código; Auth y Storage integrados |
 | Almacenamiento de documentos | Supabase Storage (S3-compatible, con RLS) | Blob storage cifrado en reposo (Azure Blob / S3) | Mismo principio de cifrado y privacidad por defecto (Art. VI.1); RLS unifica la política de acceso con la de base de datos |
@@ -170,7 +175,7 @@ producción hasta el cutover (Fase 5.2 del plan) — ver nota de Enmienda 2.2.0 
 | Fase | Contenido |
 |---|---|
 | Fase 0 — Validación | Validación legal de la taxonomía por país con abogados locales; confirmación de derechos de uso del dataset histórico |
-| Fase 1 — Fundaciones técnicas *(ya desplegado, demo interno)* | Carga de un documento por tenant, clasificación asistida por IA, auth básica con roles fijos. **Sin** catálogo de empresas, sin comparación, sin negociación, sin cola de revisión — es la base técnica, no el producto completo (`spec-mvp-demo.md`) |
+| Fase 1 — Fundaciones técnicas *(MVP interno)* | Carga de un documento por tenant, extracción/OCR, segmentación determinista y auth básica con roles fijos. **Sin IA, sin clasificación automática, sin** catálogo de empresas, sin comparación, sin negociación y sin cola de revisión — es la base técnica, no el producto completo (`spec-mvp-demo.md`) |
 | Fase 2 — Empresa + Revisión + Comparación *(ya desplegado)* | Entidad Empresa y catálogos globales de segmentación (Art. II.5); cola de revisión humana (Art. IV.8 — ya era no negociable, nunca se construyó); comparador intra-tenant filtrado por sector/tipo/actividad/geografía — el núcleo del producto original |
 | Fase 3 — Negociación colectiva *(ya desplegado)* | Módulo de discusión completo (Art. IV bis): peticiones, ofertas, reuniones, acuerdos |
 | Fase 4 — Marco legal y cumplimiento *(ya desplegado)* | Corpus de leyes por país (Art. II.6); verificación de cumplimiento activa en clasificación (Art. IV.5 bis) |

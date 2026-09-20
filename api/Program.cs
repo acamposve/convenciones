@@ -70,6 +70,11 @@ builder.Services.AddDbContext<ComparadorDbContext>(opt =>
        .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<DocumentProcessingService>();
+builder.Services.AddSingleton<TesseractOcr>();
+builder.Services.AddSingleton<DocumentTextExtractor>();
+builder.Services.AddSingleton<DocumentProcessingQueue>();
+builder.Services.AddHostedService<DocumentProcessingWorker>();
 builder.Services.AddHttpClient("public-url")
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {
