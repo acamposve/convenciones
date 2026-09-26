@@ -117,9 +117,12 @@ rol en sí en el login existente.
 
 ### A. Modelo de datos + auth nullable ✅ terminado
 
-- [x] Migración: `usuarios.tenant_id` nullable, índice único parcial de email,
-  `tenant_paises_habilitados`, `tenants.suspendido`, valores nuevos de `rol_usuario`
+- [x] Migración: `usuarios.tenant_id` nullable, `tenant_paises_habilitados`,
+  `tenants.suspendido`, valores nuevos de `rol_usuario`
   (`service/db/migrations/009_plataforma.sql`, con backfill de tenants existentes)
+- [x] Migración (Fase 5.2): índice único parcial de email → índice único global
+  `idx_usuarios_email`, por la ambigüedad de login entre tenants del registro self-service
+  (`service/db/migrations/013_usuarios_email_unico_global.sql`; ver nota de §2)
 - [x] `api/Models/Usuario.cs`: `TenantId` → `Guid?`; enum `RolUsuario` con los 3 roles nuevos
 - [x] `api/Services/TokenService.cs`: emitir el claim `tenant_id` de forma null-safe (omitirlo
   si es null, no emitir un string vacío)

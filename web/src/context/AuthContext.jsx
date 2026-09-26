@@ -83,17 +83,7 @@ export function AuthProvider({ children }) {
 
   // Alias temporal para conservar la API de los componentes durante el cutover.
   // Todos los endpoints, incluido el pipeline documental, viven ahora en .NET.
-  const docFetch = useCallback(
-    (path, options = {}) =>
-      fetch(`${API_BASE}${path}`, {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: accessToken ? `Bearer ${accessToken}` : "",
-        },
-      }),
-    [accessToken]
-  );
+  const docFetch = authFetch;
 
   return (
     <AuthContext.Provider
