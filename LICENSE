@@ -28,7 +28,7 @@ Pendiente definición: ¿MIT, Apache 2.0, Propietaria, o multi-licencia por mód
 
 ## Terceros y dependencias
 
-Ver `api/Comparador.Api.csproj`, `service/requirements.txt`, `web/package.json` para licencias de librerías (típicamente Apache 2.0, MIT, BSD).
+Ver `api/Comparador.Api.csproj` y `web/package.json` para licencias de librerías (típicamente Apache 2.0, MIT, BSD).
 
 ---
 

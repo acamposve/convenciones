@@ -61,7 +61,7 @@ var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
 dataSourceBuilder.MapEnum<RolUsuario>("rol_usuario", nameTranslator: new NpgsqlNullNameTranslator());
 var dataSource = dataSourceBuilder.Build();
 
-// UseSnakeCaseNamingConvention: el esquema real (service/db/schema.sql) usa columnas y
+// UseSnakeCaseNamingConvention: el esquema real (db/schema.sql) usa columnas y
 // tablas snake_case creadas por SQL plano, no por `dotnet ef migrations`. Sin esto, EF Core
 // genera identificadores entrecomillados en PascalCase (ej. "TenantId") que no matchean
 // ninguna columna real y el runtime falla con "column does not exist".

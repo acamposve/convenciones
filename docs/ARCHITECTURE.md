@@ -2,12 +2,12 @@
 
 **Referencia:** Esta es una síntesis ejecutiva. Para detalles, ver [`constitution.md`](constitution.md) Art. III–V.
 
-> **Migración de stack en curso (Enmienda 2.2.0):** este documento describe el stack
-> **objetivo** tras adoptar [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
-> (C#/.NET 10 unificado + Supabase). El stack **desplegado hoy** es **.NET 10 LTS** (Fase 3.1
-> ya aplicada: `api/` corre sobre `net10.0`) **+ Python/FastAPI + PostgreSQL** — Python sigue
-> atendiendo la mayoría de la lógica de negocio (Fase 3.3 pendiente) y sigue siendo la base
-> de datos local, no Supabase todavía (Fase 3.2 pendiente).
+> **Migración de stack en curso (Enmienda 2.2.0):** el backend ya está unificado en
+> **.NET 10 LTS** — el microservicio Python (`service/`) se eliminó del repositorio (Fase
+> 5.2 cutover + Fase 5.4 limpieza de
+> [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)).
+> Lo único que sigue pendiente del stack objetivo es la base de datos: hoy es PostgreSQL
+> local, todavía no Supabase (Fase 3.2 del plan).
 >
 > **Sin infraestructura en la nube (Enmienda 2.3.0):** se retiró Azure (Terraform, Container
 > Apps) — hoy no hay ningún ambiente desplegado, el proyecto corre solo local. El proveedor
@@ -52,12 +52,10 @@
     └──────────────┘        └──────────────────────────┘
 ```
 
-> Diagrama del stack **objetivo**. Hoy en producción, "AI Service" sigue siendo un
-> microservicio Python (FastAPI) separado, y la base de datos es un Azure PostgreSQL
-> Flexible Server autoadministrado — ver nota de migración arriba. El transporte entre API
-> y AI Service **no** es una cola real: Art. V decide Service Bus/RabbitMQ, pero nunca se
-> implementó (`EVALUACION_MADUREZ_MIGRACION.md` §4.3) — hoy el pipeline corre con
-> `BackgroundTasks` de FastAPI, en memoria dentro del mismo contenedor Python.
+> Este diagrama ya es el estado real: un solo servicio .NET 10, sin "AI Service" Python
+> separado ni cola entre procesos que desacoplar (`System.Threading.Channels` en el mismo
+> contenedor). Lo único que falta del stack objetivo es la base de datos — sigue siendo
+> PostgreSQL local, no Supabase todavía (ver nota de migración arriba).
 
 ## Flujo de procesamiento (MVP Demo sin IA)
 
@@ -79,11 +77,10 @@
    (FIN en MVP; Fase 1 agrega revisión + publicación)
 ```
 
-> Flujo **objetivo** (stack unificado en .NET 10). El pipeline desplegado hoy usa
-> PDFPlumber + Tesseract en el microservicio Python, ejecutado en memoria vía
-> `BackgroundTasks` de FastAPI (no hay cola real todavía — ver nota de la sección "Capas"
-> arriba) — los pasos conceptuales (extracción → segmentación → clasificación) no cambian,
-> solo el runtime y el mecanismo de background entre pasos.
+> Flujo real hoy: stack unificado en .NET 10, sin microservicio Python que ejecute esto
+> aparte. Los pasos conceptuales (extracción → segmentación → clasificación) son los mismos
+> que en el diseño original en Python; solo cambió el runtime y el mecanismo de background
+> entre pasos (`Channel` + `BackgroundService` en vez de `BackgroundTasks` de FastAPI).
 
 ## Entidades de datos (simplificado)
 
@@ -110,14 +107,15 @@ Bitácora (log_id, tenant_id, usuario_id, acción, recurso, timestamp)
 
 ## Decisiones técnicas (Art. V)
 
-Stack objetivo (Enmienda 2.2.0); el desplegado hoy sigue el diseño anterior (columna
-"Antes", vigente hasta el cutover — Fase 5.2 del plan de migración).
+Stack objetivo (Enmienda 2.2.0). La columna "Antes" documenta el diseño previo al cutover
+(Fase 5.2 del plan de migración, ya completo) — el microservicio Python ya no existe en el
+repositorio.
 
-| Componente | Decisión | Antes (hasta cutover) | Razón del cambio |
+| Componente | Decisión | Antes (pre-cutover) | Razón del cambio |
 |---|---|---|---|
-| API + procesamiento | C# / .NET 10 LTS, servicio único | API en .NET 8 + servicio Python/FastAPI separado | Un solo runtime que mantener y desplegar; el MVP procesa documentos sin IA |
+| API + procesamiento | C# / .NET 10 LTS, servicio único — **ya aplicado** | API en .NET 8 + servicio Python/FastAPI separado | Un solo runtime que mantener y desplegar; el MVP procesa documentos sin IA |
 | Clasificación IA | Fuera del MVP; queda diferida | Claude (API) directo desde Python | Se requiere una decisión posterior de alcance, proveedor y validación |
-| Base de datos | Supabase (PostgreSQL 16 + RLS) | PostgreSQL (Azure Flexible Server autoadministrado) | RLS nativo refuerza aislamiento por tenant; Auth/Storage integrados; menos infraestructura propia que operar |
+| Base de datos | Supabase (PostgreSQL 16 + RLS) — **pendiente** (hoy PostgreSQL local, Fase 3.2) | PostgreSQL (Azure Flexible Server autoadministrado) | RLS nativo refuerza aislamiento por tenant; Auth/Storage integrados; menos infraestructura propia que operar |
 | Storage | Supabase Storage | Azure Blob | Documentos encriptados en reposo, con RLS unificado a la política de datos |
 | Cola | `System.Threading.Channels` en proceso | Service Bus / RabbitMQ | Suficiente para el volumen actual; ya no hay dos procesos que desacoplar |
 | Frontend | React + Vite | React + Vite | Sin cambio |
@@ -148,7 +146,7 @@ que no hace falta reescribirlos para el proveedor nuevo, solo definir dónde cor
 ---
 
 **Stack objetivo MVP: .NET 10 LTS (API + procesamiento determinista) · React/Vite · Supabase (PostgreSQL + RLS) · proveedor de deploy sin decidir**
-**Stack desplegado hoy: .NET 10 LTS (API, sin unificar todavía) · Python/FastAPI (pipeline legado) · React/Vite · PostgreSQL local — sin ambiente en la nube**
+**Stack desplegado hoy: .NET 10 LTS unificado (API + procesamiento determinista, ya sin microservicio Python) · React/Vite · PostgreSQL local — sin ambiente en la nube, Supabase todavía pendiente**
 
 Justificación detallada de cada decisión y del plan de transición en
 [`constitution.md`](constitution.md) Art. V y en

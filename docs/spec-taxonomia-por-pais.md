@@ -46,13 +46,30 @@ Releyendo Art II.3 con cuidado: el **núcleo de categorías es común a los 4 pa
 
 ### 3.3 Clonado (Plataforma, Art II.3/VII.4)
 
-**Excepción deliberada al patrón "Plataforma vive en `api/` (.NET)"**: las tablas de taxonomía son propiedad exclusiva del servicio Python (`schema.sql`, seeds, toda la lógica de clasificación) — el `.NET` ni siquiera las mapea en EF Core. Duplicar esa capa de acceso en `.NET` solo para esta acción sería peor que una excepción bien documentada. El endpoint de clonado/edición vive en `service/app/main.py`, gateado por un nuevo `require_plataforma_role()` en `app/auth.py` (el `require_role()` actual asume `tenant_id` siempre es un UUID válido, y un usuario de Plataforma tiene `tenant_id = null` — hoy el servicio Python no puede ni decodificar ese token sin reventar).
+**Actualizado (Fase 5.2/5.4, Enmienda 2.5.0):** esta sección describía una excepción
+deliberada al patrón "Plataforma vive en `api/` (.NET)" mientras el microservicio Python
+seguía activo. Ya no aplica: `service/` se eliminó del repositorio y estos endpoints se
+portaron a `api/Controllers/TaxonomiaController.cs`, mapeados por `ComparadorDbContext`
+(`TaxonomiaCategoria`/`TaxonomiaTitulo` ya estaban ahí, sin usar hasta este port).
 
-- `POST /plataforma/taxonomia/clonar` — body `{pais_origen_id, pais_destino_id}`. Copia todos los títulos `activo=true` de origen hacia destino con ids nuevos (misma `categoria_id`, mismo `nombre`/`descripcion`). Falla si destino ya tiene algún título (evita duplicar por clonar dos veces — para volver a intentar, el país destino debe estar vacío).
+- `GET /taxonomia/categorias` y `GET /plataforma/taxonomia/titulos?pais_id=` — gateados a
+  `PuedeVerPlataforma` (los 3 roles de Plataforma). Cambio deliberado respecto al servicio
+  Python: `GET /taxonomia/categorias` no tenía ningún chequeo de auth ahí; en `.NET` sí,
+  como el resto del panel.
+- `POST /plataforma/taxonomia/clonar` — body `{pais_origen_id, pais_destino_id}`. Copia
+  todos los títulos `activo=true` de origen hacia destino con ids nuevos (misma
+  `categoria_id`, mismo `nombre`/`descripcion`). Falla si destino ya tiene algún título
+  (evita duplicar por clonar dos veces — para volver a intentar, el país destino debe estar
+  vacío). Los ids nuevos siguen viniendo de `taxonomia_titulos_clon_seq`
+  (`TaxonomiaTitulo.Id` está marcado `ValueGeneratedNever()` en EF Core — no es una columna
+  serial).
 - `POST /plataforma/taxonomia/titulos` — agrega un título nuevo a un país (no necesita venir de un clon).
 - `PUT /plataforma/taxonomia/titulos/{id}` — renombra / cambia descripción / cambia categoría.
 - `PUT /plataforma/taxonomia/titulos/{id}/activo` — activa/desactiva (nunca DELETE — preserva integridad referencial con cláusulas ya clasificadas).
-- Las cuatro gateadas a rol `PlataformaAdmin` (mismo actor que `PuedeActivarPaisGlobal` en `.NET` — es la misma puerta conceptual: cambios que afectan la oferta comercial de un país).
+- Las cuatro de escritura gateadas a una política nueva, `PuedeGestionarTaxonomia`
+  (`PlataformaAdmin` únicamente) — separada de `PuedeActivarPaisGlobal` aunque ambas
+  terminen en el mismo rol, porque no son la misma puerta conceptual (una es el flip legal
+  global de país, la otra es catálogo de taxonomía).
 
 ### 3.4 Pipeline de clasificación (Art IV.5, spec-mvp-demo.md)
 

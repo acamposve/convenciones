@@ -6,7 +6,7 @@
 -- que 002_auth.sql.
 --
 -- Uso: aplicar una sola vez contra una base que todavia no tiene la tabla `sectores`.
--- Despues de aplicar esto, correr service/db/seed_catalogos_empresa.py para sembrar los
+-- Despues de aplicar esto, correr db/seed_catalogos_empresa.py para sembrar los
 -- datos reales (docs/catalogos_empresa_venezuela.json).
 
 BEGIN;

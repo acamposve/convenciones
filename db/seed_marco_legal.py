@@ -12,11 +12,10 @@ from pathlib import Path
 import psycopg
 from dotenv import load_dotenv
 
-SERVICE_DIR = Path(__file__).resolve().parent.parent
-REPO_ROOT = SERVICE_DIR.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 LEY_PATH = REPO_ROOT / "docs" / "ley_lottt_venezuela.json"
 
-load_dotenv(SERVICE_DIR / ".env")
+load_dotenv(REPO_ROOT / ".env")
 
 
 def main() -> None:

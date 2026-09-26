@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Bootstrap de un solo uso: tenant demo + usuario AdminTenant (service/db/seed_admin_user.py),
+  # Bootstrap de un solo uso: tenant demo + usuario AdminTenant (db/seed_admin_user.py),
   # el paso que auth-spec.md §4 exige antes de que el primer login pueda funcionar. Antes era
   # un curl a mano contra POST /tenants seguido de correr el script — ahora "docker compose up"
   # deja el demo logueable sin pasos manuales adicionales.
@@ -30,7 +30,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - .:/app
+      # Solo db/, no todo el repo (legacy/ es pesado y el script no lo necesita).
+      - ./db:/app/db
     working_dir: /app
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-convenciones}:${POSTGRES_PASSWORD:-convenciones}@db:5432/${POSTGRES_DB:-convenciones}"
@@ -44,7 +45,7 @@ services:
   # separada.
   api:
     build:
-      context: ../api
+      context: ./api
       dockerfile: Dockerfile
     depends_on:
       db:
@@ -65,10 +66,12 @@ services:
 
   web:
     build:
-      context: ../web
-      # Dockerfile (sin sufijo) es el build de produccion para deploy-apps.yml (multi-stage
-      # + nginx en :80, bakea las VITE_* en build time) — para desarrollo local con
-      # hot-reload se usa Dockerfile.dev (vite dev server, lee las VITE_* en runtime).
+      context: ./web
+      # Dockerfile (sin sufijo) es el build de produccion (multi-stage + nginx en :80,
+      # bakea las VITE_* en build time; el deploy que lo usaba se retiro con Azure,
+      # Enmienda 2.3.0 — sigue siendo el build de produccion del contenedor) — para
+      # desarrollo local con hot-reload se usa Dockerfile.dev (vite dev server, lee las
+      # VITE_* en runtime).
       dockerfile: Dockerfile.dev
     depends_on:
       - api
@@ -77,7 +80,7 @@ services:
     ports:
       - "${WEB_PORT:-5173}:5173"
     volumes:
-      - ../web:/app
+      - ./web:/app
       - /app/node_modules
 
 volumes:

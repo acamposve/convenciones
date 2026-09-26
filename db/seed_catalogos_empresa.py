@@ -19,11 +19,10 @@ from pathlib import Path
 import psycopg
 from dotenv import load_dotenv
 
-SERVICE_DIR = Path(__file__).resolve().parent.parent
-REPO_ROOT = SERVICE_DIR.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 CATALOGOS_PATH = REPO_ROOT / "docs" / "catalogos_empresa_venezuela.json"
 
-load_dotenv(SERVICE_DIR / ".env")
+load_dotenv(REPO_ROOT / ".env")
 
 
 def _seed_catalogo_simple(cur, tabla: str, filas: list[dict]) -> None:

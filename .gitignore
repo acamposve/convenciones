@@ -3,7 +3,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-service/storage/
 appsettings.Development.json
 appsettings.Local.json
 bin/
