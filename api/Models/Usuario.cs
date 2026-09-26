@@ -25,7 +25,7 @@ public class Tenant
 {
     public Guid Id { get; set; }
 
-    // Mapea a la columna real "nombre_empresa" (service/db/schema.sql) — el resto del
+    // Mapea a la columna real "nombre_empresa" (db/schema.sql) — el resto del
     // sistema (servicio de ingesta en Python, UI) ya usa ese nombre para la misma tabla.
     public string NombreEmpresa { get; set; } = default!;
     public int PaisId { get; set; }

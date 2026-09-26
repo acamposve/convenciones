@@ -1,27 +1,23 @@
 # Bootstrap del demo (Venezuela)
 
-> Depende de: `constitution.md` (Art. V — stack **desplegado hoy**: dos servicios
-> separados; el Art. V objetivo tras la Enmienda 2.2.0 los unifica en un único servicio
-> .NET 10 — ver [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)),
-> `auth-spec.md` §4. Los pasos de este documento siguen siendo los correctos para correr el
-> demo localmente **hasta que el código migre** (Fase 3-4 del plan); no se ha tocado nada
-> de esto todavía.
-> Objetivo: dejar documentado y automatizado el orden real que hoy hace falta para poder
-> loguearse por primera vez. Antes era tribal knowledge (tres comandos manuales, sin
-> documentar, en un orden que si se rompe da `Unauthorized` sin explicación).
+> Depende de: `constitution.md` (Art. V), `auth-spec.md` §4. El backend ya es un único
+> servicio .NET 10 (Enmienda 2.5.0 — el microservicio Python que existía en `service/` se
+> eliminó del repositorio); lo único que sigue pendiente del stack objetivo es la base de
+> datos (Supabase, todavía PostgreSQL local aquí — ver
+> [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)).
+> Objetivo de este documento: dejar documentado y automatizado el orden real que hoy hace
+> falta para poder loguearse por primera vez. Antes era tribal knowledge (tres comandos
+> manuales, sin documentar, en un orden que si se rompe da `Unauthorized` sin explicación).
 
 ## Por qué existe este documento
 
-El sistema son dos servicios separados durante la migración: la API de auth en **.NET** (`api/`)
-y el pipeline legado en **Python** (`service/`). El login (`POST /api/auth/login`)
-solo funciona si ya existe un usuario `AdminTenant` sembrado para un tenant — sin eso,
-la API responde `Unauthorized` sin más contexto. Ese seed, a su vez, necesita que exista
-un tenant. Ninguno de los dos pasos ocurre solo.
+El login (`POST /api/auth/login`) solo funciona si ya existe un usuario `AdminTenant`
+sembrado para un tenant — sin eso, la API responde `Unauthorized` sin más contexto. Ese
+seed, a su vez, necesita que exista un tenant. Ninguno de los dos pasos ocurre solo.
 
-## Qué automatiza `docker compose up --build` (desde `service/`)
+## Qué automatiza `docker compose up --build`
 
 ```bash
-cd service
 docker compose up --build
 ```
 
@@ -30,7 +26,7 @@ docker compose up --build
    de `paises` (solo VE activo, Art. I.3). En un volumen ya existente esto **no se reaplica**
    (comportamiento estándar de la imagen de Postgres), tal como ya documentaba `schema.sql`.
 2. **`seed`** — job de un solo uso (`restart: "no"`). Corre
-   [`db/seed_admin_user.py`](../service/db/seed_admin_user.py), que:
+   [`db/seed_admin_user.py`](../db/seed_admin_user.py), que:
    - crea el tenant demo si todavía no hay ninguno (nombre configurable vía
      `TENANT_DEMO_NOMBRE` en `.env`, default `Empresa Demo`),
    - siembra el usuario `AdminTenant` (`admin@empresademo.local` / `CambiarAhora123!`,
@@ -43,14 +39,12 @@ docker compose up --build
    Idempotente: correrlo de nuevo (o reiniciar el compose) no duplica nada ni vuelve a
    loguear el email.
 3. **`api`** (.NET, puerto `API_PORT`, default `5080`) y **`web`** (React, puerto
-  `WEB_PORT`, default `5173`) — como antes. Este compose local todavía no declara el
-  contenedor `service`.
+  `WEB_PORT`, default `5173`).
 
 Con eso ya podés ir a `http://localhost:${WEB_PORT}/login`, loguearte con las credenciales
 de arriba, definir la contraseña nueva cuando te lo pida, y llegar a la pantalla de carga
 de documentos — sin ningún curl manual a `POST /tenants` ni correr el script aparte.
-La UI ahora es enteramente React: la vieja UI server-rendered en Jinja2
-(`service/app/ui.py` + `templates/`) se eliminó — React (`web/`) es el único frontend.
+La UI es enteramente React (`web/`) — no hay UI server-rendered.
 
 **Fase 5 (spec-plataforma.md):** el camino real para un operador nuevo ya no es
 `seed_admin_user.py` — es el registro self-service en `http://localhost:${WEB_PORT}/registro`
@@ -60,59 +54,16 @@ usuario elige su propia contraseña ahí mismo). `seed_admin_user.py` queda como
 desarrollo/demo — sigue siendo útil para tener un tenant con credenciales fijas y
 predecibles sin pasar por el formulario cada vez que se levanta el compose desde cero.
 
-## Servicio Python legado
-
-El microservicio Python (`service/app/main.py`) queda como referencia durante la migración,
-pero desde la Fase 5.2 el frontend ya no lo consume: auth, registro, negocio, biblioteca,
-ingesta y pipeline determinista pasan por la API .NET. El MVP objetivo en .NET cubre
-ingesta, extracción, OCR y segmentación, sin clasificación automática ni servicios de IA.
-El servicio Python sigue containerizado mediante [`service/Dockerfile`](../service/Dockerfile)
-hasta completar la eliminación de código de la Fase 5.4.
-
-Para el demo local, `service/docker-compose.yml` todavía no lo levanta automáticamente.
-Puedes iniciarlo en otro terminal con Python:
+La siembra de la taxonomía (`db/seed_taxonomia.py`, ~60 títulos reales de Venezuela), el
+marco legal (`db/seed_marco_legal.py`) y los catálogos de empresa
+(`db/seed_catalogos_empresa.py`) no se ejecutan desde este compose local. Para una base
+local ya creada, ejecutalos manualmente:
 
 ```bash
-cd service
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python db/seed_taxonomia.py
+python db/seed_marco_legal.py
+python db/seed_catalogos_empresa.py
 ```
 
-Necesita `service/.env` con `DATABASE_URL` apuntando al Postgres publicado. Usa el valor de
-`POSTGRES_PORT` definido en `service/.env` (en tu configuración actual es `5433`; si no lo
-defines, el compose usa `5432`). No uses `db:5432` desde un proceso local: ese hostname
-solo existe dentro de la red de Docker. El MVP sin IA no necesita `ANTHROPIC_API_KEY`:
-la clasificación automática queda diferida y las cláusulas se conservan sin título asignado.
-Para PDFs escaneados, la API .NET usa Tesseract y `pdftoppm`; el `Dockerfile` instala ambos
-binarios y el paquete de idioma español. Si se ejecuta la API directamente fuera de Docker,
-esas herramientas deben estar disponibles en el `PATH`.
-
-Para ejecutarlo como contenedor de forma independiente:
-
-```bash
-cd service
-docker build -t comparador-ai-service .
-docker run --rm --env-file .env -p 8000:8000 comparador-ai-service
-```
-
-En ese caso, `DATABASE_URL` debe usar `host.docker.internal` y el puerto publicado por el
-compose (`5433` en tu configuración actual), por ejemplo:
-
-`postgresql://convenciones:convenciones@host.docker.internal:5433/convenciones`
-
-Este proceso ya no es necesario para que funcione `web/`; se conserva únicamente para
-comparaciones históricas o una ejecución explícita durante la migración. La API .NET expone
-ahora `/tenants`, `/documentos` y el resto de rutas consumidas por el frontend.
-
-La siembra de la taxonomía (`db/seed_taxonomia.py`, ~60 títulos reales de Venezuela) no se
-ejecuta desde este compose local (el workflow que antes la ejecutaba antes de sembrar el
-usuario AdminTenant se eliminó junto con el deploy a Azure). Para una base local ya creada,
-ejecútala manualmente desde `service/`.
-
-## Decisión que vale la pena señalar
-
-El `Dockerfile` del servicio Python empaqueta `pymupdf`, `pytesseract` y Tesseract OCR —
-listo para correr en cualquier contenedor, sin nada específico de un proveedor de nube. La
-decisión pendiente para desarrollo local es agregarlo al mismo compose, porque eso requiere
-definir el uso de `db:5432` dentro de la red Docker; por ahora se ejecuta como proceso local o
-como contenedor independiente.
+(Necesitan `psycopg[binary]`, `python-dotenv` y `DATABASE_URL` apuntando al Postgres
+publicado por el compose — mismo patrón que usa el servicio `seed`.)

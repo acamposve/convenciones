@@ -9,12 +9,11 @@ Cualquier cambio técnico o de producto que contradiga la constitución requiere
 2. Proponer una enmienda a la constitución
 3. Registrar la razón de la enmienda en el documento
 
-> **⚠️ Migración de stack en curso (Enmienda 2.2.0 de la constitución):** el proyecto migra
-> a C#/.NET 10 unificado + Supabase, según
-> [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md).
-> La estructura y comandos de abajo describen el stack **desplegado hoy** (`service/`
-> sigue activo); no se ha portado código todavía. Ver Art. V de `constitution.md` para el
-> stack objetivo.
+> **⚠️ Migración de stack (Enmienda 2.2.0/2.5.0 de la constitución):** el backend ya es
+> C#/.NET 10 unificado, según
+> [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
+> — el microservicio Python (`service/`) se eliminó del repositorio. Falta migrar la base
+> de datos a Supabase (sigue siendo PostgreSQL local). Ver Art. V de `constitution.md`.
 
 > **⚠️ Se eliminó la infraestructura de Azure** (`infra/terraform/`, los workflows de deploy):
 > el proyecto va a redesplegar a otro proveedor, todavía sin decidir. Hoy no hay ningún
@@ -24,13 +23,12 @@ Cualquier cambio técnico o de producto que contradiga la constitución requiere
 
 | Carpeta | Qué es |
 |---|---|
-| `api/` | API .NET 10 LTS (Fase 3.1 ya aplicada) — autenticación, datos, tenants. Destino final del microservicio Python tras el cutover (plan de migración, Fase 3-5) |
-| `service/` | Microservicio Python/FastAPI — IA, extracción, segmentación, clasificación. El plan de migración prevé eliminarlo (Fase 5.4) |
+| `api/` | API única en .NET 10 LTS — autenticación, datos, tenants, negocio, ingesta/OCR/segmentación deterministas |
 | `web/` | Frontend React + Vite |
 | `docs/` | Documentación: constitution, specs, taxonomías, marcos legales |
 | `db/` | Scripts SQL: schema, seeds, fixtures de prueba |
 | `legacy/` | SaaS PHP legado — referencia arquitectónica, **no se porta código de aquí** |
-| `.github/workflows/` | CI: build + test de los tres componentes (`ci.yml`). Sin deploy |
+| `.github/workflows/` | CI: build + test de API y frontend (`ci.yml`). Sin deploy |
 
 ## Fases del proyecto
 
@@ -45,24 +43,13 @@ Ver [`spec-mvp-demo.md`](spec-mvp-demo.md) para el alcance exacto de hoy.
 ## Desarrollo local
 
 ```bash
-# Base de datos + API + frontend
-cd service
 docker compose up --build
-
-# Microservicio de IA (en otra terminal)
-cd service
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
 ```
 
-Credenciales de demo en `docker compose logs seed`.
+Credenciales de demo en `docker compose logs seed`. Guía completa en
+[`bootstrap-demo.md`](bootstrap-demo.md).
 
 ## Código
-
-### Python (service/)
-- Style: Black (100 chars), Ruff
-- Tests: pytest
-- Tipos: mypy
 
 ### C# (api/)
 - Style: Roslyn analyzers (StyleCop Analyzers)

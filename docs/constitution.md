@@ -1,6 +1,6 @@
 # Constitución del Proyecto — Comparador de Documentos Legales
 
-> **Versión:** 2.4.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-20
+> **Versión:** 2.5.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-26
 > **Origen:** `documento_arquitectura_comparador_convenciones.docx` (preparado para Alex Campos, 8 de agosto de 2026)
 > **Enmienda 2.0.0:** redefine el modelo de tenant (Art. I.3) tras revisar el código legado
 > completo (`legacy/`). El valor original del producto era la comparación cross-empresa
@@ -49,6 +49,19 @@
 > externos de clasificación, resumen o cumplimiento legal. Las cláusulas quedan sin
 > clasificación automática hasta una fase posterior. Esta excepción aplica solo al MVP y
 > difiere temporalmente el paso 5 del Art. IV.
+> **Enmienda 2.5.0:** completa el cutover de la Enmienda 2.2.0 — Fase 5.2 (corte de tráfico)
+> y Fase 5.4 (limpieza de repositorio) de `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` ya se
+> ejecutaron: el microservicio Python (`service/`) se eliminó del repositorio, y `db/`
+> (schema, migraciones, seeds — no específico de ningún servicio) se reubicó a la raíz.
+> Redefine Art. V — fila "API principal + procesamiento": deja de ser objetivo, **es la
+> decisión vigente**. La Fase 5.3 original del plan (`terraform apply` para destruir el
+> contenedor Python en Azure) queda **sin efecto**, no pendiente: la Enmienda 2.3.0 ya
+> eliminó Terraform y Azure del repositorio, así que no hay infraestructura de la que
+> corresponda "apagar" nada. Lo único que sigue objetivo, no desplegado, del Art. V es la
+> base de datos (Supabase — hoy sigue siendo PostgreSQL local, Fase 3.2 del plan) y el
+> proveedor de infraestructura (sin decidir, Enmienda 2.3.0). Igual que las enmiendas
+> 2.2.0/2.3.0, esto es una decisión de infraestructura/stack, no de producto o alcance — no
+> toca Art. I, IV ni VI.
 
 Este documento fija los principios y decisiones de arquitectura que gobiernan el diseño e implementación del nuevo Comparador de Documentos Legales. Cualquier decisión técnica o de producto que lo contradiga debe justificarse explícitamente y, si se acepta, disparar una enmienda a esta constitución.
 
@@ -126,13 +139,15 @@ Flujo obligatorio, en este orden, con revisión humana como puerta de publicaci�
 
 ## Artículo V — Stack técnico
 
-**[Enmienda 2.2.0]** Stack objetivo tras adoptar `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`.
-La columna "Decisión anterior" documenta lo reemplazado (Art. V v2.1.0), vigente en
-producción hasta el cutover (Fase 5.2 del plan) — ver nota de Enmienda 2.2.0 arriba.
+**[Enmienda 2.2.0/2.5.0]** Stack tras adoptar `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`.
+La fila "API principal + procesamiento" ya es la decisión vigente (Enmienda 2.5.0, Fase 5.2
+del plan completa; el microservicio Python se eliminó del repositorio). Base de datos e
+infraestructura siguen objetivo, no desplegado — la columna "Decisión anterior" sigue vigente
+para esas dos filas.
 
 | Componente | Decisión | Decisión anterior (hasta cutover) | Motivo del cambio |
 |---|---|---|---|
-| API principal + procesamiento | **C# / .NET 10 LTS, servicio único** — absorbe ingesta, OCR, extracción y segmentación en el MVP; la clasificación IA queda diferida | API .NET (última LTS) + microservicio Python (FastAPI) separado, consumido async vía cola | Elimina la duplicación de stack y permite cerrar primero un pipeline determinista; cualquier IA futura requiere alcance y proveedor aprobados |
+| API principal + procesamiento | **C# / .NET 10 LTS, servicio único** — absorbe ingesta, OCR, extracción y segmentación en el MVP; la clasificación IA queda diferida. **Ya es la decisión vigente (Enmienda 2.5.0)** | API .NET (última LTS) + microservicio Python (FastAPI) separado, consumido async vía cola — **eliminado del repositorio** | Elimina la duplicación de stack y permite cerrar primero un pipeline determinista; cualquier IA futura requiere alcance y proveedor aprobados |
 | Motor de IA | LLM vía API (Claude), salida estructurada, vía `IChatClient` | LLM vía API (Claude), salida estructurada | Mismo proveedor y principio; cambia solo el cliente/SDK |
 | Base de datos | **Supabase** (PostgreSQL 16 gestionado) con **Row Level Security nativo**, multi-tenant por `tenant_id` | Azure PostgreSQL Flexible Server autoadministrado (o Azure SQL), multi-tenant por columna `tenant_id` | Mismo motor relacional (compatibilidad 100% con `schema.sql`); RLS nativo refuerza el aislamiento por tenant (Art. VI.2) a nivel de base de datos, no solo en código; Auth y Storage integrados |
 | Almacenamiento de documentos | Supabase Storage (S3-compatible, con RLS) | Blob storage cifrado en reposo (Azure Blob / S3) | Mismo principio de cifrado y privacidad por defecto (Art. VI.1); RLS unifica la política de acceso con la de base de datos |

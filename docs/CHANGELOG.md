@@ -23,7 +23,7 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   `schema.sql` aplicado y verificado (27 tablas, 58 índices, 12 secuencias, enum `rol_usuario`),
   semillas cargadas (taxonomía de Venezuela: 5 categorías/64 títulos; catálogos de empresa;
   marco legal LOTTT: 1 ley/555 artículos/357 vínculos), y
-  [`service/db/migrations/012_rls_supabase.sql`](../service/db/migrations/012_rls_supabase.sql)
+  [`db/migrations/012_rls_supabase.sql`](../db/migrations/012_rls_supabase.sql)
   (RLS) aplicado y verificado contra la base real — RLS activo en las 9 tablas de tenant
   (incluidas las 5 hijas de `negociaciones`, sin `tenant_id` propio, vía subquery), biblioteca
   pública expuesta como vista de solo lectura en `schema.sql` (`biblioteca_publica`, no como
@@ -67,6 +67,13 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Removed
 - No hay versión anterior en git — este repo comienza con MVP
+- Enmienda 2.5.0: se completa el cutover anunciado en la Enmienda 2.2.0/Deprecated de
+  arriba — el microservicio Python/FastAPI (`service/`) se elimina del repositorio (Fase
+  5.2 corte de tráfico + Fase 5.4 limpieza, ya completas). `db/` (schema, migraciones,
+  seeds) y `docker-compose.yml`/`.env.example` no eran específicos del servicio Python —
+  se reubican a la raíz del repo en vez de eliminarse. La Fase 5.3 original del plan
+  (`terraform apply` para destruir el contenedor Python en Azure) queda sin efecto: la
+  Enmienda 2.3.0 ya había eliminado Terraform y Azure del repositorio.
 - Constitution.md v2.3.0: se retira Azure como proveedor de infraestructura. Se elimina
   `infra/terraform/` completo, los workflows de GitHub Actions que desplegaban ahí
   (`terraform.yml`, `deploy-apps.yml`) y el soporte a Azure Blob Storage en

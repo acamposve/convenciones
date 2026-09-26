@@ -32,8 +32,8 @@ import bcrypt
 import psycopg
 from dotenv import load_dotenv
 
-SERVICE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(SERVICE_DIR / ".env")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(REPO_ROOT / ".env")
 
 EMAIL = "admin@empresademo.local"
 PASSWORD_DEV_ONLY = "CambiarAhora123!"

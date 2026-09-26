@@ -246,25 +246,27 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
   - [x] En `web/.env`, actualizar `VITE_API_BASE_URL` para que apunte exclusivamente a la API .NET 10.
   - [x] Eliminar `VITE_DOCUMENT_API_BASE_URL`; el frontend usa una única base URL para auth, negocio y procesamiento documental.
   - [x] Migrar el registro público y la biblioteca pública a la API .NET 10; Python deja de recibir peticiones del frontend.
-- [ ] **5.3. Apagado y Destrucción en Infraestructura (Terraform):**
-  - [ ] En `infra/terraform/container_apps.tf`:
-    - Eliminar el recurso `azurerm_container_app.service` (Python).
-    - Ajustar `azurerm_container_app.api` (1.0 CPU, 2.0 GiB RAM).
-  - [ ] En `infra/terraform/database.tf`:
-    - Eliminar `azurerm_postgresql_flexible_server` (ahorro de costos, migrado a Supabase).
-  - [ ] En `.github/workflows/deploy-apps.yml`:
-    - Eliminar los steps de build y deploy de Python.
-  - [ ] Ejecutar `terraform apply`: **El contenedor Python y Postgres Azure se destruyen en la nube.**
-- [ ] **5.4. Limpieza del Repositorio:**
-  - [ ] Eliminar la carpeta `service/` del código fuente.
-  - [ ] Actualizar `README.md`, `ARCHITECTURE.md` y `docs/constitution.md` registrando a .NET 10 y Supabase como stack oficial único.
+- [x] **5.3. Apagado y Destrucción en Infraestructura (Terraform): sin efecto, no pendiente**
+  (Enmienda 2.5.0 de `docs/constitution.md`). La Enmienda 2.3.0 ya eliminó
+  `infra/terraform/` completo y `.github/workflows/deploy-apps.yml` del repositorio — no
+  hay `azurerm_container_app.service`, `azurerm_postgresql_flexible_server` ni ningún otro
+  recurso Azure que destruir. Este paso tal como estaba escrito asumía que la
+  infraestructura de la Fase 5.2 seguía siendo Terraform/Azure; deja de aplicar en cuanto
+  se decide el proveedor de infraestructura nuevo (todavía sin decidir).
+- [x] **5.4. Limpieza del Repositorio:**
+  - [x] Eliminar la carpeta `service/` del código fuente (`db/`, `docker-compose.yml` y
+    `.env.example` no son específicos del microservicio Python — se reubicaron a la raíz
+    del repo en vez de eliminarse).
+  - [x] Actualizar `README.md`, `docs/ARCHITECTURE.md` y `docs/constitution.md`
+    (Enmienda 2.5.0) registrando a .NET 10 como backend oficial único; Supabase sigue
+    pendiente (Fase 3.2).
 
 ---
 
 ## 5. Criterios de Éxito Final
 
-1. **Stack Unificado:** 100% de la lógica de backend reside en una única solución C# (.NET 10 LTS).
-2. **Cero Código Python:** El directorio `service/` y sus contenedores ya no existen en ningún entorno.
-3. **Cero Pérdida de Datos:** Base de datos PostgreSQL alojada en Supabase con RLS protegiendo el multi-tenancy.
+1. **Stack Unificado (✅ cumplido):** 100% de la lógica de backend (auth, negocio, ingesta, OCR, segmentación) reside en una única solución C# (.NET 10 LTS).
+2. **Cero Código Python del microservicio (✅ cumplido):** el directorio `service/` (la API FastAPI, sus tests y su Dockerfile) ya no existe en el repositorio ni en ningún entorno. Excepción deliberada: `db/seed_*.py` son scripts de bootstrap de un solo uso para desarrollo local (no un servicio en ejecución) — quedan en Python porque portarlos no aporta al objetivo de este criterio (cero *servicio* Python), no porque falte trabajo.
+3. **Cero Pérdida de Datos (pendiente):** Base de datos PostgreSQL alojada en Supabase con RLS protegiendo el multi-tenancy — sigue siendo PostgreSQL local (Fase 3.2).
 4. **Observabilidad Completa:** Logs estructurados JSON contextualizados en cada petición y tarea en segundo plano.
 5. **MVP sin IA:** ingesta, extracción/OCR y segmentación funcionan sin llamadas a LLM ni servicios externos de IA; la clasificación automática queda fuera del MVP.
