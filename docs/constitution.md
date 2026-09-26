@@ -1,214 +1,864 @@
-# Constitución del Proyecto — Comparador de Documentos Legales
+# Convenciones — Constitution
 
-> **Versión:** 2.5.0 · **Ratificada:** 2026-08-08 · **Última enmienda:** 2026-09-26
-> **Origen:** `documento_arquitectura_comparador_convenciones.docx` (preparado para Alex Campos, 8 de agosto de 2026)
-> **Enmienda 2.0.0:** redefine el modelo de tenant (Art. I.3) tras revisar el código legado
-> completo (`legacy/`). El valor original del producto era la comparación cross-empresa
-> dentro del catálogo propio de un operador (consultora, firma, cámara de comercio) — no
-> el autoservicio de una sola empresa. Se incorporan las entidades Empresa, Negociación y
-> Marco Legal, y se replantea el roadmap (Art. X). Registrado según la regla de enmienda
-> del Art. XI (cambio a Art. I).
-> **Enmienda 2.1.0:** a partir de la reunión con el cliente de dominio (Luis Villegas,
-> 2026-08-29): agrega el resumen ejecutivo por cláusula con revisión propia, independiente
-> de la clasificación (Art. IV.6 bis/8/9); habilita finalmente el campo comparativo del
-> Art. IV.6 (diseñado desde el MVP original, nunca implementado); agrega la biblioteca
-> pública global de convenciones, segunda excepción explícita al aislamiento por tenant
-> (Art. VI.7); aclara que la taxonomía versionada por país (Art. II.3) sigue sin
-> implementarse a nivel de esquema y define el mecanismo de clonado. Replantea el
-> roadmap (Art. X) intercalando estas fases delante de la expansión de países.
-> **Enmienda 2.2.0:** adopta el plan de migración técnica descrito en
-> `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` (raíz del repo — el nombre del archivo es
-> heredado y engañoso: el destino real es **Supabase**, no Firebase, que el propio plan
-> descarta explícitamente por incompatible con el modelo relacional del Art. III).
-> Redefine Art. V: el backend se unifica en **C#/.NET 10 LTS** (absorbe ingesta, OCR,
-> segmentación y clasificación de IA, hoy en el microservicio Python/FastAPI separado) y la
-> base de datos pasa de Azure PostgreSQL Flexible Server autoadministrado a **Supabase**
-> (PostgreSQL gestionado con Row Level Security nativo, Auth y Storage integrados). Ajusta
-> Art. VIII.1 en consecuencia. **Esta es una decisión de infraestructura/stack, no de
-> producto o alcance** — no toca Art. I, IV ni VI (protegidos por la regla de enmienda),
-> y el corte (cutover) es progresivo: Python sigue atendiendo tráfico real hasta que el
-> plan complete su Fase 5.2; hasta entonces, este documento describe el **stack objetivo**,
-> no el desplegado. Migración de código y de infraestructura pendientes — ver el plan para
-> el detalle fase por fase.
-> **Enmienda 2.3.0:** se retira **Azure como proveedor de infraestructura**. Se eliminó del
-> repositorio todo lo relacionado a Azure: `infra/terraform/` completo (Container Apps,
-> PostgreSQL Flexible Server, ACR, Storage Account), los workflows de GitHub Actions que
-> desplegaban ahí (`terraform.yml`, `deploy-apps.yml`), y el soporte a Azure Blob Storage en
-> `service/app/storage.py` (queda solo el fallback a disco local que ya existía). Redefine
-> Art. V — fila "Infraestructura": ya no es "Azure Container Apps", queda **sin decidir**;
-> el deploy a un proveedor nuevo es trabajo futuro, fuera del alcance de esta enmienda.
-> Motivo: el ACR del demo (`comparadordemoacr`) quedó en un estado `REGISTRY_NOT_READY` no
-> atribuible a permisos, red ni configuración (confirmado contra la API de Azure) — en vez
-> de seguir apostando por Azure para el demo, se decide cambiar de proveedor. **Efecto
-> práctico inmediato: no hay ningún ambiente desplegado en la nube** — el proyecto corre
-> solo local (`docs/bootstrap-demo.md`) hasta que se elija y configure el proveedor nuevo.
-> Igual que la Enmienda 2.2.0, esto es una decisión de infraestructura, no de producto o
-> alcance — no toca Art. I, IV ni VI.
-> **Enmienda 2.4.0:** el MVP interno se limita deliberadamente a ingesta, extracción/OCR y
-> segmentación determinista. No invoca LLMs, Claude, `Microsoft.Extensions.AI` ni servicios
-> externos de clasificación, resumen o cumplimiento legal. Las cláusulas quedan sin
-> clasificación automática hasta una fase posterior. Esta excepción aplica solo al MVP y
-> difiere temporalmente el paso 5 del Art. IV.
-> **Enmienda 2.5.0:** completa el cutover de la Enmienda 2.2.0 — Fase 5.2 (corte de tráfico)
-> y Fase 5.4 (limpieza de repositorio) de `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md` ya se
-> ejecutaron: el microservicio Python (`service/`) se eliminó del repositorio, y `db/`
-> (schema, migraciones, seeds — no específico de ningún servicio) se reubicó a la raíz.
-> Redefine Art. V — fila "API principal + procesamiento": deja de ser objetivo, **es la
-> decisión vigente**. La Fase 5.3 original del plan (`terraform apply` para destruir el
-> contenedor Python en Azure) queda **sin efecto**, no pendiente: la Enmienda 2.3.0 ya
-> eliminó Terraform y Azure del repositorio, así que no hay infraestructura de la que
-> corresponda "apagar" nada. Lo único que sigue objetivo, no desplegado, del Art. V es la
-> base de datos (Supabase — hoy sigue siendo PostgreSQL local, Fase 3.2 del plan) y el
-> proveedor de infraestructura (sin decidir, Enmienda 2.3.0). Igual que las enmiendas
-> 2.2.0/2.3.0, esto es una decisión de infraestructura/stack, no de producto o alcance — no
-> toca Art. I, IV ni VI.
+**Version:** 1.0
+**Status:** Active
+**Scope:** Legacy modernization, migration, and future development of Convenciones
 
-Este documento fija los principios y decisiones de arquitectura que gobiernan el diseño e implementación del nuevo Comparador de Documentos Legales. Cualquier decisión técnica o de producto que lo contradiga debe justificarse explícitamente y, si se acepta, disparar una enmienda a esta constitución.
+---
 
-## Preámbulo
+# 1. Purpose
 
-El sistema reemplaza un SaaS PHP de ~20 años ("convenciones") que comparaba convenciones colectivas de trabajo mediante clasificación 100% manual. **El legado no era una herramienta de autoservicio para una sola empresa: era el catálogo propio de un operador (consultora de RRHH, cámara de comercio) que comparaba entre muchas empresas de su cartera.** El sistema nuevo preserva esa esencia — comparación dentro del catálogo de un operador — y automatiza progresivamente la lectura, clasificación y extracción de cláusulas, preservando un paso de revisión humana obligatorio antes de publicar cualquier contenido. El MVP interno no usa IA y termina después de segmentar las cláusulas; la automatización de clasificación queda para una fase posterior. Además cubre el proceso de negociación colectiva previo a la firma, que el legado también tenía (módulo de discusión) y que la versión 1.0 de esta constitución no contemplaba.
+Convenciones is a contract intelligence platform originally developed as a legacy PHP application and currently undergoing modernization.
 
-## Artículo I — Alcance y no-alcance
+This constitution defines the engineering principles and constraints that must govern any analysis, modernization, migration, replacement, or new development related to Convenciones.
 
-1. El sistema trata **exclusivamente convenciones colectivas de trabajo**, no documentos legales genéricos. No se diseña clasificación genérica para otros tipos de documento en esta fase.
-2. Países soportados: **Venezuela, Uruguay, Argentina y Chile**. Cada país tiene su propia taxonomía de cláusulas, validada legalmente antes de activarse.
-3. **Modelo tenant–operador: 1 tenant = 1 operador (consultora, firma de abogados, cámara de comercio) que gestiona un catálogo propio de empresas-cliente, en un país.** Una Empresa (Art. III) pertenece a exactamente un tenant; el mismo operador puede tener muchas empresas en su catálogo. No hay agregación cross-tenant: dos operadores nunca comparten catálogo de empresas ni comparación entre sí (Art. VI.2 sigue aplicando al nivel de tenant, ahora sobre el catálogo completo de un operador, no sobre una sola empresa). **[Enmienda 2.0.0 — reemplaza "1 tenant = 1 empresa/firma en 1 país"]**
-4. Todo el contenido generado por IA pasa por **revisión interna obligatoria** antes de publicarse; no hay publicación automática sin intervención humana.
-5. El entregable al usuario final es dual pero de fuente única: **reporte (PDF/export) y vista web navegable**, generados desde el mismo dato estructurado.
-6. **El sistema cubre dos momentos de una convención: antes de la firma (negociación — peticiones, ofertas, acuerdos, reuniones, Art. IV bis) y después de la firma (documento final — ingesta, clasificación, comparación, Art. IV). El cierre de una negociación con acuerdo genera el Documento que entra al segundo flujo; ambos comparten el mismo modelo de Empresa y Tenant. [Enmienda 2.0.0 — nuevo]**
+The objective is not to rewrite the legacy system for the sake of using newer technology.
 
-## Artículo II — Modelo de dominio y taxonomía
+The objective is to:
 
-1. El sistema legado organiza cláusulas en dos niveles: **5 categorías** (GENERALES, ECONÓMICO, SOCIOECONÓMICAS, SINDICALES, SEGURIDAD OCUPACIONAL) y **~60 títulos comparativos** dentro de ellas, cada uno con un indicador de si requiere campo de comparación económica.
-2. Esta estructura conceptual es transversal a los cuatro países (remuneración, beneficios/condiciones de trabajo, aportes sindicales), confirmado contra los marcos legales de Argentina (Ley 14.250), Uruguay (Ley 18.566) y Chile (Código del Trabajo, Libro IV).
-3. Diseño obligatorio: **núcleo de categorías común a los cuatro países**, con una **capa de títulos versionada por país** que permite agregar, renombrar o desactivar títulos sin tocar el núcleo. **Este diseño sigue sin implementarse a nivel de esquema hasta Fase 7 (Art. X): hoy `taxonomia_categorias`/`taxonomia_titulos` son un catálogo global único (el de Venezuela), no versionado por país. Fase 8 lo implementa vía clonado — un país nuevo arranca copiando el set de un país ya activo (hoy, Venezuela) y a partir de ahí es independiente y editable por Plataforma (Art. VII.4), sin afectar al país de origen; no es una referencia compartida en vivo. [Enmienda 2.1.0 — nuevo]**
-4. Ningún país nuevo se activa comercialmente sin que su taxonomía haya sido **validada por un abogado laboral local**. La investigación web no sustituye esta validación.
-5. **Los catálogos de segmentación de empresas (sector, tipo de empresa, categoría de sector, actividad económica) y de geografía (país, estado, localidad) son globales, compartidos por todos los tenants — no se duplican por operador.** Son datos de referencia objetivos (ej. "Sector: Manufactura" es el mismo dato para cualquier consultora). **[Enmienda 2.0.0 — nuevo]**
-6. **El marco legal (leyes y artículos de ley) es un catálogo por país, igual que la taxonomía. No es solo referencia de consulta: alimenta la verificación de cumplimiento legal (Art. IV.5 bis) — cruza cada cláusula clasificada contra los artículos de ley relacionados a su título, y señala si está por debajo, iguala, o supera el mínimo legal. Esta señal es asistencia para la revisión humana, nunca una determinación legal vinculante ni asesoría legal automatizada — el Revisor (Art. VII) es quien decide, igual que ningún resultado se publica sin su aprobación (Art. IV.8, no negociable). [Enmienda 2.0.0 — nuevo]**
+* Preserve business value and operational continuity.
+* Understand and document existing business behavior.
+* Protect existing data.
+* Reduce technical debt.
+* Improve security.
+* Improve maintainability.
+* Enable automated testing.
+* Establish clear architectural boundaries.
+* Enable future contract intelligence and AI capabilities.
+* Support multi-tenant operation.
+* Progressively retire legacy components when appropriate.
+* Minimize unnecessary migration risk.
 
-## Artículo III — Modelo de datos
+Technology decisions must follow the business and technical requirements rather than the other way around.
 
-Entidades fundamentales (nombres conceptuales, no nombres de tabla definitivos):
+---
 
-| Entidad | Descripción | Origen |
-|---|---|---|
-| Tenant | **Operador (consultora/firma/cámara) cliente del SaaS**; asociado a país, plan de licencia y fecha de vencimiento. Gestiona un catálogo propio de Empresas. | Nuevo — el legado no tenía multi-tenancy; era un solo operador global |
-| **Empresa** *(nuevo)* | Empresa-cliente cuya(s) convención(es) el tenant analiza/compara: nombre, RIF, sector, tipo, categoría, actividad, país/estado/localidad, contacto. Pertenece a un tenant. | Adaptado de `empresas.php` |
-| Usuario / Rol | Pertenece a un tenant (excepto el rol de Plataforma, Art. VII.4); rol entre Admin Tenant, Revisor, Editor, Visualizador, definido en instalación | Adaptado de `tipos_de_usuarios` y `seguridades` |
-| País | Catálogo de países soportados con su marco legal de referencia | Adaptado de `paises` |
-| **Catálogos de segmentación** *(nuevo)* | Sector, tipo de empresa, categoría de sector, actividad económica, geografía (país/estado/localidad) — globales (Art. II.5) | Adaptado de `sectores`, `tipos_empresas`, `categoria_sector`, `actividad_empresa`, `estados`/`localidad` |
-| Categoría / Título | Árbol de clasificación de cláusulas, versionado por país | Adaptado de `categorias_titulos` y `titulos` |
-| **Ley / Artículo de ley** *(nuevo)* | Corpus legal por país (ej. Ley Orgánica del Trabajo, otras leyes), vinculado a títulos de taxonomía; alimenta la verificación de cumplimiento (Art. IV.5 bis) | Adaptado de `ley_trabajo`, `otras_leyes`, `articulos_ley_trabajo` |
-| **Negociación** *(nuevo)* | Proceso de negociación colectiva de una Empresa antes de firmar: peticiones (sindicato), ofertas (empresa), reuniones, acuerdos. Al cerrar con acuerdo, genera el Documento (Art. IV). Bitácora propia (`bitacora_negociacion`), **distinta** de la bitácora de accesos | Adaptado del módulo `discusion` |
-| Documento / Contrato | Convención capturada por URL, carga, **o generada al cerrar una Negociación**; guarda tenant, **empresa**, país, vigencia, estado público/privado | Adaptado de `contratos`, ahora vinculado a Empresa además de Tenant |
-| Cláusula / Artículo | Unidad extraída: número, texto, título asignado, campo comparativo (Art. IV.6), **resumen ejecutivo con revisión propia e independiente de la del título** (Art. IV.6 bis/8, `[Enmienda 2.1.0]`), confianza del modelo, señal de cumplimiento legal | Adaptado de `articulos_contratos` |
-| Bitácora de accesos | Registro de login/logout/fallos y aprobaciones de cláusulas — **distinta de la bitácora de negociación** (arriba) | Adaptado de `bitacoras` |
-| Licencia | Plan del tenant: fechas, límites de usuarios/documentos, países habilitados | Nuevo |
-| Reporte de comparación | Selección de empresas/documentos/cláusulas del catálogo del tenant, filtros por sector/tipo/actividad/geografía; alimenta vista web y export | Adaptado del módulo `comparador.php` |
+# 2. Core Principle
 
-## Artículo IV bis — Negociación colectiva (pre-firma) *(nuevo)*
+> **Understand before replacing. Preserve business value, not legacy implementation.**
 
-Flujo para una Empresa que está negociando una convención nueva, antes de que exista un
-documento firmado. No reemplaza el Art. IV — lo antecede. Una Empresa puede tener
-documentos que nunca pasaron por este flujo (convenciones históricas cargadas directo).
+The legacy application is a source of business behavior and historical knowledge.
 
-1. **Petición** — el sindicato registra una petición: número, título, texto completo, título de taxonomía sugerido (opcional, Art. II).
-2. **Oferta** — la empresa registra su respuesta a una petición.
-3. **Reunión** — se registra una sesión de negociación (fecha, asistentes, resumen), vinculada a la bitácora de negociación de la Empresa.
-4. **Acuerdo** — cuando petición y oferta convergen, se registra el acuerdo alcanzado para esa cláusula.
-5. **Cierre** — cuando los títulos relevantes tienen acuerdo, se cierra la negociación y se genera el Documento a partir de los acuerdos, listo para el pipeline del Art. IV.
+It is not automatically considered a valid architectural reference.
 
-## Artículo IV — Pipeline de extracción y clasificación
+Existing code must not be reproduced merely because it already exists.
 
-Flujo obligatorio, en este orden, con revisión humana como puerta de publicación (no opcional):
+At the same time, undocumented behavior must not be arbitrarily removed or changed without understanding its business impact.
 
-1. **Ingesta** — el tenant aporta el documento por URL pública, carga de archivo (PDF/Word), **o cierre de una Negociación (Art. IV bis.5)**. **[Enmienda 2.0.0]**
-2. **Check público/privado** — el documento es privado por defecto; si se marca público vía URL, debe validarse que sea accesible sin autenticación antes de tratarlo como tal.
-3. **Extracción de texto** — parseo de PDF/Word; OCR automático si es un escaneo.
-4. **Segmentación** — división del texto en artículos/cláusulas individuales.
-5. **Clasificación** — en el producto completo puede realizarse mediante un LLM vía API y salida estructurada; en el MVP interno este paso queda diferido y las cláusulas permanecen sin título automático.
-5 bis. **Verificación de cumplimiento legal** *(nuevo)* — cruza cada cláusula clasificada contra los artículos de ley (Art. II.6) relacionados a su título, y marca una señal: por debajo / iguala / supera el mínimo legal. Es asistencia para el paso 8, nunca una determinación automática vinculante.
-6. **Extracción del campo comparativo** — normaliza el valor comparable (ej. "15 días", "30% del salario") cuando el título lo requiere.
-6 bis. **Resumen ejecutivo** *(nuevo)* — un LLM redacta una síntesis breve y fiel al texto original de la cláusula, sin interpretar ni agregar contenido que no esté en el original (pensada para lectura ejecutiva rápida: "15 días hábiles de vacaciones + 1 bono anual", no un análisis). Recibe su **propia** revisión humana, independiente de la de clasificación (paso 8) — puede estar aprobado uno y pendiente el otro, en cualquier combinación. **[Enmienda 2.1.0]**
-7. **Score de confianza** — cada cláusula clasificada recibe un nivel de confianza que prioriza la cola de revisión.
-8. **Revisión humana** — el rol Revisor valida o corrige, en **dos gestos independientes**: (a) clasificación/título y campo comparativo, y (b) resumen ejecutivo — uno no bloquea al otro. También valida la señal de cumplimiento legal. **No negociable. [Enmienda 2.1.0 — aclara que son dos estados de revisión separados, no uno solo]**
-9. **Publicación** — la cláusula con clasificación aprobada queda visible en el reporte web y disponible para comparación; la aprobación del resumen **no** es condición de publicación (Art. IV.6 bis). Si el resumen también está aprobado, la vista de comparación lo muestra colapsado con el texto completo desplegable; si no, muestra directamente el texto completo. **[Enmienda 2.1.0]**
+---
 
-**Dataset de partida:** ~6.400 artículos ya clasificados (dump legado) y 403 PDFs reales de convenciones venezolanas vinculados a su clasificación. Uso condicionado a confirmar el derecho de reutilización de esos documentos como dataset de prueba (ver Artículo XI).
+# 3. Modernization Is Not Automatically a Rewrite
 
-## Artículo V — Stack técnico
+Convenciones must not assume that the correct strategy is:
 
-**[Enmienda 2.2.0/2.5.0]** Stack tras adoptar `PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`.
-La fila "API principal + procesamiento" ya es la decisión vigente (Enmienda 2.5.0, Fase 5.2
-del plan completa; el microservicio Python se eliminó del repositorio). Base de datos e
-infraestructura siguen objetivo, no desplegado — la columna "Decisión anterior" sigue vigente
-para esas dos filas.
+```text
+Legacy PHP → New Application
+```
 
-| Componente | Decisión | Decisión anterior (hasta cutover) | Motivo del cambio |
-|---|---|---|---|
-| API principal + procesamiento | **C# / .NET 10 LTS, servicio único** — absorbe ingesta, OCR, extracción y segmentación en el MVP; la clasificación IA queda diferida. **Ya es la decisión vigente (Enmienda 2.5.0)** | API .NET (última LTS) + microservicio Python (FastAPI) separado, consumido async vía cola — **eliminado del repositorio** | Elimina la duplicación de stack y permite cerrar primero un pipeline determinista; cualquier IA futura requiere alcance y proveedor aprobados |
-| Motor de IA | LLM vía API (Claude), salida estructurada, vía `IChatClient` | LLM vía API (Claude), salida estructurada | Mismo proveedor y principio; cambia solo el cliente/SDK |
-| Base de datos | **Supabase** (PostgreSQL 16 gestionado) con **Row Level Security nativo**, multi-tenant por `tenant_id` | Azure PostgreSQL Flexible Server autoadministrado (o Azure SQL), multi-tenant por columna `tenant_id` | Mismo motor relacional (compatibilidad 100% con `schema.sql`); RLS nativo refuerza el aislamiento por tenant (Art. VI.2) a nivel de base de datos, no solo en código; Auth y Storage integrados |
-| Almacenamiento de documentos | Supabase Storage (S3-compatible, con RLS) | Blob storage cifrado en reposo (Azure Blob / S3) | Mismo principio de cifrado y privacidad por defecto (Art. VI.1); RLS unifica la política de acceso con la de base de datos |
-| Cola de tareas | `System.Threading.Channels` en proceso + `BackgroundService` (.NET) | Azure Service Bus / RabbitMQ | Suficiente mientras el volumen no exija cola distribuida; revisar bajo Art. VIII si el volumen crece — no es una regresión de desacople, es in-process dentro del mismo servicio unificado |
-| Frontend | SPA (React) | SPA (React) | Sin cambio |
-| Autenticación | Supabase Auth (GoTrue, JWT) como base; SSO/SAML vía proveedor (WorkOS o Auth0) sobre Supabase Auth cuando se active (Art. VII.2) | OIDC estándar + SSO/SAML vía proveedor (WorkOS o Auth0) | Autenticación y base de datos bajo el mismo proveedor simplifica RLS (`auth.jwt()` nativo); SSO/SAML enterprise se mantiene como capa adicional, sin cambio de plan |
-| Infraestructura | **Contenedores (Docker) — proveedor de nube sin decidir.** `[Enmienda 2.3.0]` Se retiró Azure (Terraform, Container Apps); el objetivo de "un único contenedor de API" (antes dos: `api` + `ai-service`) se mantiene, pero sobre qué proveedor todavía es una decisión pendiente, fuera del alcance de esta constitución hasta que se tome | Contenedores (Docker) en Azure Container Apps (`api` + `ai-service` separados), con ruta a Kubernetes | Azure Container Apps ya no es la decisión vigente (Enmienda 2.3.0); el resto de motivos (menos superficie de infraestructura, sin Postgres autoadministrado) sigue aplicando una vez que se elija el proveedor nuevo |
+The modernization analysis must consider multiple strategies, including:
 
-## Artículo VI — Seguridad y privacidad (no negociables)
+1. Incremental modernization of the existing PHP application.
+2. Migration of selected functionality to Laravel.
+3. Progressive replacement using the existing/new .NET platform.
+4. Hybrid architecture.
+5. Strangler Fig migration.
+6. Temporary coexistence between legacy and modern components.
+7. Complete replacement, only when justified.
 
-1. Documentos **privados por defecto**; solo públicos si el usuario lo declara explícitamente y, cuando aplica, se valida accesibilidad sin autenticación de la URL de origen.
-2. **Aislamiento de datos por tenant obligatorio** en cada consulta (filtro por `tenant_id` / row-level security).
-3. Cifrado en tránsito y en reposo para documentos y base de datos.
-4. Contraseñas con hashing moderno (bcrypt/argon2). **No se migran** la tabla de usuarios ni las contraseñas del sistema legado — sus valores no corresponden a un hash seguro. Se fuerza restablecimiento para todo usuario heredado.
-5. Bitácora de auditoría sobre cambios y aprobaciones de cláusulas, continuando el concepto de `bitacoras` del legado.
-6. **El rol de Plataforma (Art. VII.4) es la única excepción al aislamiento estricto por tenant de este artículo: opera fuera del modelo de tenant para poder dar de alta operadores nuevos. Sus acciones quedan en una bitácora separada, con el mismo nivel de auditoría que el punto 5. [Enmienda 2.0.0 — nuevo]**
-7. **Biblioteca pública de convenciones** *(nuevo)*: un directorio de solo lectura, sin autenticación, que lista documentos con `es_publico=true` de **todos los tenants juntos** — la segunda y única otra excepción deliberada al aislamiento del punto 2 (junto con el rol de Plataforma del punto 6). A diferencia del resto del sistema, acá el cruce entre tenants es el objetivo explícito del producto (un directorio único del sector, no el catálogo de un operador) — el filtro sigue siendo estricto en el otro sentido: únicamente documentos marcados públicos por una persona (punto 1), nunca cláusulas ni metadata de un documento privado, y nunca datos de Empresa/tenant más allá del nombre necesario para identificar el documento. **[Enmienda 2.1.0 — nuevo]**
+The selected strategy must be based on evidence from the existing system.
 
-## Artículo VII — Roles, autenticación empresarial y licenciamiento
+Technology preference alone is insufficient justification.
 
-1. Los roles se configuran en instalación (como en el legado: Master, Operador, Transcriptor, perfiles por módulo). Set base propuesto: **Admin Tenant, Revisor, Editor, Visualizador**, extensible por el cliente.
-2. SSO/SAML vía proveedor de identidad (WorkOS o Auth0) debe estar previsto en la arquitectura desde el inicio, aunque no se active para la demo — retrofitear SSO sobre multi-tenancy ya construido es considerablemente más caro.
-3. Licenciamiento: **anual por tenant**, con tier según número de usuarios, volumen de documentos/mes y países habilitados, facturable anual o trimestral. Vencimiento y límites se modelan a **nivel de tenant** (no de usuario individual) y se hacen cumplir mediante feature flags.
-4. **Rol de Plataforma ("GOD")** *(nuevo)*: pertenece al operador del SaaS (Presencia Virtual), no a un tenant. Da de alta operadores nuevos (tenants) y su primer Usuario Admin Tenant; gestiona licenciamiento y activación comercial de países (Art. II.4). Es la única excepción explícita al aislamiento por tenant (Art. VI.2/VI.6). Queda pendiente de decisión técnica **cómo** modelarlo — ver Art. XI.5.
+---
 
-## Artículo VIII — Escalabilidad
+# 4. Architecture Decision Principles
 
-1. Punto de partida: multi-tenancy por columna (`tenant_id`) sobre base de datos gestionada (Supabase, Art. V), con el procesamiento de IA como worker asíncrono en proceso (`BackgroundService` .NET, Art. V) — suficiente para demo y primeros clientes; con ruta a extraerse como servicio separado si el volumen lo exige. **[Enmienda 2.2.0 — antes: microservicio Python separado]**
-2. Ruta de crecimiento: aislamiento de datos por tenant (schema o BD dedicada) para clientes grandes que lo exijan por compliance; escalado horizontal del worker de IA independiente de la API; caché/reuso de extracciones para documentos públicos compartidos entre tenants.
+Architecture decisions must optimize for:
 
-## Artículo IX — Migración desde el sistema legado
+1. Business continuity
+2. Data integrity
+3. Security
+4. Correct business behavior
+5. Maintainability
+6. Testability
+7. Operational simplicity
+8. Extensibility
+9. Performance
+10. Development velocity
 
-1. El sistema legado se trata como **especificación funcional, no como base de código a portar**.
-2. **Se reutiliza:** taxonomía de categorías y títulos (adaptada y versionada por país); ~6.400 artículos clasificados como dataset de referencia; 403 PDFs como set de prueba del extractor; la lógica de negocio del flujo categoría → título → campo comparativo → reporte; **el modelo de catálogo de empresas y comparación cross-empresa (`empresas.php`, `comparador.php`) — es el valor central del producto original; el módulo de negociación (`discusion`: peticiones, ofertas, acuerdos, reuniones); el corpus de leyes (`ley_trabajo`, `otras_leyes`) como base para la verificación de cumplimiento. [Enmienda 2.0.0]**
-3. **No se reutiliza:** código PHP4/5 (incompatible con PHP moderno, sin framework); credenciales en texto plano; consultas sin sanitizar (`$_GET` directo en SQL); tabla de usuarios y contraseñas; flujo de captura 100% manual.
-4. Se construyen **scripts ETL puntuales** para migrar tablas de referencia (países, categorías, títulos, empresas, contratos, artículos) del dump MySQL hacia el nuevo modelo, como datos semilla e históricos.
+Architecture must remain proportional to the actual complexity of the problem.
 
-## Artículo X — Roadmap *(replanteado, Enmiendas 2.0.0 y 2.1.0)*
+---
 
-| Fase | Contenido |
-|---|---|
-| Fase 0 — Validación | Validación legal de la taxonomía por país con abogados locales; confirmación de derechos de uso del dataset histórico |
-| Fase 1 — Fundaciones técnicas *(MVP interno)* | Carga de un documento por tenant, extracción/OCR, segmentación determinista y auth básica con roles fijos. **Sin IA, sin clasificación automática, sin** catálogo de empresas, sin comparación, sin negociación y sin cola de revisión — es la base técnica, no el producto completo (`spec-mvp-demo.md`) |
-| Fase 2 — Empresa + Revisión + Comparación *(ya desplegado)* | Entidad Empresa y catálogos globales de segmentación (Art. II.5); cola de revisión humana (Art. IV.8 — ya era no negociable, nunca se construyó); comparador intra-tenant filtrado por sector/tipo/actividad/geografía — el núcleo del producto original |
-| Fase 3 — Negociación colectiva *(ya desplegado)* | Módulo de discusión completo (Art. IV bis): peticiones, ofertas, reuniones, acuerdos |
-| Fase 4 — Marco legal y cumplimiento *(ya desplegado)* | Corpus de leyes por país (Art. II.6); verificación de cumplimiento activa en clasificación (Art. IV.5 bis) |
-| Fase 5 — Plataforma SaaS real *(ya desplegado)* | Rol de Plataforma (Art. VII.4) con UI propia; registro self-service de operadores; licenciamiento/países habilitados por tenant |
-| Fase 6 — Resumen ejecutivo y campo comparativo *(ya desplegado, Enmienda 2.1.0)* | Resumen ejecutivo por cláusula (Art. IV.6 bis) con revisión humana propia e independiente de la clasificación; campo comparativo (Art. IV.6, diseñado desde el MVP original, nunca implementado); comparador muestra el resumen colapsado con el texto completo desplegable cuando está aprobado |
-| Fase 7 — Biblioteca pública *(ya desplegado, Enmienda 2.1.0)* | Directorio global de solo lectura, sin autenticación, de documentos públicos de todos los tenants (Art. VI.7); buscador por nombre de empresa |
-| **Fase 8 — Taxonomía por país y expansión** *(renumerada, antes Fase 6)* | Implementación real de la taxonomía versionada por país (Art. II.3: clonado + edición independiente por Plataforma); activación de Uruguay como primer caso concreto; Argentina y Chile a continuación (cada uno con validación legal propia); SSO/SAML; aislamiento de datos dedicado para clientes grandes; mejora continua del extractor |
+# 5. Avoid Overengineering
 
-## Artículo XI — Riesgos abiertos y gobernanza de cambios
+Convenciones must not introduce architectural complexity without a concrete reason.
 
-Estos puntos están **pendientes de resolución** y bloquean decisiones downstream hasta cerrarse:
+Avoid introducing:
 
-1. Validación legal por país pendiente: la taxonomía de Uruguay, Argentina y Chile necesita revisión de abogado laboral local antes de activarse comercialmente.
-2. Derecho de uso de los 403 PDFs y ~6.400 artículos del legado como dataset de prueba — confirmar si son de registro público en cada caso.
-3. SLA de revisión humana no definido: tiempo esperado para aprobar un documento cargado y criterio de priorización de la cola por confianza del modelo.
-4. Definición fina de los tiers de licencia (números concretos de usuarios/documentos por plan) pendiente de conversación comercial.
-5. **Cómo modelar el rol de Plataforma sin romper el aislamiento por tenant** (tabla separada `usuarios_plataforma` vs. `tenant_id` nullable en `usuarios`) — pendiente de decisión técnica antes de Fase 5. *[nuevo]*
-6. **La verificación de cumplimiento legal (Art. IV.5 bis) es asistencia, no asesoría legal** — confirmar con asesoría legal real si hace falta un disclaimer/términos de servicio explícito antes de activarla comercialmente. *[nuevo]*
-7. **Los catálogos globales de segmentación (Art. II.5) no deben filtrar datos de un tenant a otro** — hay que confirmar en el diseño que listar/usar estos catálogos nunca permite inferir cuántas empresas de tal sector tiene un competidor. *[nuevo]*
+* Microservices without a clear business or technical justification.
+* Distributed systems where a modular monolith is sufficient.
+* Excessive interfaces.
+* Generic repositories without meaningful abstraction.
+* Excessive CQRS.
+* Event-driven architecture without a concrete use case.
+* Unnecessary messaging infrastructure.
+* Abstractions created only for theoretical flexibility.
+* Multiple databases without a justified requirement.
+* Infrastructure complexity that cannot be operated reliably.
 
-**Regla de enmienda:** cualquier cambio a los artículos I, IV o VI (alcance, revisión humana obligatoria, seguridad) requiere actualizar explícitamente este documento y registrar la razón del cambio. Los demás artículos pueden evolucionar durante el diseño detallado sin romper la constitución, siempre que no contradigan estos tres.
+The preferred solution is the simplest architecture that satisfies the actual requirements.
+
+---
+
+# 6. Domain Understanding
+
+Convenciones is a contract intelligence system.
+
+The modernization effort must explicitly identify and preserve the business concepts involved in:
+
+* Contracts
+* Companies
+* Clients
+* Documents
+* Clauses
+* Contract periods
+* Contract status
+* Users
+* Roles
+* Permissions
+* Document versions
+* Document processing
+* Contract comparison
+* Compliance analysis
+* Classification
+* Audit/history
+
+The actual legacy system must be inspected before assuming that these concepts are implemented correctly or completely.
+
+---
+
+# 7. Legacy System Assessment
+
+Before significant migration work begins, the legacy application must be analyzed.
+
+The assessment must identify:
+
+## Application
+
+* PHP version
+* Framework or custom architecture
+* Entry points
+* Routes
+* Pages
+* Controllers
+* Includes/requires
+* Global state
+* Sessions
+* Authentication
+* Authorization
+* Cron jobs
+* CLI processes
+* Background processes
+
+## Business functionality
+
+Identify:
+
+* Major modules
+* Major workflows
+* Business rules
+* Calculations
+* Validations
+* State transitions
+* Notifications
+* Reports
+* Imports
+* Exports
+* File processing
+* Integrations
+
+## Database
+
+Identify:
+
+* Tables
+* Primary keys
+* Foreign keys
+* Relationships
+* Indexes
+* Constraints
+* Views
+* Stored procedures
+* Triggers
+* Historical data
+* Duplicate data
+* Orphan records
+* Data inconsistencies
+
+## Infrastructure
+
+Identify:
+
+* Web server
+* PHP runtime
+* Database
+* File storage
+* Cache
+* Queue mechanisms
+* Cron
+* External services
+* Email infrastructure
+* Deployment process
+* Backups
+* Monitoring
+* Logging
+
+---
+
+# 8. Legacy Behavior Classification
+
+Every significant legacy behavior discovered during analysis should be classified as one of:
+
+* **Required business behavior**
+* **Undocumented but relied-upon behavior**
+* **Confirmed defect**
+* **Security vulnerability**
+* **Technical debt**
+* **Dead code**
+* **Deprecated functionality**
+* **Unknown behavior**
+
+Unknown behavior must remain explicitly marked as unknown until sufficient evidence exists.
+
+The migration must not silently convert assumptions into requirements.
+
+---
+
+# 9. Data Is a First-Class Asset
+
+Existing Convenciones data must be treated as a critical business asset.
+
+No migration may assume that the database is clean.
+
+The assessment must identify:
+
+* Data quality issues
+* Duplicate records
+* Missing relationships
+* Invalid values
+* Legacy identifiers
+* Inconsistent status values
+* Historical records
+* Orphan records
+* Incomplete records
+* Encoding issues
+* Legacy assumptions encoded in the schema
+
+Data cleanup and application migration must be treated as separate concerns unless there is a specific reason to combine them.
+
+---
+
+# 10. Database Migration
+
+Any database migration must document:
+
+* Schema changes
+* Data transformations
+* Backfill requirements
+* Compatibility requirements
+* Validation strategy
+* Rollback strategy
+* Production deployment considerations
+
+Existing data must not be destroyed merely to simplify the migration.
+
+If a legacy schema is inadequate, the migration must determine whether to:
+
+* Modify it incrementally.
+* Introduce compatibility structures.
+* Create a new schema.
+* Synchronize old and new models temporarily.
+* Migrate data progressively.
+
+---
+
+# 11. Multi-Tenancy
+
+Convenciones must be designed as a multi-tenant system.
+
+The tenant boundary must be explicit.
+
+Unless requirements establish otherwise:
+
+> **Data belonging to one tenant must never be accessible to another tenant.**
+
+Tenant isolation must be enforced at the application and authorization boundaries, not merely assumed from UI behavior.
+
+Every migration involving business data must identify:
+
+* Tenant ownership
+* Tenant resolution
+* Tenant authorization
+* Cross-tenant risks
+* Existing legacy assumptions
+
+The legacy implementation must be inspected to determine whether tenant isolation is currently enforced correctly.
+
+---
+
+# 12. Security
+
+Security is a mandatory architectural concern.
+
+The modernization must explicitly assess:
+
+* Authentication
+* Authorization
+* Password storage
+* Session handling
+* SQL injection
+* XSS
+* CSRF
+* File upload security
+* Access control
+* Sensitive information exposure
+* Secrets
+* Hardcoded credentials
+* Insecure dependencies
+* Authorization bypasses
+* Tenant isolation
+* Data exposure
+* Logging of sensitive information
+
+New code must follow secure-by-default practices.
+
+Known critical security vulnerabilities must not be carried forward merely for compatibility.
+
+---
+
+# 13. Authentication and Authorization
+
+Authentication and authorization must be treated as separate concerns.
+
+Authorization must be enforced server-side.
+
+The migration must identify the existing:
+
+* Users
+* Roles
+* Permissions
+* Administrative privileges
+* Resource-level permissions
+* Tenant-level permissions
+
+Visibility of a UI element must never be considered sufficient authorization.
+
+---
+
+# 14. Contract and Document Integrity
+
+Contracts and documents are core business assets.
+
+The system must preserve:
+
+* Original documents
+* Document metadata
+* Document versions
+* Relationships to contracts
+* Processing status
+* Extraction results
+* Audit information
+* Relevant historical information
+
+A migration must not modify or overwrite original documents without explicit authorization and traceability.
+
+Derived information must be distinguishable from source information.
+
+---
+
+# 15. AI and Document Intelligence
+
+AI functionality must be introduced as a controlled capability rather than embedded indiscriminately throughout the system.
+
+AI-generated or AI-assisted information must be distinguishable from authoritative source data.
+
+The system should preserve, where applicable:
+
+* Source document
+* Extracted text
+* Processing status
+* Model/provider
+* Processing version
+* Confidence
+* Generated result
+* Relevant timestamps
+* Error state
+
+AI results must not silently replace source information.
+
+The architecture must allow AI providers or models to evolve without unnecessarily coupling the core domain to a specific provider.
+
+---
+
+# 16. Processing Pipeline
+
+Document processing should be treated as a pipeline with explicit stages where applicable.
+
+Potential stages include:
+
+```text
+Ingestion
+   ↓
+Type Detection
+   ↓
+Text Extraction
+   ↓
+Text Normalization
+   ↓
+Classification
+   ↓
+Analysis
+   ↓
+Comparison / Compliance
+```
+
+The actual pipeline must be determined by the system requirements and existing implementation.
+
+Each stage should have:
+
+* Explicit input
+* Explicit output
+* Defined failure behavior
+* Observable status
+* Retry strategy where appropriate
+
+A failed processing stage must not silently appear as a successful operation.
+
+---
+
+# 17. API-First Design
+
+New functionality should expose well-defined application boundaries.
+
+APIs must:
+
+* Have explicit contracts.
+* Validate input.
+* Enforce authorization.
+* Respect tenant boundaries.
+* Return meaningful errors.
+* Avoid leaking internal implementation details.
+
+Internal implementation details must not become accidental API contracts.
+
+---
+
+# 18. Architecture for New Components
+
+New functionality should favor clear boundaries between:
+
+```text
+Presentation
+     ↓
+Application
+     ↓
+Domain
+     ↓
+Infrastructure
+```
+
+The exact implementation may vary depending on the technology selected.
+
+For Laravel, this may be implemented using appropriate Laravel conventions.
+
+For .NET, existing Convenciones architecture principles may be used where applicable.
+
+The architecture must remain pragmatic.
+
+---
+
+# 19. Technology-Neutral Migration Analysis
+
+When comparing PHP, Laravel, .NET, or other technologies, the analysis must distinguish:
+
+### Facts
+
+What is demonstrably present in the current system.
+
+### Requirements
+
+What the future system actually needs.
+
+### Assumptions
+
+What has not yet been verified.
+
+### Trade-offs
+
+Benefits and costs associated with each option.
+
+### Risks
+
+Potential failure modes and migration risks.
+
+Technology selection must not be based solely on familiarity or novelty.
+
+---
+
+# 20. Testing Strategy
+
+The modernization must progressively establish automated tests.
+
+Testing should include, where appropriate:
+
+* Characterization tests
+* Unit tests
+* Feature tests
+* Integration tests
+* Database tests
+* API tests
+* End-to-end tests
+
+Critical business workflows should receive priority.
+
+Tests should validate behavior rather than implementation details.
+
+Where legacy behavior is poorly understood, characterization tests should be used before modifying that behavior.
+
+---
+
+# 21. Code Quality
+
+New code must:
+
+* Use meaningful names.
+* Have clear responsibilities.
+* Avoid duplication.
+* Minimize hidden side effects.
+* Keep business logic explicit.
+* Handle errors deliberately.
+* Avoid unnecessary complexity.
+* Follow the conventions of its chosen framework.
+
+Legacy code should not be mechanically copied into the new architecture.
+
+---
+
+# 22. Observability
+
+Modernized components must provide sufficient observability.
+
+Where appropriate, use:
+
+* Structured logging
+* Request identifiers
+* Correlation identifiers
+* Health checks
+* Metrics
+* Processing status
+* Audit logs
+
+Sensitive information must not be logged.
+
+For document processing, failures must be observable and diagnosable.
+
+---
+
+# 23. Backward Compatibility
+
+During incremental migration, compatibility must be considered explicitly.
+
+The migration plan must identify:
+
+* Existing URLs
+* Existing API contracts
+* Existing integrations
+* Existing authentication flows
+* Existing database consumers
+* Existing scheduled jobs
+* Existing file formats
+* Existing reports
+
+Breaking changes must be deliberate and documented.
+
+---
+
+# 24. Deployment Strategy
+
+Every migration phase must consider production deployment.
+
+The plan must identify:
+
+* Application changes
+* Database changes
+* Configuration changes
+* Environment variables
+* External services
+* Deployment order
+* Rollback strategy
+* Backward compatibility
+
+Migration phases should be independently deployable whenever practical.
+
+---
+
+# 25. Legacy Retirement
+
+Migration is not complete merely because new code exists.
+
+For every migrated component, the plan must identify:
+
+* Legacy code being replaced
+* Dependencies preventing removal
+* Temporary compatibility mechanisms
+* Conditions required for removal
+* Verification required before removal
+
+Legacy code should be removed once its replacement is proven and no legitimate dependency remains.
+
+---
+
+# 26. Migration Alternatives
+
+The modernization plan must explicitly evaluate:
+
+### Option A — Incremental PHP modernization
+
+Continue improving the existing application while progressively reducing technical debt.
+
+### Option B — Laravel migration
+
+Move functionality progressively into a Laravel-based architecture.
+
+### Option C — .NET modernization
+
+Progressively replace legacy functionality using the modern Convenciones platform.
+
+### Option D — Hybrid modernization
+
+Use different technologies for different bounded areas while maintaining explicit integration boundaries.
+
+### Option E — Full replacement
+
+Replace the legacy application with a new platform.
+
+This option requires strong justification because of its potentially higher business and migration risk.
+
+The analysis must not select an option before understanding the actual characteristics of the legacy system.
+
+---
+
+# 27. Migration Decision Framework
+
+Each alternative should be evaluated against:
+
+| Criterion              | Consideration                                         |
+| ---------------------- | ----------------------------------------------------- |
+| Business continuity    | Can the business continue operating during migration? |
+| Migration risk         | How much can go wrong?                                |
+| Data risk              | How difficult is data preservation?                   |
+| Security               | Does the option improve the security posture?         |
+| Maintainability        | Does it reduce technical debt?                        |
+| Testability            | Can automated testing be established?                 |
+| Development velocity   | Can future features be delivered efficiently?         |
+| Scalability            | Can the solution support future growth?               |
+| AI integration         | Can document intelligence be incorporated cleanly?    |
+| Multi-tenancy          | Can tenant isolation be enforced correctly?           |
+| Operational complexity | Can the solution be operated reliably?                |
+| Long-term cost         | What is the expected maintenance burden?              |
+| Legacy retirement      | Can the legacy system eventually be removed?          |
+
+The evaluation must provide evidence and trade-offs rather than technology advocacy.
+
+---
+
+# 28. Migration Phases
+
+A migration plan should generally follow this logical progression:
+
+```text
+Discovery
+   ↓
+Characterization
+   ↓
+Risk Reduction
+   ↓
+Foundation
+   ↓
+Incremental Migration
+   ↓
+Validation
+   ↓
+Legacy Retirement
+```
+
+The exact phases must be determined from the actual system.
+
+No phase should be created merely because it is architecturally fashionable.
+
+---
+
+# 29. Definition of Done
+
+A migrated component is complete when:
+
+* Its behavior is understood.
+* Required functionality is implemented.
+* Appropriate automated tests exist.
+* Security requirements are satisfied.
+* Tenant isolation is verified.
+* Data integrity is verified.
+* Deployment requirements are understood.
+* Observability exists where necessary.
+* Legacy dependencies are identified.
+* Rollback considerations are documented.
+* Legacy implementation can be removed or its continued existence is explicitly justified.
+
+---
+
+# 30. Required Analysis Before Implementation
+
+Before modifying the legacy application or creating significant new implementation, Copilot must produce an analysis containing:
+
+## 30.1 Current State
+
+Describe how the existing Convenciones system actually works.
+
+## 30.2 System Inventory
+
+Identify:
+
+* Modules
+* Routes
+* PHP files
+* Database tables
+* Integrations
+* Jobs
+* Users
+* Roles
+* Permissions
+* Document workflows
+
+## 30.3 Dependency Map
+
+Identify dependencies between:
+
+* Modules
+* Business processes
+* Database entities
+* External systems
+* Shared code
+
+## 30.4 Business Capability Map
+
+Map the existing functionality to business capabilities.
+
+## 30.5 Data Model
+
+Document the relevant current data model and identify data quality concerns.
+
+## 30.6 Security Assessment
+
+Identify security weaknesses and their potential impact.
+
+## 30.7 Technical Debt Assessment
+
+Identify the major sources of technical debt.
+
+## 30.8 Migration Options
+
+Evaluate PHP modernization, Laravel, .NET, hybrid, and replacement strategies.
+
+## 30.9 Recommended Migration Strategy
+
+Provide a recommendation based on evidence discovered during analysis.
+
+## 30.10 Migration Roadmap
+
+Produce incremental phases with:
+
+* Scope
+* Dependencies
+* Risks
+* Deliverables
+* Tests
+* Deployment considerations
+* Rollback considerations
+
+## 30.11 Open Questions
+
+Explicitly list questions that cannot be answered from the repository.
+
+---
+
+# 31. Copilot Operating Rules
+
+When analyzing Convenciones, Copilot must:
+
+1. Inspect the repository before proposing implementation.
+2. Use evidence from the existing code.
+3. Avoid inventing business rules.
+4. Clearly identify assumptions.
+5. Mark unknown behavior as unknown.
+6. Avoid modifying files during the initial analysis.
+7. Prefer incremental migration.
+8. Preserve data integrity.
+9. Treat security findings as first-class concerns.
+10. Avoid unnecessary architecture.
+11. Avoid blindly translating legacy code.
+12. Document significant architectural decisions.
+13. Separate business requirements from implementation details.
+14. Identify opportunities to remove legacy functionality rather than automatically migrating everything.
+15. Consider whether functionality should be migrated, replaced, redesigned, or retired.
+
+---
+
+# 32. Prohibited Practices
+
+The following are prohibited unless explicitly justified:
+
+* Blind PHP-to-Laravel translation.
+* Blind PHP-to-.NET translation.
+* Big-bang rewrite without analysis.
+* Microservices without demonstrated need.
+* Reproducing known legacy defects.
+* Copying legacy architecture into the new system.
+* Deleting legacy functionality without understanding its usage.
+* Destructive database migration without validated backups and rollback planning.
+* Removing historical data to simplify implementation.
+* Assuming undocumented behavior is irrelevant.
+* Treating UI restrictions as authorization.
+* Storing secrets in source code.
+* Introducing AI without traceability.
+* Allowing AI-generated data to silently overwrite authoritative source data.
+* Adding infrastructure without operational justification.
+* Introducing abstractions solely to satisfy architectural patterns.
+
+---
+
+# 33. Guiding Principles
+
+The following principles summarize the constitution:
+
+> **Business value over legacy implementation.**
+
+> **Evidence over assumptions.**
+
+> **Incremental migration over unnecessary big-bang rewrites.**
+
+> **Data integrity over migration convenience.**
+
+> **Security by default.**
+
+> **Simple architecture over unnecessary complexity.**
+
+> **Tests before changing poorly understood behavior.**
+
+> **Explicit boundaries over hidden coupling.**
+
+> **Observable processes over opaque automation.**
+
+> **AI-assisted intelligence must remain traceable to its source.**
+
+> **Technology serves the business; the business does not serve the technology.**
