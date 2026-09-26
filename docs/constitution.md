@@ -57,10 +57,12 @@
 > decisión vigente**. La Fase 5.3 original del plan (`terraform apply` para destruir el
 > contenedor Python en Azure) queda **sin efecto**, no pendiente: la Enmienda 2.3.0 ya
 > eliminó Terraform y Azure del repositorio, así que no hay infraestructura de la que
-> corresponda "apagar" nada. Lo único que sigue objetivo, no desplegado, del Art. V es
-> Supabase en sí (base de datos, hoy PostgreSQL local, y storage de documentos, hoy disco
-> local, ambos Fase 3.2 del plan) y el proveedor de infraestructura (sin decidir, Enmienda
-> 2.3.0). Igual que las enmiendas
+> corresponda "apagar" nada. Lo único que sigue objetivo, no desplegado por default, del
+> Art. V es operar contra Supabase en sí — el proyecto real ya tiene esquema y RLS
+> validados (Fase 2 del plan) y la conexión es configurable (Fase 3.2), pero el entorno
+> local sigue apuntando a Postgres local a propósito, y el storage de documentos sigue en
+> disco local, sin tarea de corte todavía en el plan — y el proveedor de infraestructura
+> (sin decidir, Enmienda 2.3.0). Igual que las enmiendas
 > 2.2.0/2.3.0, esto es una decisión de infraestructura/stack, no de producto o alcance — no
 > toca Art. I, IV ni VI.
 

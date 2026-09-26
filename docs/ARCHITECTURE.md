@@ -6,9 +6,11 @@
 > **.NET 10 LTS** — el microservicio Python (`service/`) se eliminó del repositorio (Fase
 > 5.2 cutover + Fase 5.4 limpieza de
 > [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)).
-> Lo que sigue pendiente del stack objetivo es Supabase en sí: base de datos (hoy PostgreSQL
-> local, Fase 3.2 del plan) y storage de documentos (hoy disco local vía `Storage:Root` /
-> el volumen `api_storage` de `docker-compose.yml`, no Supabase Storage todavía).
+> Lo que sigue pendiente del stack objetivo es operar contra Supabase en sí: el proyecto
+> real ya tiene esquema y RLS validados (Fase 2 del plan) y la conexión es configurable
+> (Fase 3.2), pero el entorno local sigue apuntando a Postgres local a propósito. El storage
+> de documentos sigue en disco local (`Storage:Root` / el volumen `api_storage` de
+> `docker-compose.yml`, no Supabase Storage todavía) — sin tarea de corte propia en el plan.
 >
 > **Sin infraestructura en la nube (Enmienda 2.3.0):** se retiró Azure (Terraform, Container
 > Apps) — hoy no hay ningún ambiente desplegado, el proyecto corre solo local. El proveedor
@@ -119,7 +121,7 @@ repositorio.
 |---|---|---|---|
 | API + procesamiento | C# / .NET 10 LTS, servicio único — **ya aplicado** | API en .NET 8 + servicio Python/FastAPI separado | Un solo runtime que mantener y desplegar; el MVP procesa documentos sin IA |
 | Clasificación IA | Fuera del MVP; queda diferida | Claude (API) directo desde Python | Se requiere una decisión posterior de alcance, proveedor y validación |
-| Base de datos | Supabase (PostgreSQL 16 + RLS) — **pendiente** (hoy PostgreSQL local, Fase 3.2) | PostgreSQL (Azure Flexible Server autoadministrado) | RLS nativo refuerza aislamiento por tenant; Auth/Storage integrados; menos infraestructura propia que operar |
+| Base de datos | Supabase (PostgreSQL 16 + RLS) — esquema/RLS validados contra el proyecto real (Fase 2), conexión configurable (Fase 3.2), **pero no operado por default** (el entorno local sigue apuntando a Postgres local a propósito) | PostgreSQL (Azure Flexible Server autoadministrado) | RLS nativo refuerza aislamiento por tenant; Auth/Storage integrados; menos infraestructura propia que operar |
 | Storage | Supabase Storage — **pendiente** (hoy disco local, `Storage:Root`/volumen `api_storage`) | Azure Blob | Documentos encriptados en reposo, con RLS unificado a la política de datos |
 | Cola | `System.Threading.Channels` en proceso | Service Bus / RabbitMQ | Suficiente para el volumen actual; ya no hay dos procesos que desacoplar |
 | Frontend | React + Vite | React + Vite | Sin cambio |
