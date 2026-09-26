@@ -5,7 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Comparador.Api.Controllers;
 
-public sealed record CreateTenantRequest(string NombreEmpresa, string Email, string Password);
+public sealed record CreateTenantRequest(
+    [FromForm(Name = "nombre_empresa")] string NombreEmpresa,
+    [FromForm(Name = "email")] string Email,
+    [FromForm(Name = "password")] string Password);
 
 [ApiController]
 [Route("")]

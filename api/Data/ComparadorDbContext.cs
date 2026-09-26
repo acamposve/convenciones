@@ -85,14 +85,13 @@ public class ComparadorDbContext : DbContext
             .WithMany()
             .HasForeignKey(t => t.PaisId);
 
-        modelBuilder.Entity<Usuario>()
-            .HasIndex(u => new { u.TenantId, u.Email })
-            .IsUnique();
+        // Único global, no por tenant: AuthController.Login busca por email solo, sin
+        // filtrar por tenant_id (docs/spec-plataforma.md §2), así que dos tenants con el
+        // mismo email harían el login ambiguo si el índice fuera (tenant_id, email).
         modelBuilder.Entity<Usuario>()
             .HasIndex(u => u.Email)
             .IsUnique()
-            .HasFilter("tenant_id IS NULL")
-            .HasDatabaseName("idx_usuarios_email_plataforma");
+            .HasDatabaseName("idx_usuarios_email");
 
         modelBuilder.Entity<BitacoraAcceso>()
             .HasOne(ba => ba.Usuario)

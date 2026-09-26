@@ -19,6 +19,14 @@
 
 ## 2. Arquitectura: `usuarios.tenant_id` nullable (decisión cerrada)
 
+> **Actualización (Fase 5.2, alta self-service de tenants):** el índice único parcial
+> descrito abajo asumía que solo Plataforma creaba usuarios y evitaba colisiones por
+> convención. Con `POST /tenants` público, dos empresas distintas pueden elegir el mismo
+> email de `AdminTenant` y el login (que sigue buscando solo por email) queda ambiguo. La
+> migración `013_usuarios_email_unico_global.sql` reemplaza `UNIQUE(tenant_id, email)` +
+> el índice parcial de Plataforma por un único índice único global `usuarios(email)` — ver
+> §4.
+
 Se investigó el código real de `api/` (.NET) antes de decidir, no solo en abstracto:
 
 - El API tiene un solo controller de auth (`AuthController.cs`) y una sola línea de
@@ -78,9 +86,9 @@ la validación de JWT en `Program.cs` — más superficie de mantenimiento que l
   Plataforma
 - `rol_usuario` (enum Postgres) y `RolUsuario` (enum C#) ganan tres valores:
   `PlataformaAdmin`, `PlataformaSoporte`, `PlataformaAuditor`
-- Índice único parcial `usuarios(email) WHERE tenant_id IS NULL` — el `UNIQUE(tenant_id, email)`
-  existente no alcanza para filas con `tenant_id NULL` (Postgres trata cada NULL como
-  distinto en un índice único)
+- Índice único global `usuarios(email)` (reemplaza `UNIQUE(tenant_id, email)` y el índice
+  parcial de Plataforma) — necesario porque el login busca solo por email sin filtrar por
+  tenant; ver nota de actualización en §2
 - `tenant_paises_habilitados` (`tenant_id`, `pais_id`) — tabla puente, ver nota de §3
 - `tenants.suspendido` (bool, default false) — para que Plataforma pueda desactivar un
   operador sin borrar sus datos (ej. licencia vencida, incumplimiento) — el login sigue

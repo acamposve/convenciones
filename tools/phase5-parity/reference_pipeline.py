@@ -23,16 +23,26 @@ def main() -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     results = []
 
-    for relative_path in manifest["documents"]:
+    for entry in manifest["documents"]:
+        relative_path = entry["path"]
         path = ROOT / relative_path
+        actual_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
         result = {
             "path": relative_path,
-            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "sha256": actual_sha256,
             "status": "error",
             "text": "",
             "clauses": [],
             "error": None,
         }
+        if actual_sha256 != entry["sha256"]:
+            result["error"] = (
+                f"El hash SHA-256 no coincide con el manifiesto "
+                f"(esperado {entry['sha256']}, obtenido {actual_sha256}); "
+                "el lote no es reproducible."
+            )
+            results.append(result)
+            continue
         try:
             text = extract_text(path.read_bytes(), path.suffix)
             clauses = segment_clauses(text)

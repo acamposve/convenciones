@@ -21,23 +21,32 @@ var referenceByPath = reference.Documents.ToDictionary(document => document.Path
 var extractor = new DocumentTextExtractor(new TesseractOcr(new ConfigurationBuilder().Build()));
 var results = new List<DocumentResult>();
 
-foreach (var relativePath in manifest.Documents)
+foreach (var manifestDocument in manifest.Documents)
 {
+    var relativePath = manifestDocument.Path;
     var path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+    var content = await File.ReadAllBytesAsync(path);
+    var actualSha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
     var result = new DocumentResult
     {
         Path = relativePath,
-        Sha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(path))).ToLowerInvariant(),
+        Sha256 = actualSha256,
         Status = "error"
     };
 
+    if (!string.Equals(actualSha256, manifestDocument.Sha256, StringComparison.OrdinalIgnoreCase))
+    {
+        result.Error = $"El hash SHA-256 no coincide con el manifiesto (esperado {manifestDocument.Sha256}, " +
+            $"obtenido {actualSha256}); el lote no es reproducible.";
+        results.Add(result);
+        continue;
+    }
+
     try
     {
-        var content = await File.ReadAllBytesAsync(path);
         var text = await extractor.ExtractAsync(content, Path.GetExtension(path), CancellationToken.None);
         var clauses = ClauseSegmenter.Segment(text).ToArray();
         var referenceDocument = referenceByPath[relativePath];
-        result.Status = "processed";
         result.ExtractedCharacters = text.Length;
         result.ClauseCount = clauses.Length;
         result.Candidates = GetPdfCandidates(path);
@@ -46,23 +55,35 @@ foreach (var relativePath in manifest.Documents)
         result.HeaderSamples = detectedHeaders.Take(10).ToArray();
         result.ReferenceExtractedCharacters = referenceDocument.Text.Length;
         result.ReferenceClauseCount = referenceDocument.Clauses.Length;
-        result.ExtractionParity = Normalize(text) == referenceDocument.NormalizedText;
-        result.SegmentationParity = clauses.Select(Normalize).SequenceEqual(referenceDocument.NormalizedClauses);
-        result.FirstExtractionDifference = DescribeDifference(Normalize(text), referenceDocument.NormalizedText);
-        result.FirstSegmentationDifference = DescribeDifference(
-            string.Join("\n", clauses.Select(Normalize)),
-            string.Join("\n", referenceDocument.NormalizedClauses));
-        if (result.ExtractionParity != true)
+
+        if (referenceDocument.Status == "processed")
         {
-            result.Discrepancies.Add("extraccion_normalizada");
+            result.ExtractionParity = Normalize(text) == referenceDocument.NormalizedText;
+            result.SegmentationParity = clauses.Select(Normalize).SequenceEqual(referenceDocument.NormalizedClauses);
+            result.FirstExtractionDifference = DescribeDifference(Normalize(text), referenceDocument.NormalizedText);
+            result.FirstSegmentationDifference = DescribeDifference(
+                string.Join("\n", clauses.Select(Normalize)),
+                string.Join("\n", referenceDocument.NormalizedClauses));
+            if (result.ExtractionParity != true)
+            {
+                result.Discrepancies.Add("extraccion_normalizada");
+            }
+            if (result.SegmentationParity != true)
+            {
+                result.Discrepancies.Add("segmentacion_normalizada");
+            }
         }
-        if (result.SegmentationParity != true)
+        else
         {
-            result.Discrepancies.Add("segmentacion_normalizada");
+            result.ReferenceError = referenceDocument.Error;
+            result.Discrepancies.Add("referencia_python_no_comparable");
         }
+
+        result.Status = "processed";
     }
     catch (Exception exception)
     {
+        result.Status = "error";
         result.Error = $"{exception.GetType().Name}: {exception.Message}";
     }
 
@@ -165,7 +186,8 @@ static class ClauseSegmenterDiagnostics
         HeaderRegex.Matches(text).Select(match => match.Value.Trim()).ToArray();
 }
 
-record Manifest(string Dataset, string[] Documents);
+record Manifest(string Dataset, ManifestDocument[] Documents);
+record ManifestDocument(string Path, string Sha256);
 record ReferenceReport(string Dataset, string Runtime, DocumentReference[] Documents);
 record DocumentReference(
     string Path,
@@ -201,6 +223,7 @@ class DocumentResult
     public bool? SegmentationParity { get; set; }
     public List<string> Discrepancies { get; } = [];
     public string? Error { get; set; }
+    public string? ReferenceError { get; set; }
 }
 
 class Summary

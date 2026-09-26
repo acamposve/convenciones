@@ -77,14 +77,13 @@ CREATE TABLE usuarios (
     -- en true hasta que resetea su propia contraseña.
     requiere_reset_password     BOOLEAN NOT NULL DEFAULT true,
     ultimo_login_at             TIMESTAMPTZ,
-    created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, email)
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Postgres trata cada NULL como distinto en un UNIQUE compuesto, asi que
--- UNIQUE(tenant_id, email) de arriba NO evita emails duplicados entre usuarios de
--- Plataforma (tenant_id NULL) -- este indice parcial cubre exactamente ese caso.
-CREATE UNIQUE INDEX idx_usuarios_email_plataforma ON usuarios(email) WHERE tenant_id IS NULL;
+-- Global, no por tenant: AuthController.Login busca el usuario solo por email, sin
+-- filtrar por tenant_id, asi que el alta self-service de tenants (POST /tenants) podria
+-- crear un login ambiguo entre dos empresas distintas si el indice fuera (tenant_id, email).
+CREATE UNIQUE INDEX idx_usuarios_email ON usuarios(email);
 
 CREATE TABLE refresh_tokens (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
