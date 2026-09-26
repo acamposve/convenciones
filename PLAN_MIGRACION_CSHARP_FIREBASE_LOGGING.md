@@ -258,8 +258,9 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
     `.env.example` no son específicos del microservicio Python — se reubicaron a la raíz
     del repo en vez de eliminarse).
   - [x] Actualizar `README.md`, `docs/ARCHITECTURE.md` y `docs/constitution.md`
-    (Enmienda 2.5.0) registrando a .NET 10 como backend oficial único; Supabase sigue
-    pendiente (Fase 3.2).
+    (Enmienda 2.5.0) registrando a .NET 10 como backend oficial único; operar por default
+    contra el proyecto Supabase real (Fase 2, ya provisionado y validado) sigue pendiente
+    — el entorno local sigue apuntando a Postgres local a propósito (`docker-compose.yml`).
 
 ---
 
@@ -267,6 +268,6 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
 
 1. **Stack Unificado (✅ cumplido):** 100% de la lógica de backend (auth, negocio, ingesta, OCR, segmentación) reside en una única solución C# (.NET 10 LTS).
 2. **Cero Código Python del microservicio (✅ cumplido):** el directorio `service/` (la API FastAPI, sus tests y su Dockerfile) ya no existe en el repositorio ni en ningún entorno. Excepción deliberada: `db/seed_*.py` son scripts de bootstrap de un solo uso para desarrollo local (no un servicio en ejecución) — quedan en Python porque portarlos no aporta al objetivo de este criterio (cero *servicio* Python), no porque falte trabajo.
-3. **Cero Pérdida de Datos (pendiente):** Base de datos PostgreSQL alojada en Supabase con RLS protegiendo el multi-tenancy — sigue siendo PostgreSQL local (Fase 3.2).
+3. **Cero Pérdida de Datos (esquema/RLS validados en Fase 2, no operado por default):** el proyecto Supabase real ya tiene el esquema aplicado y RLS probado (Fase 2) y la cadena de conexión es configurable (Fase 3.2) — pero el entorno local sigue apuntando a Postgres local a propósito (`docker-compose.yml`), y el storage de documentos sigue en disco local; ninguno de los dos tiene todavía una tarea de corte en este plan.
 4. **Observabilidad Completa:** Logs estructurados JSON contextualizados en cada petición y tarea en segundo plano.
 5. **MVP sin IA:** ingesta, extracción/OCR y segmentación funcionan sin llamadas a LLM ni servicios externos de IA; la clasificación automática queda fuera del MVP.
