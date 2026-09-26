@@ -60,14 +60,14 @@ usuario elige su propia contraseña ahí mismo). `seed_admin_user.py` queda como
 desarrollo/demo — sigue siendo útil para tener un tenant con credenciales fijas y
 predecibles sin pasar por el formulario cada vez que se levanta el compose desde cero.
 
-## Servicio Python
+## Servicio Python legado
 
-El microservicio Python (`service/app/main.py`) es el pipeline legado durante la migración.
-El MVP objetivo en .NET cubre ingesta, extracción, OCR y segmentación, sin clasificación
-automática ni servicios de IA. El servicio Python **sí está containerizado** mediante
-[`service/Dockerfile`](../service/Dockerfile). Se eliminó el workflow que antes construía y
-publicaba esa imagen a Azure (`deploy-apps.yml`, Enmienda 2.3.0 de `constitution.md`) — hoy
-no hay ningún pipeline de publicación, solo el build local de abajo.
+El microservicio Python (`service/app/main.py`) queda como referencia durante la migración,
+pero desde la Fase 5.2 el frontend ya no lo consume: auth, registro, negocio, biblioteca,
+ingesta y pipeline determinista pasan por la API .NET. El MVP objetivo en .NET cubre
+ingesta, extracción, OCR y segmentación, sin clasificación automática ni servicios de IA.
+El servicio Python sigue containerizado mediante [`service/Dockerfile`](../service/Dockerfile)
+hasta completar la eliminación de código de la Fase 5.4.
 
 Para el demo local, `service/docker-compose.yml` todavía no lo levanta automáticamente.
 Puedes iniciarlo en otro terminal con Python:
@@ -100,10 +100,9 @@ compose (`5433` en tu configuración actual), por ejemplo:
 
 `postgresql://convenciones:convenciones@host.docker.internal:5433/convenciones`
 
-Es el servicio que sirve `/tenants` y `/documentos` — **la pantalla de carga y lista de
-documentos en `web/` no funciona sin este proceso corriendo**, aparte de `api/`. Tiene su
-propio CORS (`WEB_ORIGIN` en `.env`, default `http://localhost:5173`) para aceptar
-llamadas directas desde el navegador en ese origen.
+Este proceso ya no es necesario para que funcione `web/`; se conserva únicamente para
+comparaciones históricas o una ejecución explícita durante la migración. La API .NET expone
+ahora `/tenants`, `/documentos` y el resto de rutas consumidas por el frontend.
 
 La siembra de la taxonomía (`db/seed_taxonomia.py`, ~60 títulos reales de Venezuela) no se
 ejecuta desde este compose local (el workflow que antes la ejecutaba antes de sembrar el

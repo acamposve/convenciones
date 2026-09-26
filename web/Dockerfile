@@ -8,13 +8,9 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
-# Vite bakea las VITE_* en el bundle en tiempo de build, no las lee en runtime — por eso
-# deploy-apps.yml pasa estas URLs como --build-arg (resueltas desde las Container Apps ya
-# desplegadas de api/ai-service), no como env vars del contenedor de nginx.
+# Vite bakea las VITE_* en el bundle en tiempo de build, no las lee en runtime.
 ARG VITE_API_BASE_URL
-ARG VITE_DOCUMENT_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_DOCUMENT_API_BASE_URL=$VITE_DOCUMENT_API_BASE_URL
 RUN npm run build
 
 FROM nginx:alpine

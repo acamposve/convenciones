@@ -4,8 +4,7 @@ import { useAuth } from "../context/AuthContext";
 const PUEDE_CARGAR = ["AdminTenant", "Editor"]; // auth-spec.md §5
 
 // Sube por archivo o por URL contra POST /documentos (Art IV pasos 1-5, ejecutado
-// sincrono del lado del servicio Python). Espejo del formulario que antes vivia en
-// service/app/templates/index.html.
+// en segundo plano por la API .NET).
 export function DocumentUploadForm({ onUploaded }) {
   const { rol, docFetch } = useAuth();
   const [empresas, setEmpresas] = useState(null);

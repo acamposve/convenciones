@@ -25,9 +25,9 @@ export function PlataformaPage() {
   const [licenciaForm, setLicenciaForm] = useState({}); // { [tenantId]: {planLicencia, fechaVencimiento} }
   const [nuevoUsuario, setNuevoUsuario] = useState({ email: "", password: "", rol: "PlataformaSoporte" });
 
-  // Fase 8 (spec-taxonomia-por-pais.md Bloque B/D, Art II.3): a diferencia de todo lo de
-  // arriba (api/, .NET), el clonado/edicion de taxonomia vive en el servicio Python -- por
-  // eso usa docFetch, no authFetch (ver nota junto a los endpoints en service/app/main.py).
+  // Fase 8 (spec-taxonomia-por-pais.md Bloque B/D, Art II.3): estos endpoints de
+  // taxonomia tambien se consumen desde la API .NET; docFetch es un alias temporal de
+  // authFetch mientras se completa la limpieza de nombres del cliente.
   const [categorias, setCategorias] = useState([]);
   const [taxonomiaPaisId, setTaxonomiaPaisId] = useState("");
   const [taxonomiaTitulos, setTaxonomiaTitulos] = useState(null);

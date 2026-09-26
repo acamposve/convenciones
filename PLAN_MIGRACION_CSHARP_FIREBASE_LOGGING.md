@@ -242,9 +242,10 @@ En el calendario tecnológico actual (2026), .NET 8 se aproxima al fin de su sop
   - [x] Documentar tasas, discrepancias y casos que requieren ajuste en `docs/phase5-parity-report.md`.
   - [x] Excluir clasificación automática e IA de la comparación.
   - [x] Verificar paridad de extracción y segmentación contra los datos históricos; la diferencia textual localizada de PDVSA se acepta como cosmética por tratarse de un PDF histórico con glifos superpuestos.
-- [ ] **5.2. Corte de Tráfico (Cutover):**
-  - [ ] En `web/.env`, actualizar `VITE_API_URL` para que apunte exclusivamente a la API .NET 10.
-  - [ ] Eliminar `VITE_SERVICE_URL`. En este momento, **Python deja de recibir peticiones**.
+- [x] **5.2. Corte de Tráfico (Cutover):**
+  - [x] En `web/.env`, actualizar `VITE_API_BASE_URL` para que apunte exclusivamente a la API .NET 10.
+  - [x] Eliminar `VITE_DOCUMENT_API_BASE_URL`; el frontend usa una única base URL para auth, negocio y procesamiento documental.
+  - [x] Migrar el registro público y la biblioteca pública a la API .NET 10; Python deja de recibir peticiones del frontend.
 - [ ] **5.3. Apagado y Destrucción en Infraestructura (Terraform):**
   - [ ] En `infra/terraform/container_apps.tf`:
     - Eliminar el recurso `azurerm_container_app.service` (Python).

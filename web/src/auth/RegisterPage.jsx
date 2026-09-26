@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const API_BASE = import.meta.env.VITE_DOCUMENT_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5080";
 
 // Registro self-service (Fase 5, spec-plataforma.md): crea el Tenant y su primer Usuario
 // AdminTenant sin intervencion de Plataforma. Publico -- fuera de ProtectedRoute.
