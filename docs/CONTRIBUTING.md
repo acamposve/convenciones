@@ -12,8 +12,9 @@ Cualquier cambio técnico o de producto que contradiga la constitución requiere
 > **⚠️ Migración de stack (Enmienda 2.2.0/2.5.0 de la constitución):** el backend ya es
 > C#/.NET 10 unificado, según
 > [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)
-> — el microservicio Python (`service/`) se eliminó del repositorio. Falta migrar la base
-> de datos a Supabase (sigue siendo PostgreSQL local). Ver Art. V de `constitution.md`.
+> — el microservicio Python (`service/`) se eliminó del repositorio. Falta migrar a Supabase
+> en sí: base de datos (sigue siendo PostgreSQL local) y storage de documentos (sigue siendo
+> disco local). Ver Art. V de `constitution.md`.
 
 > **⚠️ Se eliminó la infraestructura de Azure** (`infra/terraform/`, los workflows de deploy):
 > el proyecto va a redesplegar a otro proveedor, todavía sin decidir. Hoy no hay ningún

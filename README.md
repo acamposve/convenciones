@@ -13,9 +13,9 @@ colectivas de trabajo mediante IA — reemplaza un SaaS PHP legado que hacía es
 > **C#/.NET 10 LTS unificado** — el microservicio Python (`service/`) se eliminó del
 > repositorio (Fase 5.2 cutover + Fase 5.4 limpieza de
 > [`PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md);
-> el nombre del archivo es heredado — el destino es Supabase, no Firebase). Falta migrar la
-> base de datos en sí a Supabase (hoy sigue siendo PostgreSQL local, Fase 5.3 original de
-> infraestructura) — ver nota de abajo.
+> el nombre del archivo es heredado — el destino es Supabase, no Firebase). Falta migrar a
+> Supabase en sí — base de datos (hoy PostgreSQL local) y storage de documentos (hoy disco
+> local), ambos Fase 3.2 del plan — ver nota de abajo.
 
 > **Se eliminó la infraestructura de Azure (Terraform, deploy a Container Apps):** el demo
 > dejó de estar desplegado en la nube — el equipo va a redesplegar a otro proveedor, todavía

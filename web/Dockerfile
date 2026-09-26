@@ -1,6 +1,6 @@
 # Build de produccion (multi-stage + nginx en :80, sirve estatico) — el deploy que lo usaba
 # (deploy-apps.yml + container_apps.tf) se retiro con Azure (Enmienda 2.3.0); sigue siendo
-# el build de produccion del contenedor una vez que se eliga el proveedor nuevo. Distinto de
+# el build de produccion del contenedor una vez que se elija el proveedor nuevo. Distinto de
 # Dockerfile.dev (vite dev server, usado por docker-compose.yml para desarrollo local con
 # hot-reload).
 FROM node:20-alpine AS build

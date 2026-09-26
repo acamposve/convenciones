@@ -6,8 +6,9 @@
 > **.NET 10 LTS** — el microservicio Python (`service/`) se eliminó del repositorio (Fase
 > 5.2 cutover + Fase 5.4 limpieza de
 > [`../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md`](../PLAN_MIGRACION_CSHARP_FIREBASE_LOGGING.md)).
-> Lo único que sigue pendiente del stack objetivo es la base de datos: hoy es PostgreSQL
-> local, todavía no Supabase (Fase 3.2 del plan).
+> Lo que sigue pendiente del stack objetivo es Supabase en sí: base de datos (hoy PostgreSQL
+> local, Fase 3.2 del plan) y storage de documentos (hoy disco local vía `Storage:Root` /
+> el volumen `api_storage` de `docker-compose.yml`, no Supabase Storage todavía).
 >
 > **Sin infraestructura en la nube (Enmienda 2.3.0):** se retiró Azure (Terraform, Container
 > Apps) — hoy no hay ningún ambiente desplegado, el proyecto corre solo local. El proveedor
@@ -52,10 +53,11 @@
     └──────────────┘        └──────────────────────────┘
 ```
 
-> Este diagrama ya es el estado real: un solo servicio .NET 10, sin "AI Service" Python
-> separado ni cola entre procesos que desacoplar (`System.Threading.Channels` en el mismo
-> contenedor). Lo único que falta del stack objetivo es la base de datos — sigue siendo
-> PostgreSQL local, no Supabase todavía (ver nota de migración arriba).
+> Este diagrama ya es el estado real en cuanto al servicio: un solo servicio .NET 10, sin
+> "AI Service" Python separado ni cola entre procesos que desacoplar
+> (`System.Threading.Channels` en el mismo contenedor). Lo que sigue objetivo, no
+> desplegado, son los dos recuadros de abajo — "Docs PDF" es hoy disco local, no Supabase
+> Storage, y "PostgreSQL 16" es local, no Supabase (ver nota de migración arriba).
 
 ## Flujo de procesamiento (MVP Demo sin IA)
 
@@ -80,7 +82,9 @@
 > Flujo real hoy: stack unificado en .NET 10, sin microservicio Python que ejecute esto
 > aparte. Los pasos conceptuales (extracción → segmentación → clasificación) son los mismos
 > que en el diseño original en Python; solo cambió el runtime y el mecanismo de background
-> entre pasos (`Channel` + `BackgroundService` en vez de `BackgroundTasks` de FastAPI).
+> entre pasos (`Channel` + `BackgroundService` en vez de `BackgroundTasks` de FastAPI). El
+> paso 2 ("guarda en Supabase Storage") sigue objetivo, no desplegado — hoy guarda en disco
+> local (ver nota de migración arriba); el paso 5 sí es real (Postgres local).
 
 ## Entidades de datos (simplificado)
 
@@ -116,7 +120,7 @@ repositorio.
 | API + procesamiento | C# / .NET 10 LTS, servicio único — **ya aplicado** | API en .NET 8 + servicio Python/FastAPI separado | Un solo runtime que mantener y desplegar; el MVP procesa documentos sin IA |
 | Clasificación IA | Fuera del MVP; queda diferida | Claude (API) directo desde Python | Se requiere una decisión posterior de alcance, proveedor y validación |
 | Base de datos | Supabase (PostgreSQL 16 + RLS) — **pendiente** (hoy PostgreSQL local, Fase 3.2) | PostgreSQL (Azure Flexible Server autoadministrado) | RLS nativo refuerza aislamiento por tenant; Auth/Storage integrados; menos infraestructura propia que operar |
-| Storage | Supabase Storage | Azure Blob | Documentos encriptados en reposo, con RLS unificado a la política de datos |
+| Storage | Supabase Storage — **pendiente** (hoy disco local, `Storage:Root`/volumen `api_storage`) | Azure Blob | Documentos encriptados en reposo, con RLS unificado a la política de datos |
 | Cola | `System.Threading.Channels` en proceso | Service Bus / RabbitMQ | Suficiente para el volumen actual; ya no hay dos procesos que desacoplar |
 | Frontend | React + Vite | React + Vite | Sin cambio |
 | Auth | Supabase Auth + SSO (Fase 2) | OIDC + SSO (Fase 2) | Autenticación y base de datos bajo el mismo proveedor |
@@ -146,7 +150,7 @@ que no hace falta reescribirlos para el proveedor nuevo, solo definir dónde cor
 ---
 
 **Stack objetivo MVP: .NET 10 LTS (API + procesamiento determinista) · React/Vite · Supabase (PostgreSQL + RLS) · proveedor de deploy sin decidir**
-**Stack desplegado hoy: .NET 10 LTS unificado (API + procesamiento determinista, ya sin microservicio Python) · React/Vite · PostgreSQL local — sin ambiente en la nube, Supabase todavía pendiente**
+**Stack desplegado hoy: .NET 10 LTS unificado (API + procesamiento determinista, ya sin microservicio Python) · React/Vite · PostgreSQL local + disco local para documentos — sin ambiente en la nube, Supabase (base de datos y storage) todavía pendiente**
 
 Justificación detallada de cada decisión y del plan de transición en
 [`constitution.md`](constitution.md) Art. V y en
