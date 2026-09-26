@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-const DOCUMENT_API_BASE = import.meta.env.VITE_DOCUMENT_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5080";
 
 // Art VI.7 / spec-biblioteca-publica.md: unica pagina del producto sin sesion -- directorio
-// de solo lectura de documentos publicos de TODOS los tenants. No usa docFetch (no hay JWT
+// de solo lectura de documentos publicos de TODOS los tenants. No usa authFetch (no hay JWT
 // que adjuntar) ni AuthContext. Nunca muestra clausulas ni de que tenant es cada empresa,
 // solo el nombre de la empresa y el link al documento original.
 export function BibliotecaPage() {
@@ -16,7 +16,7 @@ export function BibliotecaPage() {
     setError(null);
     const params = new URLSearchParams();
     if (empresaQuery) params.set("empresa", empresaQuery);
-    fetch(`${DOCUMENT_API_BASE}/biblioteca?${params.toString()}`)
+    fetch(`${API_BASE}/biblioteca?${params.toString()}`)
       .then((res) => {
         if (!res.ok) throw new Error("No se pudo cargar la biblioteca.");
         return res.json();

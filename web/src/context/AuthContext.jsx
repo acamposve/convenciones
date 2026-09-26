@@ -3,7 +3,6 @@ import { createContext, useContext, useState, useCallback } from "react";
 const AuthContext = createContext(null);
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5080";
-const DOCUMENT_API_BASE = import.meta.env.VITE_DOCUMENT_API_BASE_URL ?? "http://localhost:8000";
 
 // api/Services/TokenService.cs emite el rol con `new Claim(ClaimTypes.Role, ...)`, y eso
 // se serializa en el JWT con esta URI larga — NO como "role" a secas. Leerlo como
@@ -82,19 +81,9 @@ export function AuthProvider({ children }) {
     [accessToken]
   );
 
-  // Mismo patron que authFetch, pero contra el servicio Python de ingesta/clasificacion
-  // (Art IV pasos 1-5) — es un microservicio separado (Art V), con su propio origen.
-  const docFetch = useCallback(
-    (path, options = {}) =>
-      fetch(`${DOCUMENT_API_BASE}${path}`, {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: accessToken ? `Bearer ${accessToken}` : "",
-        },
-      }),
-    [accessToken]
-  );
+  // Alias temporal para conservar la API de los componentes durante el cutover.
+  // Todos los endpoints, incluido el pipeline documental, viven ahora en .NET.
+  const docFetch = authFetch;
 
   return (
     <AuthContext.Provider

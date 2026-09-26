@@ -1,5 +1,6 @@
 using DocumentFormat.OpenXml.Packaging;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace Comparador.Api.Services;
 
@@ -36,7 +37,8 @@ public sealed class DocumentTextExtractor
     {
         using var stream = new MemoryStream(content);
         using var document = PdfDocument.Open(stream);
-        var text = string.Join("\n", document.GetPages().Select(page => page.Text));
+        var text = string.Join("\n", document.GetPages()
+            .Select(page => ContentOrderTextExtractor.GetText(page, true)));
 
         if (text.Trim().Length < document.NumberOfPages * 20)
         {

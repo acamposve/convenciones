@@ -85,14 +85,13 @@ public class ComparadorDbContext : DbContext
             .WithMany()
             .HasForeignKey(t => t.PaisId);
 
-        modelBuilder.Entity<Usuario>()
-            .HasIndex(u => new { u.TenantId, u.Email })
-            .IsUnique();
+        // Único global, no por tenant: AuthController.Login busca por email solo, sin
+        // filtrar por tenant_id (docs/spec-plataforma.md §2), así que dos tenants con el
+        // mismo email harían el login ambiguo si el índice fuera (tenant_id, email).
         modelBuilder.Entity<Usuario>()
             .HasIndex(u => u.Email)
             .IsUnique()
-            .HasFilter("tenant_id IS NULL")
-            .HasDatabaseName("idx_usuarios_email_plataforma");
+            .HasDatabaseName("idx_usuarios_email");
 
         modelBuilder.Entity<BitacoraAcceso>()
             .HasOne(ba => ba.Usuario)
@@ -111,6 +110,12 @@ public class ComparadorDbContext : DbContext
             .HasOne(tt => tt.Pais)
             .WithMany()
             .HasForeignKey(tt => tt.PaisId);
+        // id no es SERIAL (schema.sql): son ids del dump legado o de
+        // taxonomia_titulos_clon_seq, siempre asignados por la app -- nunca por un default
+        // de la columna, así que EF nunca debe pedirle un valor a la base.
+        modelBuilder.Entity<TaxonomiaTitulo>()
+            .Property(tt => tt.Id)
+            .ValueGeneratedNever();
 
         modelBuilder.Entity<Ley>()
             .HasOne(l => l.Pais)

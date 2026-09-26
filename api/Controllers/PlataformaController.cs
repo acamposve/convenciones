@@ -139,10 +139,12 @@ public class PlataformaController : ControllerBase
             return BadRequest(new { message = "Rol inválido para un usuario de Plataforma." });
         }
 
-        var yaExiste = await _db.Usuarios.AnyAsync(u => u.TenantId == null && u.Email == req.Email);
+        // El email es único globalmente (todo usuario, con o sin tenant, ComparadorDbContext),
+        // porque AuthController.Login busca solo por email sin filtrar por tenant_id.
+        var yaExiste = await _db.Usuarios.AnyAsync(u => u.Email == req.Email);
         if (yaExiste)
         {
-            return Conflict(new { message = "Ya existe un usuario de Plataforma con ese email." });
+            return Conflict(new { message = "Ya existe una cuenta con ese email." });
         }
 
         _db.Usuarios.Add(new Usuario
@@ -157,7 +159,16 @@ public class PlataformaController : ControllerBase
             // registro self-service donde el usuario elige su propia contraseña.
             RequiereResetPassword = true,
         });
-        await _db.SaveChangesAsync();
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { message = "Ya existe una cuenta con ese email." });
+        }
+
         return Created(string.Empty, new { message = "Usuario de Plataforma creado." });
     }
 }

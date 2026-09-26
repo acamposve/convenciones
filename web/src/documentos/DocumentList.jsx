@@ -15,9 +15,9 @@ export function DocumentList({ reloadToken }) {
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0);
 
-  // El pipeline corre en segundo plano del lado del servicio Python (POST /documentos
-  // responde 201 enseguida), asi que el estado avanza solo. Se refresca mientras haya
-  // algun documento en vuelo y se corta al terminar — sin recargar la pagina a mano.
+  // El pipeline corre en segundo plano dentro de la API .NET (POST /documentos responde
+  // 201 enseguida), asi que el estado avanza solo. Se refresca mientras haya algun
+  // documento en vuelo y se corta al terminar — sin recargar la pagina a mano.
   const enProceso = documentos?.some((d) => !ESTADOS_FINALES.includes(d.estado)) ?? false;
 
   useEffect(() => {

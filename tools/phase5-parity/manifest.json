@@ -1,0 +1,26 @@
+{
+  "dataset": "legacy-contracts-v1",
+  "description": "Lote fijo de cinco convenciones contractuales venezolanas del repositorio legacy. sha256 fija el contenido esperado de cada documento (versionado aquí, no en artifacts/ que está en .gitignore) para que un PDF histórico modificado sin cambiar de ruta se detecte en vez de compararse en silencio.",
+  "documents": [
+    {
+      "path": "legacy/admin/modulos/contratos/contratos/documentos/82/ferrominera[1].pdf",
+      "sha256": "d3ac56f99509cdc35d2aef876228830390e2204c21e9c2e4cbc99150e7abdafd"
+    },
+    {
+      "path": "legacy/admin/modulos/contratos/contratos/documentos/8/convencion_colectiva PDVSA_PETROLEO_2007-2009[1].pdf",
+      "sha256": "c2c4d90e3d0b44bbdf3530862a409231f05be5c9ab193f39c790923134f0a972"
+    },
+    {
+      "path": "legacy/admin/modulos/contratos/contratos/documentos/83/Contrato de C.A.N.T.V.[1].pdf",
+      "sha256": "d9bf31b0006777298313d7d9ea46a0307cfa96614c95446ca337f8b914ac1a17"
+    },
+    {
+      "path": "legacy/admin/modulos/contratos/contratos/documentos/99/TELARES PALO GRANDE.pdf",
+      "sha256": "4a3c83cb1ae6de1780fb6558f1750941e4d8d8a086ea85b8055d21c4eca9052f"
+    },
+    {
+      "path": "legacy/admin/modulos/contratos/contratos/documentos/103/Banco Mercantil 2010 - 2012.pdf",
+      "sha256": "aeeb1c186b742e64431f874e90b88972ce944702c89d57d94d54a58d626a4265"
+    }
+  ]
+}
