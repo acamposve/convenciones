@@ -24,6 +24,11 @@ public static class AuthorizationPolicies
     public const string PuedeActivarPaisGlobal = "PuedeActivarPaisGlobal";
     public const string PuedeCrearUsuarioPlataforma = "PuedeCrearUsuarioPlataforma";
 
+    // Fase 8 (spec-taxonomia-por-pais.md §3.3): clonar/crear/editar/activar titulos es
+    // exclusivo de PlataformaAdmin, igual que require_plataforma_role(request, "PlataformaAdmin")
+    // en el servicio Python que este controller reemplaza.
+    public const string PuedeGestionarTaxonomia = "PuedeGestionarTaxonomia";
+
     public static void Configurar(AuthorizationOptions options)
     {
         options.AddPolicy(PuedeAprobarClausula, p =>
@@ -57,6 +62,9 @@ public static class AuthorizationPolicies
             p.RequireRole("PlataformaAdmin"));
 
         options.AddPolicy(PuedeCrearUsuarioPlataforma, p =>
+            p.RequireRole("PlataformaAdmin"));
+
+        options.AddPolicy(PuedeGestionarTaxonomia, p =>
             p.RequireRole("PlataformaAdmin"));
     }
 }

@@ -110,6 +110,12 @@ public class ComparadorDbContext : DbContext
             .HasOne(tt => tt.Pais)
             .WithMany()
             .HasForeignKey(tt => tt.PaisId);
+        // id no es SERIAL (schema.sql): son ids del dump legado o de
+        // taxonomia_titulos_clon_seq, siempre asignados por la app -- nunca por un default
+        // de la columna, así que EF nunca debe pedirle un valor a la base.
+        modelBuilder.Entity<TaxonomiaTitulo>()
+            .Property(tt => tt.Id)
+            .ValueGeneratedNever();
 
         modelBuilder.Entity<Ley>()
             .HasOne(l => l.Pais)
